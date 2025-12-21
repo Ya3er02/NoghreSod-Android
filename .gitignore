@@ -63,7 +63,24 @@ package-lock.json
 .env
 .env.local
 
+# API Keys and Secrets
+local.properties
+*.keystore
+*.jks
+
+# Generated
+**/BuildConfig.kt
+app/google-services.json
+
+# Coverage
+*.exec
+*.ec
+
+# Paparazzi
+**/snapshots/
+
 # IDE
+.vscode/
 *.swp
 *.swo
 *~
