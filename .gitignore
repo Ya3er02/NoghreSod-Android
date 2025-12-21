@@ -1,0 +1,70 @@
+# Gradle files
+.gradle/
+build/
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Log/OS Files
+*.log
+.DS_Store
+
+# Android Studio generated files and folders
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Android Studio/IntelliJ
+*.iml
+*.iws
+*.ipr
+.idea/
+captures/
+.externalNativeBuild
+.cxx/
+
+# Keystore files
+*.jks
+*.keystore
+*.p12
+
+# Google Services (e.g. APIs or Firebase)
+google-services.json
+
+# Freeline
+freeline.py
+freeline/
+freelineλ.py
+
+# FastBuild
+fastbuild/
+
+# Gradle
+.gradle
+gradle-wrapper.jar
+gradle-wrapper.properties
+
+# Python
+*.py
+
+# Node
+node_modules/
+package-lock.json
+
+# Environment files
+.env
+.env.local
+
+# IDE
+*.swp
+*.swo
+*~
+.DS_Store
