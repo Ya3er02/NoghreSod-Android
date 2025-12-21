@@ -40,7 +40,7 @@ securityCrypto = "1.1.0-alpha06"
 sqlcipher = "4.5.4"
 
 # Image Loading
-coil = "2.5.0"
+coil = "2.7.0"
 
 # Testing
 junit = "4.13.2"
