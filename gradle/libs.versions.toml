@@ -9,7 +9,7 @@ androidxAppCompat = "1.7.0"
 androidxMultidex = "2.0.1"
 
 # Compose
-jetpackCompose = "1.7.5"
+jetpackCompose = "1.10.0"
 material3 = "1.2.1"
 activityCompose = "1.8.1"
 navigationCompose = "2.8.0"
