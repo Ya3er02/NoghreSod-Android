@@ -23,7 +23,7 @@ abstract class UseCase<in P, out R>(private val dispatcher: CoroutineDispatcher)
     suspend operator fun invoke(params: P): Result<R> = withContext(dispatcher) {
         try {
             Result.Success(execute(params))
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Result.Error(e)
         }
     }
@@ -50,7 +50,7 @@ abstract class FlowUseCase<in P, out R>(private val dispatcher: CoroutineDispatc
      * Automatically catches exceptions and emits Result.Error.
      */
     operator fun invoke(params: P): Flow<Result<R>> = execute(params)
-        .catch { emit(Result.Error(it as Exception)) }
+        .catch { emit(Result.Error(it)) }
         .flowOn(dispatcher)
     
     /**
@@ -73,7 +73,7 @@ abstract class NoParamsUseCase<out R>(private val dispatcher: CoroutineDispatche
     suspend operator fun invoke(): Result<R> = withContext(dispatcher) {
         try {
             Result.Success(execute())
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Result.Error(e)
         }
     }
