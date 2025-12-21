@@ -1,5 +1,5 @@
 plugins {
-    id("org.jetbrains.dokka") version "1.9.10"
+    id("org.jetbrains.dokka") version "2.1.0"
 }
 
 tasks.dokkaHtml.configure {
