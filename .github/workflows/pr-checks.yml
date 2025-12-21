@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Lint Check
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Unit Tests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Build Debug APK
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Security Checks
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           
