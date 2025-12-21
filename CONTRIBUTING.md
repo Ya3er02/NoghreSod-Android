@@ -1,160 +1,361 @@
 # Contributing to NoghreSod Android
 
-First off, thank you for considering contributing to the NoghreSod Android application! It's people like you that make this application such a great tool.
+Thank you for your interest in contributing to the NoghreSod jewelry e-commerce app! We appreciate your efforts to make this project better.
 
-## Code of Conduct
+## Table of Contents
 
-This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code.
+- [Development Setup](#development-setup)
+- [Code Style](#code-style)
+- [Commit Messages](#commit-messages)
+- [Pull Request Process](#pull-request-process)
+- [Testing Requirements](#testing-requirements)
+- [Code of Conduct](#code-of-conduct)
 
-## How Can I Contribute?
-
-### Reporting Bugs
-
-Before creating bug reports, please check the issue list as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
-
-* **Use a clear and descriptive title**
-* **Describe the exact steps which reproduce the problem**
-* **Provide specific examples to demonstrate the steps**
-* **Describe the behavior you observed after following the steps**
-* **Explain which behavior you expected to see instead and why**
-* **Include screenshots and animated GIFs if possible**
-* **Include your environment details** (device, Android version, app version)
-
-### Suggesting Enhancements
-
-Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please include:
-
-* **Use a clear and descriptive title**
-* **Provide a step-by-step description of the suggested enhancement**
-* **Provide specific examples to demonstrate the steps**
-* **Describe the current behavior and expected behavior**
-* **Explain why this enhancement would be useful**
-
-### Pull Requests
-
-* Fill in the required template
-* Follow the Kotlin style guide
-* Include appropriate test cases
-* Update documentation as needed
-* End all files with a newline
+---
 
 ## Development Setup
 
-1. Fork and clone the repository
-2. Follow [SETUP.md](SETUP.md) for development environment setup
-3. Create a new branch for your feature: `git checkout -b feature/my-feature`
-4. Make your changes
-5. Test your changes thoroughly
-6. Commit with clear messages: `git commit -m "[FEATURE] Add my feature"`
-7. Push to your fork: `git push origin feature/my-feature`
-8. Open a Pull Request
+### Prerequisites
 
-## Commit Messages
+- **Android Studio:** Hedgehog (2023.1.1) or later
+- **JDK:** Version 17 or later
+- **Android SDK:** API 34 (Android 14)
+- **Gradle:** 8.0+
 
-Use clear and descriptive commit messages:
+### Initial Setup
 
-```
-[TYPE] Brief description
+1. **Fork and Clone**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/NoghreSod-Android.git
+   cd NoghreSod-Android
+   ```
 
-Detailed explanation of the change (optional)
+2. **Configure Local Properties**
+   ```bash
+   cp local.properties.example local.properties
+   # Edit local.properties with your API credentials
+   ```
 
-Types: FEATURE, FIX, REFACTOR, DOCS, STYLE, TEST
-```
+3. **Sync Gradle**
+   ```bash
+   ./gradlew clean build
+   ```
 
-Examples:
-- `[FEATURE] Add product search functionality`
-- `[FIX] Fix login validation bug`
-- `[DOCS] Update README with API configuration`
+4. **Verify Setup**
+   ```bash
+   ./gradlew test
+   ```
+
+---
 
 ## Code Style
 
-### Kotlin
+### Kotlin Guidelines
 
-* Follow [Kotlin conventions](https://kotlinlang.org/docs/coding-conventions.html)
-* Use meaningful variable names
-* Keep functions small and focused
-* Use data classes for DTOs
-* Prefer immutable variables (val over var)
+We follow [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html) and [Google's Android Kotlin Style Guide](https://developer.android.com/kotlin/style-guide).
 
-### Composables
+#### Key Rules
 
-* Use `@Composable` annotation
-* Keep composables focused on single responsibility
-* Use modifier as parameter (last position)
-* Provide preview with `@Preview`
+- **Naming:** Use meaningful, descriptive names
+  ```kotlin
+  // ✅ Good
+  val isProductAvailable = true
+  fun fetchProductDetails(productId: String)
+  
+  // ❌ Bad
+  val a = true
+  fun getProduct(p: String)
+  ```
 
-### Comments
+- **Functions:** Keep them small and focused
+  ```kotlin
+  // ✅ Good - Single responsibility
+  fun calculateDiscount(price: Double): Double {
+      return price * 0.1
+  }
+  
+  // ❌ Bad - Does multiple things
+  fun processOrder(price: Double, tax: Double): Pair<Double, String> {
+      val discount = price * 0.1
+      val total = price + tax - discount
+      return Pair(total, formatCurrency(total))
+  }
+  ```
 
-* Add comments for complex logic
-* Use KDoc for public APIs
-* Avoid obvious comments
+- **Documentation:** Write KDoc for public APIs
+  ```kotlin
+  /**
+   * Fetches products from the remote API.
+   *
+   * @param category Optional category filter
+   * @param sortBy Sort order ("price", "rating", "newest")
+   * @return Flow of Result containing product list
+   *
+   * Example:
+   * ```
+   * getProductsUseCase(params).collect { result ->
+   *     result.onSuccess { products -> updateUI(products) }
+   * }
+   * ```
+   */
+  class GetProductsUseCase : UseCase<GetProductsParams, List<Product>>(ioDispatcher) {
+      // ...
+  }
+  ```
 
-## Testing
+- **Class Organization:** Follow standard structure
+  ```kotlin
+  class UserViewModel @Inject constructor(
+      private val getUserUseCase: GetUserUseCase
+  ) : ViewModel() {
+      // 1. Properties
+      private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
+      val uiState = _uiState.asStateFlow()
 
-Please include tests for your changes:
+      // 2. Initialization
+      init { loadUser() }
+
+      // 3. Public methods
+      fun retry() { loadUser() }
+
+      // 4. Private methods
+      private fun loadUser() { /* ... */ }
+  }
+  ```
+
+### Format Configuration
+
+Use the provided `.editorconfig`:
+
+```ini
+[*.kt]
+indent_size = 4
+max_line_length = 120
+```
+
+### IDE Configuration
+
+In Android Studio:
+1. File → Settings → Editor → Code Style → Kotlin
+2. Import scheme from: [Google Android Kotlin Style Guide](https://developer.android.com/kotlin/style-guide)
+3. Enable "Hard wrap at": 120 characters
+
+---
+
+## Commit Messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+### Commit Types
+
+- **feat:** New feature
+- **fix:** Bug fix
+- **docs:** Documentation changes
+- **style:** Code style changes (formatting, missing semicolons, etc.)
+- **refactor:** Code refactoring without behavior change
+- **perf:** Performance improvements
+- **test:** Adding or updating tests
+- **build:** Build system or dependency changes
+- **ci:** CI/CD configuration changes
+- **chore:** Maintenance tasks
+
+### Examples
+
+```bash
+# ✅ Good
+git commit -m "feat(cart): add product quantity adjustment"
+git commit -m "fix(payment): handle network timeout during checkout"
+git commit -m "docs(readme): add setup instructions"
+git commit -m "refactor(domain): simplify Result sealed class"
+git commit -m "perf(image): optimize image caching strategy"
+
+# ❌ Bad
+git commit -m "fixed stuff"
+git commit -m "Updated code"
+git commit -m "Changes"
+```
+
+### Commit Body Template
+
+```
+feat(feature-name): brief description
+
+Detailed explanation of what changed and why.
+Include any relevant context or motivation.
+
+Fixes #issue_number
+Breaking change: No
+```
+
+---
+
+## Pull Request Process
+
+### Before Creating PR
+
+1. **Create Feature Branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make Changes** following code style guidelines
+
+3. **Local Testing**
+   ```bash
+   ./gradlew clean build
+   ./gradlew test
+   ./gradlew lint
+   ```
+
+4. **Commit Changes** with conventional messages
+
+5. **Push to Fork**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Creating the PR
+
+1. Go to GitHub and create a Pull Request
+2. Use the PR template (auto-populated)
+3. Fill all sections:
+   - **Description:** Clear overview of changes
+   - **Type:** Select one or more
+   - **Related Issues:** Link any related issues
+   - **Changes:** Bullet list of modifications
+   - **Screenshots:** Visual changes if applicable
+
+4. Complete the **Checklist**
+
+### PR Requirements
+
+Before approval, all of the following must be met:
+
+- ✅ All automated checks pass (CI/CD)
+- ✅ Code review approved
+- ✅ Tests included and passing
+- ✅ Documentation updated
+- ✅ No merge conflicts
+- ✅ PR description is clear
+- ✅ Commits follow conventional format
+
+---
+
+## Testing Requirements
+
+### Unit Tests
+
+Write unit tests for all business logic:
 
 ```kotlin
-class MyViewModelTest {
-    @Test
-    fun testLoginSuccess() {
-        // Arrange
-        // Act
-        // Assert
+@Test
+fun `Result Success should return data`() {
+    val result = Result.Success("test")
+    assertTrue(result.isSuccess)
+    assertEquals("test", result.getOrNull())
+}
+
+@Test
+`fun validateEmail returns Valid for correct email`() {
+    val result = InputValidators.validateEmail("test@example.com")
+    assertEquals(ValidationResult.Valid, result)
+}
+```
+
+### Integration Tests
+
+Test repository and data layer interactions:
+
+```kotlin
+@Test
+fun `getUserProfile fetches from database when cached`() = runTest {
+    // Setup
+    val userId = "123"
+    val user = User(id = userId, name = "Test")
+    
+    // Act
+    repository.cacheUser(user)
+    val result = repository.getUserProfile(userId)
+    
+    // Assert
+    assertTrue(result.isSuccess)
+    assertEquals(user, result.getOrNull())
+}
+```
+
+### Screenshot Tests
+
+For UI changes, add Paparazzi screenshot tests:
+
+```kotlin
+@Test
+fun errorView_noInternet() {
+    paparazzi.snapshot {
+        ErrorView(
+            error = NetworkException.NoInternetException(),
+            onRetry = {}
+        )
     }
 }
 ```
 
-Run tests before submitting:
+### Test Coverage
+
+Maintain minimum 80% code coverage:
 
 ```bash
-./gradlew test
+./gradlew jacocoTestReport
+# View report: app/build/reports/jacoco/index.html
 ```
 
-## Documentation
+---
 
-Update documentation if your change affects:
+## Code of Conduct
 
-- User-facing features
-- API usage
-- Architecture
-- Setup process
+### Be Respectful
 
-## Performance
+- Treat all contributors with respect
+- Use inclusive language
+- Be open to feedback and different perspectives
 
-- Minimize recompositions in Compose
-- Use `remember` for expensive computations
-- Profile with Android Profiler before submitting
-- Avoid blocking operations on main thread
+### Be Professional
 
-## Review Process
+- Avoid offensive or discriminatory language
+- Keep discussions focused on the project
+- Maintain a positive and constructive tone
 
-When you submit a pull request:
+### Be Collaborative
 
-1. One or more maintainers will review your code
-2. We may suggest changes or improvements
-3. Tests must pass before merging
-4. Code must follow style guidelines
-5. Documentation must be updated
+- Help other contributors
+- Share knowledge and expertise
+- Acknowledge contributions from others
 
-## Additional Notes
+---
 
-### Issue Labels
+## Getting Help
 
-* `bug` - Something isn't working
-* `enhancement` - New feature or request
-* `documentation` - Improvements or additions to documentation
-* `good first issue` - Good for newcomers
-* `help wanted` - Extra attention is needed
+- **Questions:** Check existing issues and documentation first
+- **Setup Issues:** See [IMPLEMENTATION_QUICK_START.md](IMPLEMENTATION_QUICK_START.md)
+- **Code Questions:** Ask in relevant PR or issue
+- **Architecture Questions:** Refer to [IMPROVEMENTS_PART_1.md](IMPROVEMENTS_PART_1.md)
 
-### Project Structure
+---
 
-- Respect the existing architecture
-- Don't move files without discussion
-- Keep dependencies minimal
-- Test before submitting
+## Recognition
 
-## Questions?
+Contributors are recognized in:
+- GitHub contributor graph
+- Release notes
+- Project documentation
 
-Feel free to open an issue for questions or discussions!
+---
 
-Thank you for contributing! 🎉
+**Thank you for contributing to NoghreSod! 🙏**
