@@ -1,103 +1,123 @@
 package com.noghre.sod.data.remote
 
-import retrofit2.http.*
-import kotlinx.serialization.Serializable
+from retrofit2.http.*
+import com.noghre.sod.data.dto.ApiResponse
+import com.noghre.sod.data.dto.PaginatedResponse
+import com.noghre.sod.data.dto.ProductDto
+import com.noghre.sod.data.dto.OrderDto
+import com.noghre.sod.data.model.User
 
-@Serializable
-data class ProductDto(
-    val id: String,
-    val title: String,
-    val description: String,
-    val price: Double,
-    val image: String,
-    val category: String,
-    val rating: Double,
-    val reviews: Int
-)
-
-@Serializable
-data class UserDto(
-    val id: String,
-    val name: String,
-    val email: String,
-    val phone: String,
-    val avatar: String?
-)
-
-@Serializable
-data class AuthRequest(
-    val email: String,
-    val password: String
-)
-
-@Serializable
-data class AuthResponse(
-    val token: String,
-    val user: UserDto
-)
-
+/**
+ * Retrofit API service interface for NoghreSod Marketplace.
+ */
 interface ApiService {
-    // Auth
-    @POST("api/v1/auth/login")
-    suspend fun login(@Body request: AuthRequest): AuthResponse
 
-    @POST("api/v1/auth/register")
-    suspend fun register(@Body request: AuthRequest): AuthResponse
-
-    @POST("api/v1/auth/logout")
-    suspend fun logout()
-
-    // Products
-    @GET("api/v1/products")
+    // ===== Products =====
+    @GET("products")
     suspend fun getProducts(
         @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20,
+        @Query("pageSize") pageSize: Int = 20,
         @Query("category") category: String? = null
-    ): List<ProductDto>
+    ): ApiResponse<PaginatedResponse<ProductDto>>
 
-    @GET("api/v1/products/{id}")
-    suspend fun getProduct(@Path("id") id: String): ProductDto
+    @GET("products/{id}")
+    suspend fun getProductById(@Path("id") id: String): ApiResponse<ProductDto>
 
-    @GET("api/v1/products/search")
-    suspend fun searchProducts(@Query("q") query: String): List<ProductDto>
+    @GET("products/search")
+    suspend fun searchProducts(
+        @Query("q") query: String,
+        @Query("page") page: Int = 1
+    ): ApiResponse<PaginatedResponse<ProductDto>>
 
-    // User Profile
-    @GET("api/v1/users/profile")
-    suspend fun getUserProfile(): UserDto
+    @GET("categories")
+    suspend fun getCategories(): ApiResponse<List<String>>
 
-    @PUT("api/v1/users/profile")
-    suspend fun updateUserProfile(@Body user: UserDto): UserDto
+    // ===== Cart =====
+    @GET("cart")
+    suspend fun getCart(): ApiResponse<List<ProductDto>>
 
-    // Orders
-    @GET("api/v1/orders")
-    suspend fun getOrders(): List<OrderDto>
+    @POST("cart/add")
+    suspend fun addToCart(
+        @Body request: AddToCartRequest
+    ): ApiResponse<String>
 
-    @POST("api/v1/orders")
-    suspend fun createOrder(@Body order: CreateOrderRequest): OrderDto
+    @POST("cart/remove/{productId}")
+    suspend fun removeFromCart(@Path("productId") productId: String): ApiResponse<String>
 
-    @GET("api/v1/orders/{id}")
-    suspend fun getOrder(@Path("id") id: String): OrderDto
+    @POST("cart/update/{productId}")
+    suspend fun updateCartItem(
+        @Path("productId") productId: String,
+        @Body request: UpdateCartRequest
+    ): ApiResponse<String>
+
+    @POST("cart/clear")
+    suspend fun clearCart(): ApiResponse<String>
+
+    // ===== Orders =====
+    @GET("orders")
+    suspend fun getOrders(
+        @Query("page") page: Int = 1
+    ): ApiResponse<PaginatedResponse<OrderDto>>
+
+    @GET("orders/{id}")
+    suspend fun getOrderById(@Path("id") id: String): ApiResponse<OrderDto>
+
+    @POST("orders/create")
+    suspend fun createOrder(
+        @Body request: CreateOrderRequest
+    ): ApiResponse<OrderDto>
+
+    @POST("orders/{id}/cancel")
+    suspend fun cancelOrder(@Path("id") id: String): ApiResponse<String>
+
+    // ===== User Profile =====
+    @GET("user/profile")
+    suspend fun getUserProfile(): ApiResponse<User>
+
+    @PUT("user/profile")
+    suspend fun updateUserProfile(
+        @Body request: UpdateUserRequest
+    ): ApiResponse<User>
+
+    @GET("user/wishlist")
+    suspend fun getWishlist(): ApiResponse<List<ProductDto>>
+
+    @POST("user/wishlist/add")
+    suspend fun addToWishlist(@Body request: WishlistRequest): ApiResponse<String>
+
+    @POST("user/wishlist/remove")
+    suspend fun removeFromWishlist(@Body request: WishlistRequest): ApiResponse<String>
 }
 
-@Serializable
-data class OrderDto(
-    val id: String,
-    val userId: String,
-    val items: List<OrderItem>,
-    val total: Double,
-    val status: String,
-    val createdAt: String
-)
-
-@Serializable
-data class OrderItem(
+// Request models
+data class AddToCartRequest(
     val productId: String,
-    val quantity: Int,
-    val price: Double
+    val quantity: Int
 )
 
-@Serializable
+data class UpdateCartRequest(
+    val quantity: Int
+)
+
 data class CreateOrderRequest(
-    val items: List<OrderItem>,
-    val shippingAddress: String
+    val items: List<OrderItemRequest>,
+    val shippingAddress: String,
+    val paymentMethodId: String
+)
+
+data class OrderItemRequest(
+    val productId: String,
+    val quantity: Int
+)
+
+data class UpdateUserRequest(
+    val name: String? = null,
+    val email: String? = null,
+    val phone: String? = null,
+    val bio: String? = null,
+    val profileImageUrl: String? = null
+)
+
+data class WishlistRequest(
+    val productId: String
 )
