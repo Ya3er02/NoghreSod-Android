@@ -2,10 +2,11 @@
 
 > Complete Android marketplace application built with Kotlin and Jetpack Compose
 
-[![Android CI/CD](https://github.com/Ya3er02/NoghreSod-Android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Ya3er02/NoghreSod-Android/actions)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg)](https://kotlinlang.org/)
-[![Compose](https://img.shields.io/badge/Jetpack%20Compose-1.6.8-brightgreen.svg)](https://developer.android.com/compose)
-[![API](https://img.shields.io/badge/API-26%2B-brightgreen.svg)](https://android-arsenal.com/api?level=26)
+[![Android CI](https://github.com/Ya3er02/NoghreSod-Android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Ya3er02/NoghreSod-Android/actions)
+[![codecov](https://codecov.io/gh/Ya3er02/NoghreSod-Android/branch/main/graph/badge.svg)](https://codecov.io/gh/Ya3er02/NoghreSod-Android)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)](https://kotlinlang.org/)
+[![Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.5-green.svg)](https://developer.android.com/compose)
+[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)]()
 
 ## Features
@@ -24,6 +25,28 @@
 - Address management
 - Payment methods
 - Order history
+
+### 🧪 Testing & Quality
+- ✅ 80%+ Code Coverage with JaCoCo
+- ✅ Screenshot Testing with Paparazzi
+- ✅ Unit Tests with MockK
+- ✅ Integration Tests
+- ✅ Automated CI/CD Pipeline
+- ✅ Firebase Test Lab Integration
+
+### 🚀 Performance
+- ⚡ Optimized Image Loading (Coil)
+- ⚡ Shimmer Loading States
+- ⚡ Memory Leak Detection (LeakCanary)
+- ⚡ Recomposition Tracking
+- ⚡ Network Connectivity Monitoring
+
+### ♿ Accessibility
+- 🌐 Full RTL Support (Persian/Arabic)
+- 🔊 Screen Reader Support
+- 📱 TalkBack Compatible
+- 🎨 Dark Mode Support
+- 🎯 Semantic Labels
 
 ### 🏗️ Technical Architecture
 - **MVVM + Clean Architecture** - Separation of concerns
@@ -64,29 +87,35 @@ git clone https://github.com/Ya3er02/NoghreSod-Android.git
 cd NoghreSod-Android
 ```
 
-2. **Open in Android Studio**
+2. **Configure local properties**
+```bash
+cp local.properties.example local.properties
+# Edit with your API credentials
+```
+
+3. **Open in Android Studio**
 - File → Open → Select project directory
 - Wait for Gradle sync
 
-3. **Build & Run**
+4. **Build & Run**
 ```bash
 ./gradlew assembleDebug
 ./gradlew installDebug
 ```
 
-4. **Run on emulator**
-- Create Android Virtual Device (AVD)
-- Select "Run → Run 'app'"
+For detailed setup instructions, see [README_SETUP.md](README_SETUP.md).
 
 ## Project Structure
 ```
 app/src/main/
 ├── kotlin/com/noghre/sod/
+│   ├── domain/         # Domain layer (entities, use cases, results)
 │   ├── data/           # Data layer (models, DAOs, repositories)
 │   ├── ui/             # UI layer (screens, components, theme)
 │   ├── viewmodel/      # MVVM ViewModels
 │   ├── di/             # Dependency injection modules
 │   ├── utils/          # Utilities and extensions
+│   ├── analytics/      # Analytics tracking
 │   ├── MainActivity.kt
 │   └── NoghreSodApp.kt
 ├── res/
@@ -103,10 +132,10 @@ app/src/main/
 - androidx.multidex:multidex:2.0.1
 
 ### Compose
-- androidx.compose.ui:ui:1.6.8
+- androidx.compose.ui:ui:1.7.5
 - androidx.compose.material3:material3:1.2.1
 - androidx.activity:activity-compose:1.8.1
-- androidx.navigation:navigation-compose:2.7.7
+- androidx.navigation:navigation-compose:2.8.0
 
 ### Networking
 - com.squareup.retrofit2:retrofit:2.11.0
@@ -125,10 +154,14 @@ app/src/main/
 - org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3
 - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3
 
+### Image Loading
+- io.coil-kt:coil-compose:2.5.0
+
 ### Testing
 - junit:junit:4.13.2
 - io.mockk:mockk:1.13.8
 - app.cash.turbine:turbine:1.0.0
+- app.cash.paparazzi:paparazzi:1.3.1
 
 ## Development Commands
 
@@ -145,14 +178,26 @@ app/src/main/
 # Run unit tests
 ./gradlew test
 
+# Run screenshot tests
+./gradlew verifyPaparazziDebug
+
+# Generate coverage report
+./gradlew jacocoTestReport
+
 # Run lint
 ./gradlew lint
 
 # Run static analysis
 ./gradlew detekt
 
+# Generate API documentation
+./gradlew dokkaHtml
+
 # Build and run on device
 ./gradlew installDebug
+
+# Run all checks
+./gradlew check
 ```
 
 ## CI/CD Pipeline
@@ -161,8 +206,19 @@ GitHub Actions automatically:
 - ✅ Builds on every push
 - ✅ Runs all tests
 - ✅ Performs lint checks
-- ✅ Generates reports
+- ✅ Validates commits (Conventional Commits)
+- ✅ Generates coverage reports
+- ✅ Scans dependencies for vulnerabilities
 - ✅ Builds debug APK
+- ✅ Updates dependencies (Dependabot)
+
+## Documentation
+
+- **[README_SETUP.md](README_SETUP.md)** - Detailed setup and troubleshooting
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines and conventions
+- **[IMPROVEMENTS_PART_1.md](IMPROVEMENTS_PART_1.md)** - Architecture and domain layer
+- **[IMPROVEMENTS_PART_2.md](IMPROVEMENTS_PART_2.md)** - Utilities and analytics
+- **[IMPLEMENTATION_QUICK_START.md](IMPLEMENTATION_QUICK_START.md)** - Quick reference guide
 
 ## Roadmap
 
@@ -171,21 +227,23 @@ GitHub Actions automatically:
 - [ ] Product recommendations
 - [ ] Seller analytics dashboard
 - [ ] Marketplace admin panel
-- [ ] Multi-language support
+- [ ] Multi-language support (currently Persian/English)
 - [ ] Offline functionality
+- [ ] Advanced search with AI suggestions
 
 ## Contributing
 
 Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md)
+2. Fork the repository
+3. Create a feature branch: `git checkout -b feature/your-feature`
+4. Follow [Conventional Commits](https://www.conventionalcommits.org/)
+5. Add tests for your changes
+6. Submit a pull request
 
 ## Troubleshooting
 
-See [SETUP.md](SETUP.md) for detailed troubleshooting guide.
+See [README_SETUP.md](README_SETUP.md) for detailed troubleshooting and [CONTRIBUTING.md](CONTRIBUTING.md) for development issues.
 
 ## License
 
@@ -194,7 +252,8 @@ Copyright © 2025 NoghreSod. All rights reserved.
 ## Contact
 
 - **GitHub**: [@Ya3er02](https://github.com/Ya3er02)
-- **Email**: your-email@example.com
+- **Project Issues**: [GitHub Issues](https://github.com/Ya3er02/NoghreSod-Android/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Ya3er02/NoghreSod-Android/discussions)
 
 ---
 
