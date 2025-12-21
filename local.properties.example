@@ -1,0 +1,17 @@
+# API Configuration
+API_BASE_URL=https://api.noghre.sod/
+API_KEY=your_api_key_here
+API_SECRET=your_secret_here
+
+# Third-party Services
+MAPBOX_TOKEN=your_mapbox_token
+FIREBASE_API_KEY=your_firebase_key
+
+# Signing Configuration
+KEYSTORE_PATH=path/to/keystore.jks
+KEYSTORE_PASSWORD=your_keystore_password
+KEY_ALIAS=release-key
+KEY_PASSWORD=your_key_password
+
+# Note: Never commit secrets to git!
+# Use local.properties for local development only
