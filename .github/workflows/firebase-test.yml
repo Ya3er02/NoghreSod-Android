@@ -1,0 +1,81 @@
+name: Firebase Test Lab Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'app/src/**'
+      - 'gradle/libs.versions.toml'
+      - 'build.gradle.kts'
+      - 'app/build.gradle.kts'
+  workflow_dispatch:
+
+jobs:
+  firebase-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission
+      run: chmod +x gradlew
+
+    - name: Build debug APK
+      run: ./gradlew assembleDebug
+      timeout-minutes: 30
+
+    - name: Build debug test APK
+      run: ./gradlew assembleDebugAndroidTest
+      timeout-minutes: 30
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.FIREBASE_TEST_CREDENTIALS }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Run tests on Firebase Test Lab
+      run: |
+        gcloud firebase test android run \
+          --app=app/build/outputs/apk/debug/app-debug.apk \
+          --test=app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+          --device=model=Pixel5,version=30,locale=en,orientation=portrait \
+          --device=model=Pixel6Pro,version=33,locale=en,orientation=portrait \
+          --device=model=NexusLowRes,version=25,locale=en,orientation=portrait \
+          --timeout=1800s \
+          --results-bucket=gs://noghre-sod-firebase-test-results \
+          --results-dir=firebase-test-${GITHUB_RUN_ID} \
+          --num-flaky-test-attempts=2
+      timeout-minutes: 35
+
+    - name: Download test results
+      if: always()
+      run: |
+        mkdir -p firebase-test-results
+        gsutil -m cp -r gs://noghre-sod-firebase-test-results/firebase-test-${GITHUB_RUN_ID}/* firebase-test-results/ || true
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: firebase-test-results
+        path: firebase-test-results/
+        retention-days: 30
+
+    - name: Publish test results
+      if: always()
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        files: firebase-test-results/**/*.xml
+        comment_mode: always
