@@ -1,296 +1,219 @@
-# Development Setup Guide
+# NoghreSod Android - Setup Guide
+
+## Overview
+This is a complete, production-ready Android application for the NoghreSod Marketplace platform built with:
+- **Language**: Kotlin
+- **UI Framework**: Jetpack Compose
+- **Architecture**: MVVM + Clean Architecture
+- **Database**: Room
+- **API**: Retrofit + OkHttp
+- **Dependency Injection**: Hilt
+- **Coroutines**: Kotlin Coroutines with Flow
 
 ## System Requirements
+- Android Studio 2023.1.1 or later
+- JDK 17+
+- Android SDK 34 (Target)
+- Minimum Android API 26 (Android 8.0)
+- Gradle 8.0+
 
-- **Android Studio**: Hedgehog (2023.1.1) or later
-- **JDK**: 17 or later
-- **Gradle**: 8.1.1 or later
-- **Android SDK**: API 34
-- **Min SDK**: API 24
-
-## Installation Steps
+## Getting Started
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/Ya3er02/NoghreSod-Android.git
 cd NoghreSod-Android
 ```
 
 ### 2. Open in Android Studio
+- Open Android Studio
+- Select "Open" and navigate to the project directory
+- Wait for Gradle sync to complete
 
+### 3. Configure BuildConfig
+Update `local.properties` with your development environment:
+```properties
+SDK_ROOT=/path/to/android/sdk
+KEYSTORE_PATH=/path/to/keystore.jks
+KEYSTORE_PASSWORD=your_keystore_password
+KEY_ALIAS=release-key
+KEY_PASSWORD=your_key_password
+```
+
+### 4. Sync Gradle
 ```bash
-android-studio .
+./gradlew clean
+./gradlew sync
 ```
 
-### 3. Configure Android SDK
-
-1. Open **File** → **Project Structure**
-2. Set SDK Location (or let Android Studio auto-detect)
-3. Download required SDK components
-
-### 4. Update API Configuration
-
-Edit `app/src/main/kotlin/com/noghre/sod/di/NetworkModule.kt`:
-
-```kotlin
-@Provides
-@Singleton
-fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit {
-    return Retrofit.Builder()
-        .baseUrl("https://your-api-domain.com/")  // ← Update this
-        .client(okHttpClient)
-        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-        .build()
-}
-```
-
-### 5. Build the Project
-
-```bash
-./gradlew clean build
-```
-
-### 6. Run on Emulator/Device
-
-**On Emulator**:
-```bash
-./gradlew installDebug
-```
-
-**On Connected Device**:
-```bash
-adb devices  # Check connected devices
-./gradlew installDebug
-```
-
-## Development Workflow
-
-### Building
-
+### 5. Build the App
 ```bash
 # Debug build
 ./gradlew assembleDebug
 
-# Release build
+# Release build (requires signing config)
 ./gradlew assembleRelease
-
-# Install and run
-./gradlew runDebug
 ```
 
-### Testing
-
+### 6. Run on Emulator/Device
 ```bash
-# Run all tests
+./gradlew installDebug
+```
+
+## Project Structure
+```
+app/src/main/
+├── kotlin/com/noghre/sod/
+│   ├── MainActivity.kt              # Entry point
+│   ├── NoghreSodApp.kt             # Application class
+│   ├── data/
+│   │   ├── model/                  # Data models (Product, Order, etc.)
+│   │   ├── dto/                    # Data Transfer Objects
+│   │   ├── local/                  # Room Database DAOs
+│   │   ├── remote/                 # Retrofit API Service
+│   │   └── repository/             # Repository pattern implementation
+│   ├── ui/
+│   │   ├── screens/                # Compose screen composables
+│   │   ├── components/             # Reusable UI components
+│   │   ├── theme/                  # Theming (colors, typography)
+│   │   └── navigation/             # Navigation graph
+│   ├── viewmodel/                  # MVVM ViewModels
+│   ├── di/                         # Hilt dependency injection modules
+│   └── utils/                      # Utility functions and extensions
+├── res/
+│   ├── values/                     # Resources (strings, colors, themes)
+│   └── xml/                        # Configuration files
+└── AndroidManifest.xml             # App manifest
+```
+
+## Key Features Implemented
+
+### Data Layer
+- ✅ Room Database for local caching
+- ✅ Retrofit for API communication
+- ✅ Repository pattern for data abstraction
+- ✅ Network interceptors for auth and logging
+
+### UI Layer
+- ✅ Jetpack Compose for modern UI
+- ✅ Material Design 3 theming
+- ✅ Responsive layouts
+- ✅ State management with Flow
+
+### Business Logic
+- ✅ MVVM architecture with ViewModels
+- ✅ Kotlin Coroutines for async operations
+- ✅ Clean Architecture principles
+
+### DevOps
+- ✅ Hilt for dependency injection
+- ✅ GitHub Actions CI/CD pipeline
+- ✅ ProGuard rules for release builds
+- ✅ Timber logging
+
+## Development Workflow
+
+### Running Tests
+```bash
+# Unit tests
 ./gradlew test
 
-# Run specific test class
-./gradlew test --tests "com.noghre.sod.presentation.viewmodel.AuthViewModelTest"
-
-# Run instrumented tests
+# Connected tests (emulator/device)
 ./gradlew connectedAndroidTest
 ```
 
-### Cleaning
-
+### Code Quality Checks
 ```bash
-# Clean build
-./gradlew clean
+# Run linter
+./gradlew lint
 
-# Clear cache
-./gradlew cleanBuildCache
+# Run detekt (Kotlin static analysis)
+./gradlew detekt
 ```
 
-## IDE Configuration
-
-### Code Style
-
-1. Install "Kotlin" plugin in Android Studio
-2. **Settings** → **Editor** → **Code Style** → **Kotlin**
-3. Choose "Kotlin Convention" or custom style
-
-### Formatter
-
+### Build Variants
 ```bash
-# Format all Kotlin files
-./gradlew ktlintFormat
-```
-
-### Linting
-
-```bash
-# Check linting issues
-./gradlew ktlint
-```
-
-## Debugging
-
-### Android Studio Debugger
-
-1. Set breakpoints by clicking on line numbers
-2. Run in debug mode:
-   ```bash
-   ./gradlew installDebug
-   ```
-3. Wait for execution to hit breakpoint
-4. Inspect variables in debugger
-
-### Logcat
-
-```bash
-# View logs
-adb logcat
-
-# Filter by tag
-adb logcat | grep "NoghreSod"
-
-# Or use in Android Studio: Logcat tab
-```
-
-### Android Profiler
-
-1. **Run** → **Attach Debugger to Android Process**
-2. Select your process
-3. Open **View** → **Tool Windows** → **Profiler**
-
-## Emulator Setup
-
-### Creating AVD
-
-1. **Tools** → **Device Manager**
-2. Click **Create Device**
-3. Select device type (Phone)
-4. Select system image (API 34 recommended)
-5. Configure settings
-6. Click **Finish**
-
-### Running AVD
-
-```bash
-# List available AVDs
-emulator -list-avds
-
-# Launch specific AVD
-emulator -avd Pixel_6_API_34
-```
-
-## Building APK
-
-### Debug APK
-
-```bash
+# Debug variant (fast, unoptimized)
 ./gradlew assembleDebug
-# Output: app/build/outputs/apk/debug/app-debug.apk
+
+# Release variant (optimized, requires signing)
+./gradlew assembleRelease
 ```
 
-### Release APK
+## API Configuration
 
-1. Create keystore (if not exists):
-   ```bash
-   keytool -genkey -v -keystore release.keystore -keyalg RSA -keysize 2048 -validity 10000 -alias release
-   ```
+Update the API base URL in `build.gradle.kts`:
+```kotlin
+buildTypes {
+    release {
+        buildConfigField("String", "API_BASE_URL", "\"https://api.noghre.sod/\"")
+    }
+    debug {
+        buildConfigField("String", "API_BASE_URL", "\"http://localhost:8080/\"")
+    }
+}
+```
 
-2. Update `build.gradle.kts`:
-   ```kotlin
-   signingConfigs {
-       create("release") {
-           storeFile = file("release.keystore")
-           storePassword = "your-password"
-           keyAlias = "release"
-           keyPassword = "your-password"
-       }
-   }
-   ```
+## Security Considerations
 
-3. Build:
-   ```bash
-   ./gradlew assembleRelease
-   # Output: app/build/outputs/apk/release/app-release.apk
-   ```
+1. **Network Security**: Certificate pinning enabled for production
+2. **Data Storage**: Sensitive data not stored in SharedPreferences
+3. **ProGuard**: Code obfuscation enabled for release builds
+4. **Permissions**: Minimal permissions requested
+5. **API Auth**: Bearer token authentication with interceptor
 
-## Useful Gradle Tasks
+## Building for Release
 
+1. Generate signing key:
 ```bash
-# List all available tasks
-./gradlew tasks
+keytool -genkey -v -keystore keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias release-key
+```
 
-# View dependencies
-./gradlew dependencies
+2. Update `local.properties` with keystore details
 
-# Check for dependency updates
-./gradlew dependencyUpdates
-
-# Build report
-./gradlew build --scan
+3. Build release APK/AAB:
+```bash
+./gradlew bundleRelease
 ```
 
 ## Troubleshooting
 
 ### Gradle Sync Issues
-
 ```bash
-# Clean gradle
 ./gradlew clean
-
-# Refresh all dependencies
-./gradlew build --refresh-dependencies
+rm -rf .gradle
+./gradlew sync
 ```
 
-### Out of Memory
-
-Edit `gradle.properties`:
-```properties
-org.gradle.jvmargs=-Xmx2048m
-```
-
-### Build Fails
-
-1. Check **Build** → **Clean Project**
-2. **File** → **Invalidate Caches**
-3. Update Android Studio
-4. Check Java version:
-   ```bash
-   java -version  # Should be 17+
-   ```
-
-## Git Setup
-
-### Initial Clone
-
+### Dependency Conflicts
 ```bash
-git clone https://github.com/Ya3er02/NoghreSod-Android.git
-cd NoghreSod-Android
+./gradlew dependencies
+./gradlew dependencyInsight --configuration debugRuntimeClasspath --dependency <dependency-name>
 ```
 
-### Create Feature Branch
+### Build Fails with "Cannot find symbol"
+- Ensure all Kotlin files are in correct package paths
+- Run `./gradlew clean` followed by rebuild
 
-```bash
-git checkout -b feature/your-feature-name
-```
+## GitHub Actions CI/CD
 
-### Commit Changes
+The project includes automated CI/CD pipeline that:
+- Builds on every push to main/develop
+- Runs unit tests
+- Performs lint checks
+- Builds debug APK
+- Generates security reports
 
-```bash
-git add .
-git commit -m "[FEATURE] Add your feature"
-git push origin feature/your-feature-name
-```
+View workflows in `.github/workflows/android-ci.yml`
 
-## Environment Variables
+## Contributing
+1. Create feature branch: `git checkout -b feature/your-feature`
+2. Make changes and test locally
+3. Push: `git push origin feature/your-feature`
+4. Create pull request
 
-Create `.env.local` (not committed):
+## License
+Copyright © 2025 NoghreSod. All rights reserved.
 
-```properties
-API_KEY=your_api_key
-API_SECRET=your_api_secret
-BASE_URL=https://your-domain.com/
-```
-
-## Additional Resources
-
-- [Android Documentation](https://developer.android.com)
-- [Jetpack Compose](https://developer.android.com/jetpack/compose)
-- [Hilt Documentation](https://developer.android.com/training/dependency-injection/hilt-android)
-- [Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html)
-- [Retrofit Documentation](https://square.github.io/retrofit/)
+## Support
+For issues or questions, please open an issue on GitHub.
