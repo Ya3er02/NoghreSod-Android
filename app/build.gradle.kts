@@ -6,6 +6,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-kapt")
     id("kotlinx-serialization")
+    id("app.cash.paparazzi") version "1.3.1"
 }
 
 android {
@@ -111,7 +112,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     // Testing
-    implementation(libs.bundles.testing)
+    testImplementation(libs.bundles.testing)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
