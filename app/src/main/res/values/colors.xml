@@ -1,8 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#2E807F</color>
-    <color name="onPrimary">#FFFFFF</color>
-    <color name="primaryContainer">#B1F1ED</color>
-    <color name="secondary">#4B635E</color>
-    <color name="error">#B3261E</color>
+    <!-- Primary Colors -->
+    <color name="primary">#2196F3</color>
+    <color name="primary_light">#BBDEFB</color>
+    <color name="primary_dark">#1565C0</color>
+
+    <!-- Secondary Colors -->
+    <color name="secondary">#FF9800</color>
+    <color name="secondary_light">#FFE0B2</color>
+    <color name="secondary_dark">#E65100</color>
+
+    <!-- Tertiary Colors -->
+    <color name="tertiary">#4CAF50</color>
+    <color name="tertiary_light">#C8E6C9</color>
+    <color name="tertiary_dark">#2E7D32</color>
+
+    <!-- Error Colors -->
+    <color name="error">#F44336</color>
+    <color name="error_light">#FFCDD2</color>
+    <color name="error_dark">#C62828</color>
+
+    <!-- Warning Colors -->
+    <color name="warning">#FFC107</color>
+    <color name="warning_light">#FFF9C4</color>
+    <color name="warning_dark">#F57F17</color>
+
+    <!-- Success Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="success_light">#A5D6A7</color>
+    <color name="success_dark">#1B5E20</color>
+
+    <!-- Info Colors -->
+    <color name="info">#2196F3</color>
+    <color name="info_light">#BBDEFB</color>
+    <color name="info_dark">#0D47A1</color>
+
+    <!-- Neutral Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray_50">#F5F5F5</color>
+    <color name="gray_100">#EEEEEE</color>
+    <color name="gray_200">#E0E0E0</color>
+    <color name="gray_300">#BDBDBD</color>
+    <color name="gray_400">#9E9E9E</color>
+    <color name="gray_500">#757575</color>
+    <color name="gray_600">#616161</color>
+    <color name="gray_700">#424242</color>
+    <color name="gray_800">#212121</color>
+    <color name="gray_900">#121212</color>
+
+    <!-- Semantic Colors -->
+    <color name="surface">#FAFAFA</color>
+    <color name="background">#FFFFFF</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_hint">#BDBDBD</color>
+    <color name="border">#E0E0E0</color>
+    <color name="divider">#EEEEEE</color>
+    <color name="shadow">#00000029</color>
+
+    <!-- Brand Colors -->
+    <color name="brand_primary">#2196F3</color>
+    <color name="brand_secondary">#FF9800</color>
+    <color name="brand_accent">#4CAF50</color>
+
+    <!-- Status Colors -->
+    <color name="status_active">#4CAF50</color>
+    <color name="status_inactive">#9E9E9E</color>
+    <color name="status_pending">#FF9800</color>
+    <color name="status_error">#F44336</color>
+
 </resources>
