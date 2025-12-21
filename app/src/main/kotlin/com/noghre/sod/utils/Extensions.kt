@@ -1,26 +1,18 @@
 package com.noghre.sod.utils
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
-import java.text.SimpleDateFormat
-import java.util.*
 
-/**
- * Extension functions for common operations.
- */
-
-fun Long.formatDate(pattern: String = "yyyy-MM-dd HH:mm:ss"): String {
-    return try {
-        val sdf = SimpleDateFormat(pattern, Locale.getDefault())
-        sdf.format(Date(this))
-    } catch (e: Exception) {
-        ""
-    }
+fun Context.showToast(message: String, duration: Int = Toast.LENGTH_SHORT) {
+    Toast.makeText(this, message, duration).show()
 }
 
-fun Double.formatPrice(currency: String = "\$"): String {
-    return "$currency%.2f".format(this)
+@Composable
+fun ShowToast(message: String, duration: Int = Toast.LENGTH_SHORT) {
+    val context = LocalContext.current
+    context.showToast(message, duration)
 }
 
 fun String.isValidEmail(): Boolean {
@@ -28,8 +20,17 @@ fun String.isValidEmail(): Boolean {
 }
 
 fun String.isValidPassword(): Boolean {
-    return this.length >= 8
+    return this.length >= 6
 }
 
-@Composable
-fun getCurrentContext(): Context = LocalContext.current
+fun Double.formatPrice(): String {
+    return String.format("$%.2f", this)
+}
+
+fun String.truncate(maxLength: Int): String {
+    return if (this.length > maxLength) {
+        this.substring(0, maxLength) + "..."
+    } else {
+        this
+    }
+}
