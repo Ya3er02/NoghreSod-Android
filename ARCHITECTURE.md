@@ -1,265 +1,402 @@
-# Android App Architecture
+# NoghreSod Android - Architecture Documentation
 
-## Overview
-
-This Android application follows Clean Architecture principles combined with MVVM (Model-View-ViewModel) pattern. The architecture is designed to be:
-
-- **Testable**: Each layer can be tested independently
-- **Maintainable**: Clear separation of concerns
-- **Scalable**: Easy to add new features
-- **Modular**: Components can be reused
-
-## Architecture Layers
+## Architecture Pattern: MVVM + Clean Architecture
 
 ```
-┌─────────────────────────────────────┐
-│     Presentation Layer (UI)         │
-│  (Composables, Screens, Components) │
-└────────────┬────────────────────────┘
-             │
-┌────────────▼────────────────────────┐
-│     ViewModel Layer                 │
-│  (State Management, User Actions)   │
-└────────────┬────────────────────────┘
-             │
-┌────────────▼────────────────────────┐
-│     Repository Layer                │
-│  (Data Abstraction)                 │
-└──────┬──────────────────────┬───────┘
-       │                      │
-   ┌───▼────┐          ┌──────▼──────┐
-   │  Local │          │   Remote    │
-   │Database│          │   (API)     │
-   └────────┘          └─────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                   PRESENTATION LAYER (UI)                   │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Jetpack Compose Screens & Components                 │  │
+│  │  - HomeScreen           - CartScreen                  │  │
+│  │  - ProductScreen        - OrderScreen                 │  │
+│  │  - ProfileScreen        - BottomNav                   │  │
+│  │  - Material Design 3 Components                       │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                           ↑ Observes
+┌─────────────────────────────────────────────────────────────┐
+│              APPLICATION LAYER (VIEWMODEL)                  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Hilt-Injected ViewModels with State Management       │  │
+│  │  - HomeViewModel        - CartViewModel               │  │
+│  │  - ProductViewModel     - OrderViewModel              │  │
+│  │  - ProfileViewModel                                   │  │
+│  │                                                       │  │
+│  │  State Flow for reactive updates                      │  │
+│  │  Error handling and Loading states                    │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                           ↑ Uses
+┌─────────────────────────────────────────────────────────────┐
+│                  DOMAIN LAYER (REPOSITORY)                  │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Repository Pattern: Business Logic Abstraction       │  │
+│  │  - ProductRepository    - CartRepository              │  │
+│  │                                                       │  │
+│  │  Flow-based stream of data                            │  │
+│  │  Error handling and Result wrapper                    │  │
+│  │  Offline-first data management                        │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                    ↑ Coordinates Data From
+       ├────────────────────────────┬────────────────────────┤
+       ↑                            ↑
+┌──────────────────────┐    ┌──────────────────────┐
+│   LOCAL DATA SOURCE  │    │  REMOTE DATA SOURCE  │
+│  ┌────────────────┐  │    │  ┌────────────────┐  │
+│  │ Room Database  │  │    │  │  Retrofit API  │  │
+│  │                │  │    │  │                │  │
+│  │ ProductDao     │  │    │  │ ApiService     │  │
+│  │ CartDao        │  │    │  │ (18 endpoints) │  │
+│  │ UserDao        │  │    │  │                │  │
+│  │ CategoryDao    │  │    │  │ RetrofitClient │  │
+│  │                │  │    │  │ Interceptors   │  │
+│  │ Converters     │  │    │  │                │  │
+│  │ Database       │  │    │  │ OkHttp Client  │  │
+│  └────────────────┘  │    │  └────────────────┘  │
+│                      │    │                      │
+└──────────────────────┘    └──────────────────────┘
 ```
 
-## Layer Descriptions
+## Dependency Injection with Hilt
 
-### Presentation Layer (UI)
-- **Location**: `presentation/`
-- **Responsibility**: Rendering UI and handling user interactions
-- **Components**:
-  - `screen/`: Complete screens (LoginScreen, HomeScreen, etc.)
-  - `component/`: Reusable UI components
-  - `navigation/`: Navigation setup and routing
-
-**Technologies**: Jetpack Compose, Material Design 3
-
-### ViewModel Layer
-- **Location**: `presentation/viewmodel/`
-- **Responsibility**: Managing UI state and business logic
-- **Characteristics**:
-  - Survives configuration changes
-  - Manages coroutines for async operations
-  - Emits state updates through StateFlow
-
-**Example**: `AuthViewModel`, `ProductViewModel`
-
-### Repository Layer
-- **Location**: `data/repository/`
-- **Responsibility**: Abstracting data sources
-- **Features**:
-  - Provides single source of truth
-  - Combines local and remote data
-  - Implements caching strategies
-
-**Example**: `AuthRepository`, `ProductRepository`
-
-### Data Layer
-
-#### Remote (Network)
-- **Location**: `data/remote/`
-- **Responsibility**: API communication
-- **Components**:
-  - `ApiService`: Retrofit interface with all endpoints
-  - DTOs: Data Transfer Objects for API responses
-
-#### Local (Database)
-- **Location**: `data/local/`
-- **Responsibility**: Local data persistence
-- **Components**:
-  - `PreferencesManager`: User preferences and tokens
-  - Room DAOs: Database access objects (future)
-
-### Domain Layer
-- **Location**: `domain/`
-- **Responsibility**: Business logic and models
-- **Components**:
-  - `Result<T>`: Sealed class for handling async results
-  - Domain models (independent of UI/API)
+```
+┌─────────────────────────────────────────────────────┐
+│          DEPENDENCY INJECTION (HILT)                │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ AppModule                                     │  │
+│  │ - Application context provision               │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ NetworkModule                                 │  │
+│  │ - Retrofit instance creation                  │  │
+│  │ - ApiService interface binding                │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ DatabaseModule                                │  │
+│  │ - Room database instance                      │  │
+│  │ - All DAO bindings                            │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐  │
+│  │ RepositoryModule                              │  │
+│  │ - Repository implementations                  │  │
+│  │ - Scope and lifecycle management              │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
 
 ## Data Flow
 
-### User Interaction Flow
-
+### Read Flow (User Views Products)
 ```
-User clicks button
-        ↓
-  UI (Composable)
-        ↓
-  ViewModel.method()
-        ↓
-  Repository.operation()
-        ↓
-  Data Layer (Remote/Local)
-        ↓
-  Result<T> (Success/Error)
-        ↓
-  Repository returns Result
-        ↓
-  ViewModel updates State
-        ↓
-  StateFlow emits
-        ↓
-  Composable recomposes
-        ↓
-  UI updates
+UI (ProductScreen)
+  ↑
+  ↑ Observes Flow<List<Product>>
+  ↑
+ViewModel (ProductViewModel)
+  ↑
+  ↑ Calls repository.getProductById()
+  ↑
+Repository (ProductRepository)
+  ↑
+  ↑ Checks local first
+  ↑ Then fetches remote if needed
+  ↑
+DAO & API
+  Local: Room ProductDao
+  Remote: Retrofit ApiService
 ```
 
-## State Management
-
-### ViewModel State
-
-```kotlin
-data class MyScreenState(
-    val isLoading: Boolean = false,
-    val data: List<Item> = emptyList(),
-    val error: String? = null
-)
-
-class MyViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(MyScreenState())
-    val uiState: StateFlow<MyScreenState> = _uiState.asStateFlow()
-}
+### Write Flow (User Adds to Cart)
+```
+UI (Button Click)
+  ↑
+  ↑ viewModel.addToCart(productId, quantity)
+  ↑
+ViewModel (CartViewModel)
+  ↑
+  ↑ viewModelScope.launch
+  ↑ repo.addToCart()
+  ↑
+Repository (CartRepository)
+  ↑
+  ↑ Saves to local first
+  ↑ Syncs to remote API
+  ↑
+DAO & API
+  Local: CartDao.addToCart()
+  Remote: ApiService.addToCart()
 ```
 
-### State in Composables
+## Model & DTO Conversion
 
-```kotlin
-@Composable
-fun MyScreen(viewModel: MyViewModel = hiltViewModel()) {
-    val uiState = viewModel.uiState.collectAsState()
-    val state = uiState.value
-    
-    // UI based on state
-}
+```
+┌──────────────────────────────────────────┐
+│  Network Response (Json from API)        │
+│                                          │
+│  {
+│    "id": "123",
+│    "name": "Product",
+│    "price": 99.99
+│  }
+└──────────────────────────────────────────┘
+             ↑
+             ↑ Gson deserialization
+             ↑
+┌──────────────────────────────────────────┐
+│  ProductDto (Data Transfer Object)       │
+│                                          │
+│  @Serializable
+│  data class ProductDto(
+│    val id: String,
+│    val name: String,
+│    val price: Double
+│  )
+└──────────────────────────────────────────┘
+             ↑
+             ↑ Extension function: toEntity()
+             ↑
+┌──────────────────────────────────────────┐
+│  Product Entity (Room Database)          │
+│                                          │
+│  @Entity(tableName = "products")
+│  data class Product(
+│    @PrimaryKey val id: String,
+│    val name: String,
+│    val price: Double
+│  )
+└──────────────────────────────────────────┘
+             ↑
+             ↑ Repository abstraction
+             ↑
+┌──────────────────────────────────────────┐
+│  ViewModel/UI Layer                      │
+│  - Uses Product entity directly          │
+│  - No DTO exposure to UI                 │
+└──────────────────────────────────────────┘
 ```
 
-## Dependency Injection
+## Error Handling Strategy
 
-### Hilt Configuration
-
-```kotlin
-@HiltAndroidApp
-class NoghreSodApp : Application()
-
-@AndroidEntryPoint
-class MainActivity : ComponentActivity()
-
-@Module
-@InstallIn(SingletonComponent::class)
-object NetworkModule {
-    @Provides
-    @Singleton
-    fun provideApiService(): ApiService = ...
-}
+```
+┌─────────────────────────────────────────┐
+│  Try-Catch at Repository Layer          │
+│                                         │
+│  fun getProducts(): Flow<Result> {      │
+│    return flow {                        │
+│      try {                              │
+│        emit(Result.Loading)             │
+│        val response = api.get()         │
+│        emit(Result.Success(data))       │
+│      } catch (e: Exception) {           │
+│        emit(Result.Error(message))      │
+│      }                                  │
+│    }                                    │
+│  }                                      │
+└─────────────────────────────────────────┘
+             ↑
+             ↑ Observe in ViewModel
+             ↑
+┌─────────────────────────────────────────┐
+│  ViewModel State Management              │
+│                                         │
+│  sealed class Result<T> {               │
+│    class Success<T>(val data: T)        │
+│    class Error<T>(val message: String)  │
+│    class Loading<T>                     │
+│  }                                      │
+└─────────────────────────────────────────┘
+             ↑
+             ↑ Update UI State
+             ↑
+┌─────────────────────────────────────────┐
+│  UI Composables                         │
+│                                         │
+│  if (state.isLoading) {                 │
+│    LoadingIndicator()                   │
+│  } else if (state.error != null) {      │
+│    ErrorMessage(state.error)            │
+│  } else {                               │
+│    ProductList(state.products)          │
+│  }                                      │
+└─────────────────────────────────────────┘
 ```
 
-### ViewModels with Hilt
+## Lifecycle Management
 
-```kotlin
-@HiltViewModel
-class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
-) : ViewModel()
+```
+App Launch
+  ↓
+NoghreSodApp.onCreate()
+  - Initialize Timber logging
+  - Initialize Hilt
+  ↓
+MainActivity.onCreate()
+  - Set Compose content
+  - Initialize NavGraph
+  ↓
+Navigation
+  - Screen pushed on stack
+  - ViewModel created (scope: navigation backstack)
+  - Repositories initialized
+  - Database/API services loaded
+  ↓
+Screen Lifecycle
+  - Composable renders
+  - ViewModel observes repositories
+  - Flow subscriptions activated
+  - Data loads from DB or API
+  ↓
+Screen Destruction
+  - Composable unmounts
+  - Flow subscriptions cancelled
+  - ViewModel cleared
+  ↓
+App Termination
+  - All resources released
+  - Database connections closed
+  - SharedPreferences saved
 ```
 
-## Error Handling
+## State Management Pattern
 
-### Result Sealed Class
-
-```kotlin
-seal class Result<out T> {
-    data class Success<T>(val data: T) : Result<T>()
-    data class Error(val message: String) : Result<Nothing>()
-    object Loading : Result<Nothing>()
-}
+```
+ViewModel State Flow:
+  MutableStateFlow<UiState>() → asStateFlow()
+  ↗ ↙
+  ↗ Update state based on repository results
+  ↗ Emit new state
+  ↗ UI observes and recomposes
+  ↗
+Composable Observation:
+  val state = viewModel.uiState.collectAsState()
+  ↑
+  ↑ Automatic recomposition on state change
+  ↑
+UI Rendering:
+  When(state.value) {
+    Loading → Show progress
+    Error → Show error message
+    Success → Show content
+  }
 ```
 
-### Usage in Repository
+## Threading Model
 
-```kotlin
-suspend fun login(email: String, password: String): Result<AuthResponse> {
-    return try {
-        val response = apiService.login(AuthRequest(email, password))
-        Result.Success(response)
-    } catch (e: Exception) {
-        Result.Error(e.message ?: "Unknown error")
-    }
-}
+```
+Main Thread (UI)
+  ↑
+  ↑ Jetpack Compose recomposition
+  ↑
+ViewModel Scope
+  ↑
+  ↑ viewModelScope.launch { }
+  ↑ Default dispatcher context
+  ↑
+IO Thread (Network/Database)
+  ↑
+  ↑ Retrofit API calls
+  ↑ Room database queries
+  ↑ IO coroutine dispatcher
+  ↑
+Results returned to Main Thread
+  ↑
+  ↑ StateFlow emits on main
+  ↑ Compose recomposes
+  ↑
+UI Updates
 ```
 
-## Network Communication
+## Security Layers
 
-### Retrofit Setup
-
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object NetworkModule {
-    @Provides
-    fun provideRetrofit(): Retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .addConverterFactory(...)
-        .client(httpClient)
-        .build()
-}
+```
+┌─────────────────────────────────────────┐
+│  Network Security                       │
+│  - Certificate pinning (optional)       │
+│  - HTTPS only in production             │
+│  - Security config file                 │
+└─────────────────────────────────────────┘
+             ↑
+┌─────────────────────────────────────────┐
+│  API Authentication                     │
+│  - Bearer token in Authorization header │
+│  - AuthInterceptor adds token           │
+│  - Token refresh handling               │
+└─────────────────────────────────────────┘
+             ↑
+┌─────────────────────────────────────────┐
+│  Data Storage Security                  │
+│  - SharedPreferences for non-sensitive  │
+│  - Room database encrypted (optional)   │
+│  - Sensitive data in memory only        │
+└─────────────────────────────────────────┘
+             ↑
+┌─────────────────────────────────────────┐
+│  Code Security                          │
+│  - ProGuard obfuscation (release)       │
+│  - Resource shrinking enabled           │
+│  - Lint security checks                 │
+└─────────────────────────────────────────┘
 ```
 
-### API Service
+## Testing Architecture
 
-```kotlin
-interface ApiService {
-    @POST("api/v1/auth/login")
-    suspend fun login(@Body request: AuthRequest): AuthResponse
-    
-    @GET("api/v1/products")
-    suspend fun getProducts(): List<ProductDto>
-}
+```
+┌─────────────────────────────────────────┐
+│  Unit Tests (Repository/ViewModel)      │
+│  - MockK for mocking dependencies       │
+│  - Coroutines testing library           │
+│  - Turbine for Flow testing             │
+└─────────────────────────────────────────┘
+             ↑
+┌─────────────────────────────────────────┐
+│  Integration Tests (Database/API)       │
+│  - Room testing library                 │
+│  - MockWebServer for API mocking        │
+└─────────────────────────────────────────┘
+             ↑
+┌─────────────────────────────────────────┐
+│  UI Tests (Compose Preview/Emulator)    │
+│  - Compose testing library              │
+│  - UI state verification                │
+└─────────────────────────────────────────┘
 ```
 
-## Testing Strategy
+---
 
-### Unit Tests
-- ViewModel logic
-- Repository operations
-- Utility functions
+## Key Architectural Principles
 
-### Integration Tests
-- API responses
-- Database operations
-- Repository interactions
+1. **Separation of Concerns**
+   - UI doesn't access database directly
+   - ViewModels don't contain UI logic
+   - Repositories don't know about UI
 
-### UI Tests
-- Composable rendering
-- User interactions
-- Navigation flows
+2. **Unidirectional Data Flow**
+   - Data flows down from repositories
+   - Events flow up from UI
+   - ViewModel bridges communication
 
-## Best Practices
+3. **Dependency Inversion**
+   - High-level modules depend on abstractions
+   - Low-level modules implement abstractions
+   - Hilt manages dependencies automatically
 
-1. **Immutable State**: Use immutable data classes for UI state
-2. **Single Responsibility**: Each class has one reason to change
-3. **Dependency Injection**: Use Hilt for all dependencies
-4. **Coroutines**: Use ViewModelScope for lifecycle-aware operations
-5. **Error Handling**: Always handle errors gracefully
-6. **Logging**: Use Timber for debug logging
-7. **Performance**: Minimize recompositions in Compose
+4. **Single Responsibility**
+   - Each class has one reason to change
+   - ViewModel: state management
+   - Repository: data fetching logic
+   - DAO: database operations
 
-## Future Improvements
+5. **Reactive Programming**
+   - Flows for data streams
+   - State flows for UI state
+   - Coroutines for async operations
+   - No callbacks or blocking operations
 
-- [ ] Add Room database for offline support
-- [ ] Implement pagination for large lists
-- [ ] Add local caching strategy
-- [ ] Implement WorkManager for background sync
-- [ ] Add analytics integration
-- [ ] Implement more comprehensive error handling
+---
+
+This architecture ensures maintainability, testability, and scalability.
