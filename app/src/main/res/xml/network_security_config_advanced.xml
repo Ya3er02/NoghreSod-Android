@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Production API Configuration with Certificate Pinning -->
+    <domain-config cleartextTrafficAllowed="false">
+        <domain includeSubdomains="true">api.noghre.sod</domain>
+        <domain includeSubdomains="true">cdn.noghre.sod</domain>
+
+        <!-- Certificate Pinning: Pin both primary and backup certificates -->
+        <pin-set expiration="2026-12-31">
+            <!-- Primary certificate hash -->
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            <!-- Backup certificate hash for rotation -->
+            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+            <!-- Additional backup pins -->
+            <pin digest="SHA-256">CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=</pin>
+        </pin-set>
+
+        <!-- Trust system certificates -->
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Development/Debug Configuration -->
+    <domain-config cleartextTrafficAllowed="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">192.168.1.0/24</domain>
+        <domain includeSubdomains="true">10.0.0.0/8</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Fallback for other domains -->
+    <domain-config cleartextTrafficAllowed="false">
+        <domain includeSubdomains="true">.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+</network-security-config>
