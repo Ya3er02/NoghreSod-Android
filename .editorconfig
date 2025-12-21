@@ -1,14 +1,32 @@
+# EditorConfig helps maintain consistent coding styles
+# For more information see https://editorconfig.org
+
 root = true
+
+# All files
 [*]
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
+
+# Kotlin files
 [*.{kt,kts}]
-max_line_length = 120
 indent_size = 4
 indent_style = space
-[*.xml]
-indent_size = 4
-[*.json]
+max_line_length = 120
+
+# XML and JSON files
+[*.{xml,json,yml,yaml}]
 indent_size = 2
+indent_style = space
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+# Gradle
+[*.gradle]
+indent_size = 4
+indent_style = space
