@@ -1,29 +1,27 @@
 package com.noghre.sod.utils
 
 object Constants {
-    // API Configuration
-    const val API_BASE_URL = "https://api.noghre.sod/"
-    const val API_TIMEOUT_SECONDS = 30L
+    const val BASE_URL = "https://api.noghre-sod.com/"
+    const val CONNECT_TIMEOUT = 30L
+    const val READ_TIMEOUT = 30L
+    const val WRITE_TIMEOUT = 30L
 
-    // Database
-    const val DATABASE_NAME = "noghre_sod_database"
-
-    // Preferences
-    const val PREFERENCE_NAME = "noghre_sod_prefs"
-    const val AUTH_TOKEN_KEY = "auth_token"
-    const val USER_ID_KEY = "user_id"
-    const val LAST_SYNC_KEY = "last_sync"
+    // Storage Keys
+    const val PREF_AUTH_TOKEN = "auth_token"
+    const val PREF_USER_ID = "user_id"
+    const val PREF_USER_EMAIL = "user_email"
+    const val PREF_IS_LOGGED_IN = "is_logged_in"
 
     // Pagination
-    const val PAGE_SIZE = 20
+    const val DEFAULT_PAGE_SIZE = 20
     const val INITIAL_PAGE = 1
 
-    // UI
-    const val ANIMATION_DURATION_MS = 300
-    const val DEBOUNCE_DURATION_MS = 500
+    // Timeouts
+    const val SPLASH_DELAY = 2000L
 
     // Error Messages
-    const val GENERIC_ERROR = "Something went wrong. Please try again."
     const val NETWORK_ERROR = "Network error. Please check your connection."
-    const val TIMEOUT_ERROR = "Request timed out. Please try again."
+    const val UNKNOWN_ERROR = "An unknown error occurred."
+    const val INVALID_EMAIL = "Please enter a valid email address."
+    const val INVALID_PASSWORD = "Password must be at least 6 characters."
 }
