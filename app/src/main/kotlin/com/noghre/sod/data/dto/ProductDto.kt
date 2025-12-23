@@ -1,69 +1,107 @@
 package com.noghre.sod.data.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import com.noghre.sod.data.model.ProductEntity
 
 /**
- * Data Transfer Object for Product API responses.
- * Represents the network response model for Product data.
+ * Product Data Transfer Object (DTO)
+ * Represents product data structure from API responses
  */
+@Serializable
 data class ProductDto(
-    @SerializedName("id")
+    @SerialName("id")
     val id: String,
-
-    @SerializedName("name")
+    @SerialName("name")
     val name: String,
-
-    @SerializedName("name_en")
-    val nameEn: String? = null,
-
-    @SerializedName("description")
+    @SerialName("name_fa")
+    val nameFA: String,
+    @SerialName("description")
     val description: String,
-
-    @SerializedName("description_en")
-    val descriptionEn: String? = null,
-
-    @SerializedName("price")
-    val price: Double,
-
-    @SerializedName("discount_price")
-    val discountPrice: Double? = null,
-
-    @SerializedName("images")
-    val images: List<String> = emptyList(),
-
-    @SerializedName("category_id")
+    @SerialName("description_fa")
+    val descriptionFA: String? = null,
+    @SerialName("price")
+    val price: Long, // Price in Toman
+    @SerialName("purity")
+    val purity: String, // Silver purity: 925, 950, 999
+    @SerialName("weight")
+    val weight: Double, // Weight in grams
+    @SerialName("labor_cost")
+    val laborCost: Long = 0, // Labor cost in Toman
+    @SerialName("category_id")
     val categoryId: String,
-
-    @SerializedName("stock")
+    @SerialName("category_name")
+    val categoryName: String,
+    @SerialName("stock")
     val stock: Int,
-
-    @SerializedName("rating")
+    @SerialName("images")
+    val images: List<String> = emptyList(),
+    @SerialName("is_favorite")
+    val isFavorite: Boolean = false,
+    @SerialName("rating")
     val rating: Float = 0f,
-
-    @SerializedName("review_count")
+    @SerialName("review_count")
     val reviewCount: Int = 0,
+    @SerialName("discount")
+    val discount: Int = 0, // Discount percentage
+    @SerialName("is_new")
+    val isNew: Boolean = false,
+    @SerialName("created_at")
+    val createdAt: Long,
+    @SerialName("updated_at")
+    val updatedAt: Long
+) {
+    fun toEntity(): ProductEntity = ProductEntity(
+        id = id,
+        name = name,
+        nameFA = nameFA,
+        description = description,
+        descriptionFA = descriptionFA,
+        price = price,
+        purity = purity,
+        weight = weight,
+        laborCost = laborCost,
+        categoryId = categoryId,
+        categoryName = categoryName,
+        stock = stock,
+        images = images,
+        isFavorite = isFavorite,
+        rating = rating,
+        reviewCount = reviewCount,
+        discount = discount,
+        isNew = isNew,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        lastSyncedAt = System.currentTimeMillis()
+    )
+}
 
-    @SerializedName("weight")
-    val weight: Double? = null,
+/**
+ * API Response wrapper for product list
+ */
+@Serializable
+data class ProductListResponse(
+    @SerialName("success")
+    val success: Boolean,
+    @SerialName("data")
+    val data: List<ProductDto> = emptyList(),
+    @SerialName("message")
+    val message: String? = null,
+    @SerialName("pagination")
+    val pagination: PaginationDto? = null
+)
 
-    @SerializedName("material")
-    val material: String,
-
-    @SerializedName("specifications")
-    val specifications: Map<String, String>? = null,
-
-    @SerializedName("seller_id")
-    val sellerId: String,
-
-    @SerializedName("seller_name")
-    val sellerName: String? = null,
-
-    @SerializedName("seller_rating")
-    val sellerRating: Float? = null,
-
-    @SerializedName("created_at")
-    val createdAt: String? = null,
-
-    @SerializedName("updated_at")
-    val updatedAt: String? = null
+/**
+ * Pagination information from API
+ */
+@Serializable
+data class PaginationDto(
+    @SerialName("page")
+    val page: Int,
+    @SerialName("limit")
+    val limit: Int,
+    @SerialName("total")
+    val total: Int,
+    @SerialName("pages")
+    val pages: Int
 )
