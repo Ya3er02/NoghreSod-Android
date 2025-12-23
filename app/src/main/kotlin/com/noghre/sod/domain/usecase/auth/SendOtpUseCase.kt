@@ -13,13 +13,11 @@ class SendOtpUseCase @Inject constructor(
     data class Params(val phone: String)
 
     override suspend fun execute(params: Params) {
-        if (!isValidPhone(params.phone)) {
-            throw IllegalArgumentException("شماره تلفن نامعتبر است")
+        // Validate phone
+        if (!params.phone.matches(Regex("^09\\d{9}$"))) {
+            throw IllegalArgumentException("شماره موبایل نامعتبر")
         }
+        
         authRepository.sendOtp(params.phone)
-    }
-
-    private fun isValidPhone(phone: String): Boolean {
-        return phone.matches(Regex("^09\\d{9}$"))
     }
 }

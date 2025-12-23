@@ -8,9 +8,10 @@ import javax.inject.Inject
 @ViewModelScoped
 class RefreshTokenUseCase @Inject constructor(
     private val authRepository: AuthRepository
-) : UseCase<Unit, Unit>() {
+) : UseCase<Unit, String>() {
 
-    override suspend fun execute(params: Unit) {
-        authRepository.refreshToken()
+    override suspend fun execute(params: Unit): String {
+        val result = authRepository.refreshToken()
+        return result.accessToken
     }
 }

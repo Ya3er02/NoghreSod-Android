@@ -18,28 +18,25 @@ class RegisterUseCase @Inject constructor(
     )
 
     override suspend fun execute(params: Params): AuthResult {
-        // Validate inputs
-        if (!isValidPhone(params.phone)) {
-            throw IllegalArgumentException("شماره تلفن نامعتبر است")
+        // Validate phone
+        if (!params.phone.matches(Regex("^09\\d{9}$"))) {
+            throw IllegalArgumentException("شماره موبایل نامعتبر")
         }
-        if (params.fullName.length < 3) {
+        
+        // Validate full name
+        if (params.fullName.isEmpty() || params.fullName.length < 3) {
             throw IllegalArgumentException("نام حداقل 3 کاراکتر باید باشد")
         }
-        if (!isValidPassword(params.password)) {
-            throw IllegalArgumentException("رمز عبور حداقل 8 کاراکتر و شامل حروف و اعداد باید باشد")
+        
+        // Validate password
+        if (params.password.length < 8) {
+            throw IllegalArgumentException("رمز عبور حداقل 8 کاراکتر باید باشد")
         }
-
-        // Call repository
-        return authRepository.register(params.phone, params.fullName, params.password)
-    }
-
-    private fun isValidPhone(phone: String): Boolean {
-        return phone.matches(Regex("^09\\d{9}$"))
-    }
-
-    private fun isValidPassword(password: String): Boolean {
-        return password.length >= 8 &&
-                password.any { it.isLetter() } &&
-                password.any { it.isDigit() }
+        
+        return authRepository.register(
+            phone = params.phone,
+            fullName = params.fullName,
+            password = params.password
+        )
     }
 }
