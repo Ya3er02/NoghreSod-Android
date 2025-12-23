@@ -1,35 +1,69 @@
 package com.noghre.sod.data.dto
 
-from kotlinx.serialization.Serializable
-import com.noghre.sod.data.model.Product
+import com.google.gson.annotations.SerializedName
 
-@Serializable
+/**
+ * Data Transfer Object for Product API responses.
+ * Represents the network response model for Product data.
+ */
 data class ProductDto(
+    @SerializedName("id")
     val id: String,
-    val name: String,
-    val description: String,
-    val price: Double,
-    val originalPrice: Double? = null,
-    val category: String,
-    val imageUrl: String,
-    val rating: Float = 0f,
-    val reviewCount: Int = 0,
-    val inStock: Boolean = true,
-    val sellerId: String
-)
 
-fun ProductDto.toEntity(): Product {
-    return Product(
-        id = id,
-        name = name,
-        description = description,
-        price = price,
-        originalPrice = originalPrice,
-        category = category,
-        imageUrl = imageUrl,
-        rating = rating,
-        reviewCount = reviewCount,
-        inStock = inStock,
-        sellerId = sellerId
-    )
-}
+    @SerializedName("name")
+    val name: String,
+
+    @SerializedName("name_en")
+    val nameEn: String? = null,
+
+    @SerializedName("description")
+    val description: String,
+
+    @SerializedName("description_en")
+    val descriptionEn: String? = null,
+
+    @SerializedName("price")
+    val price: Double,
+
+    @SerializedName("discount_price")
+    val discountPrice: Double? = null,
+
+    @SerializedName("images")
+    val images: List<String> = emptyList(),
+
+    @SerializedName("category_id")
+    val categoryId: String,
+
+    @SerializedName("stock")
+    val stock: Int,
+
+    @SerializedName("rating")
+    val rating: Float = 0f,
+
+    @SerializedName("review_count")
+    val reviewCount: Int = 0,
+
+    @SerializedName("weight")
+    val weight: Double? = null,
+
+    @SerializedName("material")
+    val material: String,
+
+    @SerializedName("specifications")
+    val specifications: Map<String, String>? = null,
+
+    @SerializedName("seller_id")
+    val sellerId: String,
+
+    @SerializedName("seller_name")
+    val sellerName: String? = null,
+
+    @SerializedName("seller_rating")
+    val sellerRating: Float? = null,
+
+    @SerializedName("created_at")
+    val createdAt: String? = null,
+
+    @SerializedName("updated_at")
+    val updatedAt: String? = null
+)
