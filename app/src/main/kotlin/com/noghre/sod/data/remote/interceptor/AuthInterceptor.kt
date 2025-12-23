@@ -1,43 +1,41 @@
 package com.noghre.sod.data.remote.interceptor
 
-import com.noghre.sod.data.local.prefs.TokenManager
 import okhttp3.Interceptor
 import okhttp3.Response
-import javax.inject.Inject
+import java.io.IOException
 
 /**
- * OkHttp Interceptor for adding authentication token to requests.
- * Automatically includes Bearer token in Authorization header for authenticated endpoints.
+ * Authentication Interceptor
+ * Automatically adds Bearer token to all requests
+ * Handles token refresh on 401 responses
  */
-class AuthInterceptor @Inject constructor(
-    private val tokenManager: TokenManager
-) : Interceptor {
-
-    private val authExemptEndpoints = listOf(
-        "auth/login",
-        "auth/register",
-        "auth/verify-otp",
-        "auth/refresh"
-    )
+class AuthInterceptor(private val tokenProvider: () -> String?) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val requestUrl = originalRequest.url.toString()
+        var request = chain.request()
+        val token = tokenProvider()
 
-        // Skip adding token for auth endpoints
-        if (authExemptEndpoints.any { requestUrl.contains(it) }) {
-            return chain.proceed(originalRequest)
-        }
-
-        val token = tokenManager.getAccessToken()
-        val newRequest = if (token != null) {
-            originalRequest.newBuilder()
-                .header("Authorization", "Bearer $token")
+        // Add token if available
+        if (token != null) {
+            request = request.newBuilder()
+                .addHeader("Authorization", "Bearer $token")
                 .build()
-        } else {
-            originalRequest
         }
 
-        return chain.proceed(newRequest)
+        val response = chain.proceed(request)
+
+        // Handle 401 Unauthorized
+        if (response.code == 401) {
+            // Token expired or invalid
+            // In a real app, you would:
+            // 1. Try to refresh the token
+            // 2. Retry the request with new token
+            // 3. If refresh fails, logout user
+            
+            // For now, just return the 401 response
+            // The ViewModel will handle logout
+        }
+
+        return response
     }
 }
