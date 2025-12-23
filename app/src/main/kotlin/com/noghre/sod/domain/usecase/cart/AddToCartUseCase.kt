@@ -1,25 +1,23 @@
 package com.noghre.sod.domain.usecase.cart
 
+import com.noghre.sod.domain.Result
 import com.noghre.sod.domain.base.UseCase
+import com.noghre.sod.domain.model.CartItem
+import com.noghre.sod.domain.model.Product
 import com.noghre.sod.domain.repository.CartRepository
-import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
 
-@ViewModelScoped
+data class AddToCartParams(
+    val productId: String,
+    val product: Product,
+    val quantity: Int,
+)
+
 class AddToCartUseCase @Inject constructor(
-    private val cartRepository: CartRepository
-) : UseCase<AddToCartUseCase.Params, Unit>() {
+    private val cartRepository: CartRepository,
+) : UseCase<AddToCartParams, CartItem>() {
 
-    data class Params(
-        val productId: String,
-        val quantity: Int = 1
-    )
-
-    override suspend fun execute(params: Params) {
-        if (params.quantity <= 0) {
-            throw IllegalArgumentException("تعداد باید بیشتر از 0 باشد")
-        }
-        
-        cartRepository.addToCart(params.productId, params.quantity)
+    override suspend fun execute(parameters: AddToCartParams): Result<CartItem> {
+        return cartRepository.addToCart(parameters.productId, parameters.product, parameters.quantity)
     }
 }

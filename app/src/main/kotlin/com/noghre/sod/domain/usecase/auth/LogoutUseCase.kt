@@ -1,16 +1,26 @@
 package com.noghre.sod.domain.usecase.auth
 
-import com.noghre.sod.domain.base.UseCase
+import com.noghre.sod.domain.Result
+import com.noghre.sod.domain.base.NoParamsUseCase
 import com.noghre.sod.domain.repository.AuthRepository
-import dagger.hilt.android.scopes.ViewModelScoped
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
-@ViewModelScoped
 class LogoutUseCase @Inject constructor(
-    private val authRepository: AuthRepository
-) : UseCase<Unit, Unit>() {
+    private val authRepository: AuthRepository,
+) : NoParamsUseCase<Unit>() {
 
-    override suspend fun execute(params: Unit) {
-        authRepository.logout()
+    override fun execute(): Flow<Result<Unit>> {
+        return object : Flow<Result<Unit>> {
+            override suspend fun collect(collector: kotlinx.coroutines.flow.FlowCollector<Result<Unit>>) {
+                try {
+                    collector.emit(Result.Loading)
+                    val result = authRepository.logout()
+                    collector.emit(result)
+                } catch (e: Throwable) {
+                    collector.emit(Result.Error(e))
+                }
+            }
+        }
     }
 }
