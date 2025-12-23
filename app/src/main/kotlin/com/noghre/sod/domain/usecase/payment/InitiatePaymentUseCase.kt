@@ -1,28 +1,26 @@
 package com.noghre.sod.domain.usecase.payment
 
 import com.noghre.sod.domain.base.UseCase
+import com.noghre.sod.domain.model.PaymentInitResponse
+import com.noghre.sod.domain.repository.PaymentRepository
 import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
 
-data class PaymentInitResult(
-    val success: Boolean,
-    val paymentUrl: String? = null,
-    val authority: String? = null,
-    val message: String? = null
-)
-
 @ViewModelScoped
-class InitiatePaymentUseCase @Inject constructor() : UseCase<InitiatePaymentUseCase.Params, PaymentInitResult>() {
+class InitiatePaymentUseCase @Inject constructor(
+    private val paymentRepository: PaymentRepository
+) : UseCase<InitiatePaymentUseCase.Params, PaymentInitResponse>() {
 
     data class Params(
         val orderId: String,
         val amount: Double
     )
 
-    override suspend fun execute(params: Params): PaymentInitResult {
-        return PaymentInitResult(
-            success = false,
-            message = "ابلاغ نامعتبر"
-        )
+    override suspend fun execute(params: Params): PaymentInitResponse {
+        if (params.amount <= 0) {
+            throw IllegalArgumentException("مبلغ باید بیشتر از 0 باشد")
+        }
+        
+        return paymentRepository.initiatePayment(params.orderId, params.amount)
     }
 }

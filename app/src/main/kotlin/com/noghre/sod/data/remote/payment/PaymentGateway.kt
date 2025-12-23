@@ -1,19 +1,7 @@
 package com.noghre.sod.data.remote.payment
 
-data class PaymentInitResponse(
-    val success: Boolean,
-    val authority: String? = null,
-    val paymentUrl: String? = null,
-    val message: String? = null
-)
-
-data class PaymentVerifyResponse(
-    val success: Boolean,
-    val refId: String? = null,
-    val cardPan: String? = null,
-    val message: String? = null,
-    val amount: Double? = null
-)
+import com.noghre.sod.domain.model.PaymentInitResponse
+import com.noghre.sod.domain.model.PaymentVerifyResponse
 
 interface PaymentGateway {
     suspend fun initiatePayment(

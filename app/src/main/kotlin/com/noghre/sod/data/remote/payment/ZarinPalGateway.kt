@@ -1,58 +1,44 @@
 package com.noghre.sod.data.remote.payment
 
-import android.os.Build
-import com.noghre.sod.BuildConfig
+import com.noghre.sod.domain.common.ServerException
+import com.noghre.sod.domain.model.PaymentInitResponse
+import com.noghre.sod.domain.model.PaymentVerifyResponse
 import dagger.hilt.android.scopes.ViewModelScoped
-import timber.log.Timber
 import javax.inject.Inject
 
 @ViewModelScoped
 class ZarinPalGateway @Inject constructor(
-    private val apiService: ZarinPalApiService
+    private val apiService: ZarinPalApiService,
+    private val merchantId: String = "YOUR_MERCHANT_ID"
 ) : PaymentGateway {
-
-    companion object {
-        private const val MERCHANT_ID = "ZARINPAL_MERCHANT_ID"
-    }
 
     override suspend fun initiatePayment(
         amount: Double,
         orderId: String,
         callbackUrl: String
     ): PaymentInitResponse {
-        return try {
+        try {
             val request = PaymentRequest(
-                merchant_id = MERCHANT_ID,
-                amount = amount,
-                description = "سفارش #$orderId",
-                callback_url = callbackUrl,
-                metadata = MetadataRequest(
-                    order_id = orderId
-                )
+                merchantId = merchantId,
+                amount = (amount * 10).toLong(), // ZarinPal expects 10-rial units
+                description = "Order: $orderId",
+                callbackUrl = callbackUrl
             )
-
+            
             val response = apiService.requestPayment(request)
-            val data = response.data
-
-            if (data?.code == 100 && !data.authority.isNullOrEmpty()) {
-                val paymentUrl = buildPaymentUrl(data.authority!!)
+            
+            return if (response.data != null && response.data.code == 100) {
+                val authority = response.data.authority
+                val paymentUrl = "https://www.zarinpal.com/pg/StartPay/$authority"
                 PaymentInitResponse(
-                    success = true,
-                    authority = data.authority,
+                    authority = authority,
                     paymentUrl = paymentUrl
                 )
             } else {
-                PaymentInitResponse(
-                    success = false,
-                    message = data?.message ?: "Payment initialization failed"
-                )
+                throw ServerException("خطا در ارتباط با درگاه")
             }
         } catch (e: Exception) {
-            Timber.e(e, "Payment initiation error")
-            PaymentInitResponse(
-                success = false,
-                message = e.message ?: "Network error"
-            )
+            throw ServerException(e.message ?: "خطای نامشخص")
         }
     }
 
@@ -60,43 +46,30 @@ class ZarinPalGateway @Inject constructor(
         authority: String,
         amount: Double
     ): PaymentVerifyResponse {
-        return try {
+        try {
             val request = VerifyRequest(
-                merchant_id = MERCHANT_ID,
-                amount = amount,
+                merchantId = merchantId,
+                amount = (amount * 10).toLong(),
                 authority = authority
             )
-
+            
             val response = apiService.verifyPayment(request)
-            val data = response.data
-
-            if (data?.code == 100 && data.ref_id != null) {
+            
+            return if (response.data != null && response.data.code == 100) {
                 PaymentVerifyResponse(
                     success = true,
-                    refId = data.ref_id.toString(),
-                    cardPan = data.card_pan
+                    refId = response.data.refId?.toString(),
+                    cardPan = response.data.cardPan?.takeLast(4)?.let { "****$it" }
                 )
             } else {
                 PaymentVerifyResponse(
                     success = false,
-                    message = data?.message ?: "Payment verification failed"
+                    refId = null,
+                    cardPan = null
                 )
             }
         } catch (e: Exception) {
-            Timber.e(e, "Payment verification error")
-            PaymentVerifyResponse(
-                success = false,
-                message = e.message ?: "Network error"
-            )
+            throw ServerException(e.message ?: "خطا در درخواست با درگاه")
         }
-    }
-
-    private fun buildPaymentUrl(authority: String): String {
-        val baseUrl = if (BuildConfig.DEBUG) {
-            "https://sandbox.zarinpal.com/pg/StartPay/$authority"
-        } else {
-            "https://www.zarinpal.com/pg/StartPay/$authority"
-        }
-        return baseUrl
     }
 }
