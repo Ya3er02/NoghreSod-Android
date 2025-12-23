@@ -1,35 +1,38 @@
 package com.noghre.sod.di
 
-from dagger.Module
-from dagger.hilt.InstallIn
-from dagger.hilt.components.SingletonComponent
-from dagger.Provides
-import com.noghre.sod.data.repository.ProductRepository
-import com.noghre.sod.data.repository.CartRepository
+import com.noghre.sod.data.local.AppDatabase
 import com.noghre.sod.data.remote.ApiService
-import com.noghre.sod.data.local.ProductDao
-import com.noghre.sod.data.local.CartDao
-from javax.inject.Singleton
+import com.noghre.sod.data.repository.ProductRepositoryImpl
+import com.noghre.sod.domain.repository.ProductRepository
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+import javax.inject.Named
+import javax.inject.Singleton
 
+/**
+ * Hilt dependency injection module for repository implementations.
+ * Binds interfaces to their implementations.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
 
+    /**
+     * Provides ProductRepository implementation.
+     * Injects dependencies for offline-first functionality.
+     */
     @Provides
     @Singleton
     fun provideProductRepository(
         apiService: ApiService,
-        productDao: ProductDao
-    ): ProductRepository {
-        return ProductRepository(apiService, productDao)
-    }
-
-    @Provides
-    @Singleton
-    fun provideCartRepository(
-        apiService: ApiService,
-        cartDao: CartDao
-    ): CartRepository {
-        return CartRepository(apiService, cartDao)
-    }
+        database: AppDatabase,
+        @Named("io") ioDispatcher: CoroutineDispatcher
+    ): ProductRepository = ProductRepositoryImpl(
+        apiService = apiService,
+        database = database,
+        ioDispatcher = ioDispatcher
+    )
 }
