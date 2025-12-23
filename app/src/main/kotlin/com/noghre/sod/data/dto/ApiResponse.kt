@@ -1,22 +1,28 @@
 package com.noghre.sod.data.dto
 
-from kotlinx.serialization.Serializable
+import kotlinx.serialization.Serializable
 
+/**
+ * Generic wrapper for API responses.
+ * Used for single object responses.
+ */
 @Serializable
 data class ApiResponse<T>(
-    val success: Boolean,
     val data: T? = null,
     val message: String? = null,
-    val error: String? = null,
-    val code: Int? = null
+    val status: String = "success",
+    val error: String? = null
 )
 
+/**
+ * Generic wrapper for paginated API responses.
+ * Used for list endpoints with pagination.
+ */
 @Serializable
 data class PaginatedResponse<T>(
-    val items: List<T>,
+    val data: List<T>,
     val page: Int,
-    val pageSize: Int,
-    val totalItems: Int,
-    val totalPages: Int,
-    val hasNextPage: Boolean
+    val limit: Int,
+    val total: Int,
+    val totalPages: Int
 )
