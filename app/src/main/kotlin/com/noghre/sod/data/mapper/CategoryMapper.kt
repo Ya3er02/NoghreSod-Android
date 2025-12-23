@@ -5,63 +5,58 @@ import com.noghre.sod.data.local.entity.CategoryEntity
 import com.noghre.sod.domain.model.Category
 
 /**
- * Mapper functions for converting between Category representations:
- * - CategoryDto (API response)
- * - CategoryEntity (database)
- * - Category (domain model)
+ * Mapper for Category conversions between layers.
  */
+object CategoryMapper {
 
-/**
- * Converts CategoryDto (API response) to CategoryEntity (database).
- */
-fun CategoryDto.toEntity(): CategoryEntity = CategoryEntity(
-    id = id,
-    name = name,
-    nameEn = nameEn,
-    slug = slug,
-    icon = icon,
-    cachedAt = System.currentTimeMillis()
-)
+    /**
+     * Convert CategoryDto to Category (domain).
+     */
+    fun CategoryDto.toDomain(): Category {
+        return Category(
+            id = id,
+            name = name,
+            nameEn = nameEn,
+            description = description,
+            iconUrl = iconUrl,
+            parentId = parentId,
+            isActive = isActive,
+            displayOrder = displayOrder,
+            productCount = productCount
+        )
+    }
 
-/**
- * Converts CategoryEntity (database) to CategoryDto (API format).
- */
-fun CategoryEntity.toDto(): CategoryDto = CategoryDto(
-    id = id,
-    name = name,
-    nameEn = nameEn,
-    slug = slug,
-    icon = icon
-)
+    /**
+     * Convert Category (domain) to CategoryEntity.
+     */
+    fun Category.toEntity(): CategoryEntity {
+        return CategoryEntity(
+            id = id,
+            name = name,
+            nameEn = nameEn,
+            description = description,
+            iconUrl = iconUrl,
+            parentId = parentId,
+            isActive = isActive,
+            displayOrder = displayOrder,
+            productCount = productCount
+        )
+    }
 
-/**
- * Converts CategoryEntity (database) to Category (domain model).
- */
-fun CategoryEntity.toDomain(): Category = Category(
-    id = id,
-    name = name,
-    nameEn = nameEn,
-    slug = slug,
-    icon = icon
-)
-
-/**
- * Converts CategoryDto (API response) to Category (domain model).
- */
-fun CategoryDto.toDomain(): Category = Category(
-    id = id,
-    name = name,
-    nameEn = nameEn,
-    slug = slug,
-    icon = icon
-)
-
-/**
- * Converts a list of CategoryEntity to a list of Category (domain model).
- */
-fun List<CategoryEntity>.toDomain(): List<Category> = map { it.toDomain() }
-
-/**
- * Converts a list of CategoryDto to a list of Category (domain model).
- */
-fun List<CategoryDto>.toDomain(): List<Category> = map { it.toDomain() }
+    /**
+     * Convert CategoryEntity to Category (domain).
+     */
+    fun CategoryEntity.toDomain(): Category {
+        return Category(
+            id = id,
+            name = name,
+            nameEn = nameEn,
+            description = description,
+            iconUrl = iconUrl,
+            parentId = parentId,
+            isActive = isActive,
+            displayOrder = displayOrder,
+            productCount = productCount
+        )
+    }
+}
