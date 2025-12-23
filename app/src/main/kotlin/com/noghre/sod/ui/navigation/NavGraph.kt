@@ -4,42 +4,80 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.noghre.sod.ui.screens.HomeScreen
-import com.noghre.sod.ui.screens.CartScreen
-import com.noghre.sod.ui.screens.ProfileScreen
-import com.noghre.sod.ui.screens.OrderScreen
 
-sealed class Route(val route: String) {
-    object Home : Route("home")
-    object Products : Route("products")
-    object ProductDetail : Route("product/{productId}")
-    object Cart : Route("cart")
-    object Orders : Route("orders")
-    object OrderDetail : Route("order/{orderId}")
-    object Profile : Route("profile")
-}
-
+/**
+ * Main navigation graph for the app
+ *
+ * @param navController Navigation controller
+ * @param startDestination Starting route
+ */
 @Composable
 fun NavGraph(
-    navController: NavHostController = rememberNavController(),
-    startDestination: String = Route.Home.route
+    navController: NavHostController,
+    startDestination: String = Screen.Home.route
 ) {
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
-        composable(Route.Home.route) {
-            HomeScreen(navController)
+        // Auth screens
+        composable(Screen.Login.route) {
+            // LoginScreen(navController)
         }
-        composable(Route.Cart.route) {
-            CartScreen(navController)
+        composable(Screen.Register.route) {
+            // RegisterScreen(navController)
         }
-        composable(Route.Orders.route) {
-            OrderScreen(navController)
+        composable(Screen.OtpVerification.route) { backStackEntry ->
+            val phone = backStackEntry.arguments?.getString("phone") ?: ""
+            // OtpVerificationScreen(phone, navController)
         }
-        composable(Route.Profile.route) {
-            ProfileScreen(navController)
+
+        // Main screens
+        composable(Screen.Home.route) {
+            // HomeScreen(navController)
+        }
+        composable(Screen.ProductDetail.route) { backStackEntry ->
+            val productId = backStackEntry.arguments?.getString("productId") ?: ""
+            // ProductDetailScreen(productId, navController)
+        }
+        composable(Screen.Cart.route) {
+            // CartScreen(navController)
+        }
+        composable(Screen.Checkout.route) {
+            // CheckoutScreen(navController)
+        }
+        composable(Screen.OrderConfirmation.route) {
+            // OrderConfirmationScreen(navController)
+        }
+
+        // User screens
+        composable(Screen.Profile.route) {
+            // ProfileScreen(navController)
+        }
+        composable(Screen.Orders.route) {
+            // OrdersScreen(navController)
+        }
+        composable(Screen.OrderDetail.route) { backStackEntry ->
+            val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
+            // OrderDetailScreen(orderId, navController)
+        }
+        composable(Screen.Addresses.route) {
+            // AddressesScreen(navController)
+        }
+        composable(Screen.AddEditAddress.route) { backStackEntry ->
+            val addressId = backStackEntry.arguments?.getString("addressId")
+            // AddEditAddressScreen(addressId, navController)
+        }
+
+        // Other screens
+        composable(Screen.Favorites.route) {
+            // FavoritesScreen(navController)
+        }
+        composable(Screen.Search.route) {
+            // SearchScreen(navController)
+        }
+        composable(Screen.Categories.route) {
+            // CategoriesScreen(navController)
         }
     }
 }
