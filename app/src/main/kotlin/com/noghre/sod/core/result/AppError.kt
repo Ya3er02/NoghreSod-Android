@@ -1,244 +1,182 @@
 package com.noghre.sod.core.result
 
+import android.util.Log
+import retrofit2.HttpException
 import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
- * Sealed class representing different types of errors that can occur in the application.
- * Each error type includes Persian localized error messages.
- *
- * This class provides a single point for error handling and localization throughout the app.
+ * Sealed class representing different error types in the application.
+ * Each error type has a user-friendly Persian message.
  */
-sealed class AppError : Throwable() {
+sealed class AppError : Exception() {
+    abstract val userMessage: String
+    abstract val code: String
+
     /**
-     * Network-related errors.
+     * Network error when device has no internet connection.
      */
-    sealed class NetworkError : AppError() {
-        object NoConnection : NetworkError() {
-            override fun getMessage(): String = "اتصال اینترنت برقرار نیست"
-            override fun toString(): String = "NoConnection: ${getMessage()}"
-        }
+    data class NetworkError(
+        val exception: IOException,
+        override val userMessage: String = "خطا در اتصال به اینترنت. لطفا اتصال خود را بررسی کنید.",
+        override val code: String = "NETWORK_ERROR"
+    ) : AppError()
 
-        object Timeout : NetworkError() {
-            override fun getMessage(): String = "درخواست به مدت زمان مشخصی پاسخ نداد. لطفاً دوباره سعی کنید"
-            override fun toString(): String = "Timeout: ${getMessage()}"
-        }
+    /**
+     * Timeout error when server doesn't respond in time.
+     */
+    data class TimeoutError(
+        val exception: SocketTimeoutException,
+        override val userMessage: String = "مهلت درخواست به پایان رسید. لطفا دوباره تلاش کنید.",
+        override val code: String = "TIMEOUT_ERROR"
+    ) : AppError()
 
-        object SSLError : NetworkError() {
-            override fun getMessage(): String = "خطا در برقراری اتصال ایمن. لطفاً بعداً سعی کنید"
-            override fun toString(): String = "SSLError: ${getMessage()}"
-        }
+    /**
+     * Server error for 4xx and 5xx status codes.
+     */
+    data class ServerError(
+        val statusCode: Int,
+        val serverMessage: String?,
+        override val code: String,
+        override val userMessage: String
+    ) : AppError() {
+        companion object {
+            fun from(exception: HttpException): ServerError {
+                val statusCode = exception.code()
+                val serverMessage = exception.response()?.errorBody()?.string()
 
-        data class DNSError(val cause: String = "") : NetworkError() {
-            override fun getMessage(): String = "نام سرور پیدا نشد. لطفاً اتصال اینترنت خود را بررسی کنید"
-            override fun toString(): String = "DNSError: ${getMessage()}"
+                return when (statusCode) {
+                    400 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "BAD_REQUEST",
+                        "درخواست نامعتبر. لطفا اطلاعات خود را بررسی کنید."
+                    )
+                    401 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "UNAUTHORIZED",
+                        "شناسایی اعتباری ناموفق. لطفا مجددا وارد شوید."
+                    )
+                    403 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "FORBIDDEN",
+                        "شما اجازه دسترسی به این منبع را ندارید."
+                    )
+                    404 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "NOT_FOUND",
+                        "منبع درخواستی یافت نشد."
+                    )
+                    409 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "CONFLICT",
+                        "یک تعارض رخ داد. لطفا دوباره تلاش کنید."
+                    )
+                    422 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "UNPROCESSABLE_ENTITY",
+                        "اطلاعات ارسال‌شده قابل‌پردازش نیستند."
+                    )
+                    500 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "INTERNAL_SERVER_ERROR",
+                        "خطای سرور. لطفا بعدا دوباره تلاش کنید."
+                    )
+                    502, 503, 504 -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "SERVICE_UNAVAILABLE",
+                        "سرویس موقتا در دسترس نیست. لطفا بعدا دوباره تلاش کنید."
+                    )
+                    else -> ServerError(
+                        statusCode,
+                        serverMessage,
+                        "UNKNOWN_HTTP_ERROR",
+                        "خطای سرور (${statusCode}). لطفا بعدا دوباره تلاش کنید."
+                    )
+                }
+            }
         }
     }
 
     /**
-     * Server-related errors (4xx, 5xx responses).
+     * Authentication error for auth-related failures.
      */
-    sealed class ServerError : AppError() {
-        data class BadRequest(
-            val code: Int = 400,
-            val message: String = "درخواست نامعتبر است"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "BadRequest($code): $message"
-        }
-
-        data class Unauthorized(
-            val code: Int = 401,
-            val message: String = "شما وارد نشده‌اید. لطفاً وارد شوید"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "Unauthorized($code): $message"
-        }
-
-        data class Forbidden(
-            val code: Int = 403,
-            val message: String = "شما اجازه دسترسی به این منابع را ندارید"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "Forbidden($code): $message"
-        }
-
-        data class NotFound(
-            val code: Int = 404,
-            val message: String = "منبع درخواستی پیدا نشد"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "NotFound($code): $message"
-        }
-
-        data class Conflict(
-            val code: Int = 409,
-            val message: String = "این آیتم قبلاً وجود دارد"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "Conflict($code): $message"
-        }
-
-        data class ValidationError(
-            val code: Int = 422,
-            val message: String = "داده‌های ارسالی معتبر نیستند",
-            val fieldErrors: Map<String, String> = emptyMap()
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "ValidationError($code): $message - Fields: $fieldErrors"
-        }
-
-        data class InternalServerError(
-            val code: Int = 500,
-            val message: String = "خطای سرور. لطفاً بعداً سعی کنید"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "InternalServerError($code): $message"
-        }
-
-        data class ServiceUnavailable(
-            val code: Int = 503,
-            val message: String = "سرویس موقتاً در دسترس نیست. لطفاً بعداً سعی کنید"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "ServiceUnavailable($code): $message"
-        }
-
-        data class UnknownServerError(
-            val code: Int,
-            val message: String = "خطای سرور نامعلوم"
-        ) : ServerError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "UnknownServerError($code): $message"
-        }
-    }
+    data class AuthError(
+        val reason: String,
+        override val userMessage: String = "خطای احراز هویت. لطفا مجددا وارد شوید.",
+        override val code: String = "AUTH_ERROR"
+    ) : AppError()
 
     /**
-     * Authentication-related errors.
+     * Token refresh error.
      */
-    sealed class AuthError : AppError() {
-        object TokenExpired : AuthError() {
-            override fun getMessage(): String = "نشست شما منقضی شده است. لطفاً دوباره وارد شوید"
-            override fun toString(): String = "TokenExpired: ${getMessage()}"
-        }
-
-        object InvalidCredentials : AuthError() {
-            override fun getMessage(): String = "نام کاربری یا رمز عبور نادرست است"
-            override fun toString(): String = "InvalidCredentials: ${getMessage()}"
-        }
-
-        object RefreshFailed : AuthError() {
-            override fun getMessage(): String = "نمی‌توان نشست شما را بازیابی کنید. لطفاً دوباره وارد شوید"
-            override fun toString(): String = "RefreshFailed: ${getMessage()}"
-        }
-
-        data class Generic(val message: String) : AuthError() {
-            override fun getMessage(): String = message
-            override fun toString(): String = "AuthError: $message"
-        }
-    }
+    data class TokenRefreshError(
+        val cause: Exception,
+        override val userMessage: String = "ناموفق در تازه‌کردن اعتبار. لطفا مجددا وارد شوید.",
+        override val code: String = "TOKEN_REFRESH_ERROR"
+    ) : AppError()
 
     /**
-     * Validation errors with field information.
+     * Validation error for input validation failures.
      */
     data class ValidationError(
-        val fields: Map<String, String> = emptyMap(),
-        val message: String = "اطلاعات ارسالی معتبر نیستند"
+        val fieldErrors: Map<String, String>,
+        override val code: String = "VALIDATION_ERROR",
+        override val userMessage: String = buildValidationMessage(fieldErrors)
     ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "ValidationError: $message - Fields: $fields"
+        companion object {
+            private fun buildValidationMessage(errors: Map<String, String>): String {
+                return if (errors.isEmpty()) {
+                    "خطای اعتبارسنجی"
+                } else {
+                    "خطاهای اعتبارسنجی:\n" + errors.values.joinToString("\n")
+                }
+            }
+        }
     }
 
     /**
-     * Database-related errors.
+     * Local database error.
      */
     data class DatabaseError(
-        val message: String = "خطای پایگاه داده رخ داد",
-        val cause: Throwable? = null
-    ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "DatabaseError: $message"
-    }
+        val exception: Exception,
+        override val userMessage: String = "خطای پایگاه داده. لطفا دوباره تلاش کنید.",
+        override val code: String = "DATABASE_ERROR"
+    ) : AppError()
 
     /**
-     * Parse/Serialization errors.
-     */
-    data class ParseError(
-        val message: String = "خطا در پردازش داده‌ها",
-        val cause: Throwable? = null
-    ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "ParseError: $message"
-    }
-
-    /**
-     * Cache-related errors.
-     */
-    data class CacheError(
-        val message: String = "خطا در دسترسی به کش",
-        val cause: Throwable? = null
-    ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "CacheError: $message"
-    }
-
-    /**
-     * File-related errors.
-     */
-    data class FileError(
-        val message: String = "خطا در دسترسی به فایل",
-        val cause: Throwable? = null
-    ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "FileError: $message"
-    }
-
-    /**
-     * Permission-related errors.
-     */
-    data class PermissionError(
-        val message: String = "دسترسی رد شد",
-        val cause: Throwable? = null
-    ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "PermissionError: $message"
-    }
-
-    /**
-     * Unknown/Unexpected errors.
+     * Unknown error for unexpected exceptions.
      */
     data class UnknownError(
-        val message: String = "خطای نامعلوم رخ داد",
-        val cause: Throwable? = null
-    ) : AppError() {
-        override fun getMessage(): String = message
-        override fun toString(): String = "UnknownError: $message"
-    }
-
-    /**
-     * Returns a user-friendly message in Persian.
-     */
-    abstract override fun getMessage(): String
+        val exception: Throwable,
+        override val userMessage: String = "خطای نامشخص رخ داد. لطفا دوباره تلاش کنید.",
+        override val code: String = "UNKNOWN_ERROR"
+    ) : AppError()
 }
 
 /**
- * Extension function to convert a Throwable to AppError.
+ * Extension function to convert Throwable to AppError.
  */
-fun Throwable.toAppError(): AppError = when (this) {
-    is AppError -> this
-    is IOException -> when {
-        this.message?.contains("timeout", ignoreCase = true) == true ->
-            AppError.NetworkError.Timeout
-        this.message?.contains("unable to resolve", ignoreCase = true) == true ->
-            AppError.NetworkError.DNSError(this.message ?: "")
-        else -> AppError.NetworkError.NoConnection
+fun Throwable.toAppError(): AppError {
+    return when (this) {
+        is AppError -> this
+        is HttpException -> AppError.ServerError.from(this)
+        is ConnectException -> AppError.NetworkError(this as IOException)
+        is UnknownHostException -> AppError.NetworkError(this as IOException)
+        is SocketTimeoutException -> AppError.TimeoutError(this)
+        is IOException -> AppError.NetworkError(this)
+        else -> {
+            Log.e("AppError", "Unexpected error: ", this)
+            AppError.UnknownError(this)
+        }
     }
-    else -> AppError.UnknownError(
-        message = this.message ?: "خطای نامعلوم رخ داد",
-        cause = this
-    )
 }
-
-/**
- * Extension function to get a user-friendly error message.
- */
-fun AppError.toUserMessage(): String = this.getMessage()
