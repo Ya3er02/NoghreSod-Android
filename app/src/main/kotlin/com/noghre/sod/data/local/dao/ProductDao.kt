@@ -1,22 +1,15 @@
 package com.noghre.sod.data.local.dao
 
-import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
-import com.noghre.sod.data.model.ProductEntity
+import androidx.room.*
+import com.noghre.sod.data.local.entity.FavoriteProductEntity
+import com.noghre.sod.data.local.entity.ProductEntity
+import com.noghre.sod.data.local.entity.ProductReviewEntity
 import kotlinx.coroutines.flow.Flow
 
-/**
- * Product Data Access Object (DAO)
- * Handles all product-related database operations
- */
 @Dao
 interface ProductDao {
 
-    // ==================== INSERT Operations ====================
+    // ==================== Product Operations ====================
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProduct(product: ProductEntity)
@@ -24,117 +17,52 @@ interface ProductDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProducts(products: List<ProductEntity>)
 
-    // ==================== QUERY Operations ====================
-
     @Query("SELECT * FROM products WHERE id = :productId")
-    suspend fun getProductById(productId: String): ProductEntity?
+    fun getProduct(productId: String): Flow<ProductEntity?>
 
-    @Query("SELECT * FROM products WHERE id = :productId")
-    fun getProductByIdFlow(productId: String): Flow<ProductEntity?>
+    @Query("SELECT * FROM products ORDER BY createdAt DESC LIMIT :pageSize OFFSET :offset")
+    fun getAllProducts(offset: Int, pageSize: Int): Flow<List<ProductEntity>>
 
-    @Query("SELECT * FROM products ORDER BY createdAt DESC")
-    fun getAllProducts(): Flow<List<ProductEntity>>
+    @Query("SELECT * FROM products WHERE category = :category ORDER BY createdAt DESC LIMIT :pageSize OFFSET :offset")
+    fun getProductsByCategory(category: String, offset: Int, pageSize: Int): Flow<List<ProductEntity>>
 
-    @Query(
-        """SELECT * FROM products 
-           WHERE categoryId = :categoryId 
-           ORDER BY createdAt DESC"""
-    )
-    fun getProductsByCategory(categoryId: String): Flow<List<ProductEntity>>
+    @Query("SELECT * FROM products WHERE name LIKE :query OR nameInFarsi LIKE :query LIMIT :pageSize OFFSET :offset")
+    fun searchProducts(query: String, offset: Int, pageSize: Int): Flow<List<ProductEntity>>
 
-    @Query(
-        """SELECT * FROM products 
-           WHERE LOWER(name) LIKE '%' || LOWER(:query) || '%' 
-           OR LOWER(nameFA) LIKE '%' || LOWER(:query) || '%'
-           ORDER BY createdAt DESC"""
-    )
-    fun searchProducts(query: String): Flow<List<ProductEntity>>
-
-    @Query(
-        """SELECT * FROM products 
-           WHERE purity = :purity 
-           ORDER BY createdAt DESC"""
-    )
-    fun getProductsByPurity(purity: String): Flow<List<ProductEntity>>
-
-    @Query(
-        """SELECT * FROM products 
-           WHERE isFavorite = 1 
-           ORDER BY createdAt DESC"""
-    )
-    fun getFavoriteProducts(): Flow<List<ProductEntity>>
-
-    @Query(
-        """SELECT * FROM products 
-           WHERE isNew = 1 
-           ORDER BY createdAt DESC 
-           LIMIT :limit"""
-    )
-    fun getNewProducts(limit: Int = 10): Flow<List<ProductEntity>>
-
-    @Query(
-        """SELECT * FROM products 
-           WHERE discount > 0 
-           ORDER BY discount DESC 
-           LIMIT :limit"""
-    )
-    fun getDiscountedProducts(limit: Int = 10): Flow<List<ProductEntity>>
-
-    @Query(
-        """SELECT * FROM products 
-           WHERE stock > 0 
-           ORDER BY createdAt DESC"""
-    )
-    fun getInStockProducts(): Flow<List<ProductEntity>>
-
-    @Query("SELECT COUNT(*) FROM products")
-    suspend fun getProductCount(): Int
-
-    @Query(
-        """SELECT * FROM products 
-           ORDER BY rating DESC 
-           LIMIT :limit"""
-    )
-    fun getTopRatedProducts(limit: Int = 10): Flow<List<ProductEntity>>
-
-    // ==================== UPDATE Operations ====================
+    @Query("SELECT * FROM products WHERE rating >= 4.0 ORDER BY rating DESC LIMIT :limit")
+    fun getFeaturedProducts(limit: Int = 10): Flow<List<ProductEntity>>
 
     @Update
     suspend fun updateProduct(product: ProductEntity)
 
-    @Update
-    suspend fun updateProducts(products: List<ProductEntity>)
-
-    @Query("UPDATE products SET isFavorite = :isFavorite WHERE id = :productId")
-    suspend fun updateFavoriteStatus(productId: String, isFavorite: Boolean)
-
-    @Query("UPDATE products SET stock = :stock WHERE id = :productId")
-    suspend fun updateStock(productId: String, stock: Int)
-
-    @Query(
-        """UPDATE products 
-           SET lastSyncedAt = :timestamp 
-           WHERE id = :productId"""
-    )
-    suspend fun updateSyncTime(productId: String, timestamp: Long)
-
-    // ==================== DELETE Operations ====================
-
     @Delete
     suspend fun deleteProduct(product: ProductEntity)
-
-    @Query("DELETE FROM products WHERE id = :productId")
-    suspend fun deleteProductById(productId: String)
 
     @Query("DELETE FROM products")
     suspend fun deleteAllProducts()
 
-    // ==================== SYNC Operations ====================
+    // ==================== Favorite Operations ====================
 
-    @Query(
-        """SELECT * FROM products 
-           WHERE lastSyncedAt < :timestamp 
-           ORDER BY updatedAt DESC"""
-    )
-    suspend fun getOutdatedProducts(timestamp: Long): List<ProductEntity>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun addToFavorites(favorite: FavoriteProductEntity)
+
+    @Query("DELETE FROM favorite_products WHERE productId = :productId")
+    suspend fun removeFromFavorites(productId: String)
+
+    @Query("SELECT * FROM products WHERE id IN (SELECT productId FROM favorite_products ORDER BY addedAt DESC)")
+    fun getFavoriteProducts(): Flow<List<ProductEntity>>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorite_products WHERE productId = :productId)")
+    fun isFavorite(productId: String): Flow<Boolean>
+
+    // ==================== Review Operations ====================
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReview(review: ProductReviewEntity)
+
+    @Query("SELECT * FROM product_reviews WHERE productId = :productId ORDER BY createdAt DESC")
+    fun getProductReviews(productId: String): Flow<List<ProductReviewEntity>>
+
+    @Delete
+    suspend fun deleteReview(review: ProductReviewEntity)
 }
