@@ -1,29 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<network-security-config
-    xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- Cleartext traffic is not allowed except for localhost -->
-    <domain-config cleartextTrafficAllowed="false">
-        <domain includeSubdomains="true">api.noghre.sod</domain>
-        <domain includeSubdomains="true">cdn.noghre.sod</domain>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.noghresod.com</domain>
+        <pin-set expiration="2026-12-31">
+            <pin digest="SHA-256">CERTIFICATE_PIN_HERE</pin>
+        </pin-set>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
-    </domain-config>
-
-    <!-- Allow cleartext only for localhost debug builds -->
-    <domain-config cleartextTrafficAllowed="true">
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-    </domain-config>
-
-    <!-- Certificate pinning for production (optional) -->
-    <!-- Uncomment and update with actual certificates -->
-    <!-- <pin-set>
-        <pin digest="SHA-256">base64encodedvalue==</pin>
-        <pin digest="SHA-256">backup-pin==</pin>
-        <expiration>2025-12-31</expiration>
-    </pin-set> -->
-
+    </base-config>
 </network-security-config>
