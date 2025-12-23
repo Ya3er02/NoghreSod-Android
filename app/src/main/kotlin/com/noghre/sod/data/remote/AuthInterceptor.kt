@@ -1,10 +1,10 @@
 package com.noghre.sod.data.remote
 
 import android.util.Log
+import com.noghre.sod.data.local.TokenManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
-from com.noghre.sod.data.local.TokenManager
 
 /**
  * OkHttp interceptor that automatically handles JWT token injection and refresh.
