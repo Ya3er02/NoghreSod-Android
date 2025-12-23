@@ -1,69 +1,87 @@
 package com.noghre.sod.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * Room entity for storing product information locally.
- * Includes caching metadata for offline-first strategy.
- *
- * @param id Unique product identifier
- * @param name Product name in Persian
- * @param nameEn Product name in English
- * @param description Product description
- * @param price Product price in Rials
- * @param images Comma-separated list of image URLs
- * @param categoryId Reference to category
- * @param weight Product weight in grams
- * @param purity Product purity percentage
- * @param stock Current stock quantity
- * @param createdAt Backend creation timestamp
- * @param updatedAt Backend last update timestamp
- * @param cachedAt Local cache timestamp for invalidation
+ * Room entity for Product local caching.
+ * Stores product data for offline access and performance optimization.
  */
 @Entity(
     tableName = "products",
-    foreignKeys = [
-        ForeignKey(
-            entity = CategoryEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["categoryId"],
-            onDelete = ForeignKey.SET_NULL,
-            onUpdate = ForeignKey.CASCADE
-        )
-    ],
     indices = [
-        Index("id", unique = true),
-        Index("categoryId"),
-        Index("cachedAt"),
-        Index("name")
+        Index("category_id"),
+        Index("is_favorite"),
+        Index("cached_at")
     ]
 )
 data class ProductEntity(
     @PrimaryKey
+    @ColumnInfo(name = "id")
     val id: String,
+
+    @ColumnInfo(name = "name")
     val name: String,
-    val nameEn: String? = null,
+
+    @ColumnInfo(name = "name_en")
+    val nameEn: String?,
+
+    @ColumnInfo(name = "description")
     val description: String,
+
+    @ColumnInfo(name = "description_en")
+    val descriptionEn: String?,
+
+    @ColumnInfo(name = "price")
     val price: Double,
-    val images: String = "", // Stored as comma-separated
-    val categoryId: String? = null,
-    val weight: Double? = null,
-    val purity: String? = null,
-    val stock: Int = 0,
-    val createdAt: Long? = null,
-    val updatedAt: Long? = null,
-    // Caching metadata
+
+    @ColumnInfo(name = "discount_price")
+    val discountPrice: Double?,
+
+    @ColumnInfo(name = "images")
+    val images: String, // JSON serialized list
+
+    @ColumnInfo(name = "category_id")
+    val categoryId: String,
+
+    @ColumnInfo(name = "stock")
+    val stock: Int,
+
+    @ColumnInfo(name = "rating")
+    val rating: Float,
+
+    @ColumnInfo(name = "review_count")
+    val reviewCount: Int,
+
+    @ColumnInfo(name = "weight")
+    val weight: Double?,
+
+    @ColumnInfo(name = "material")
+    val material: String,
+
+    @ColumnInfo(name = "specifications")
+    val specifications: String?, // JSON serialized map
+
+    @ColumnInfo(name = "seller_id")
+    val sellerId: String,
+
+    @ColumnInfo(name = "seller_name")
+    val sellerName: String?,
+
+    @ColumnInfo(name = "seller_rating")
+    val sellerRating: Float?,
+
+    @ColumnInfo(name = "is_favorite")
+    val isFavorite: Boolean = false,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: String?,
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: String?,
+
+    @ColumnInfo(name = "cached_at")
     val cachedAt: Long = System.currentTimeMillis()
-) {
-    /**
-     * Checks if this cached product is still valid.
-     * Cache is considered valid for 24 hours.
-     */
-    fun isCacheValid(validityHours: Int = 24): Boolean {
-        val cacheValidityMs = validityHours * 60 * 60 * 1000L
-        return (System.currentTimeMillis() - cachedAt) < cacheValidityMs
-    }
-}
+)
