@@ -1,22 +1,141 @@
 package com.noghre.sod.data.remote
 
+import com.noghre.sod.core.config.ApiEndpoints
+import com.noghre.sod.data.dto.*
 import retrofit2.Response
 import retrofit2.http.*
-import com.noghre.sod.data.dto.*
-import com.noghre.sod.core.config.ApiEndpoints
 
 /**
- * Retrofit API service interface for NoghreSod Marketplace.
- * All endpoints are aligned with the backend API structure.
+ * Retrofit API service interface for all backend endpoints.
+ * All endpoints are aligned with NoghreSod backend API specification.
  *
- * Base URL: https://api.noghresod.com/
+ * The API service automatically handles:
+ * - Token injection via AuthInterceptor
+ * - Error conversion via SafeApiCall
+ * - Base URL management via Retrofit configuration
  */
 interface ApiService {
 
-    // ===== Authentication Endpoints =====
+    // ============ PRODUCTS ENDPOINTS ============
+
     /**
-     * Login with email and password
-     * POST /auth/login
+     * Fetches paginated list of products.
+     *
+     * @param page Page number (1-indexed)
+     * @param limit Number of items per page
+     * @param category Optional category filter
+     * @param sort Optional sort parameter (e.g., "price_asc", "price_desc")
+     * @return Paginated response of products
+     */
+    @GET(ApiEndpoints.Products.LIST)
+    suspend fun getProducts(
+        @Query(ApiEndpoints.QueryParams.PAGE) page: Int = 1,
+        @Query(ApiEndpoints.QueryParams.LIMIT) limit: Int = 20,
+        @Query(ApiEndpoints.QueryParams.CATEGORY) category: String? = null,
+        @Query(ApiEndpoints.QueryParams.SORT) sort: String? = null
+    ): Response<PaginatedResponse<ProductDto>>
+
+    /**
+     * Fetches a single product by ID.
+     *
+     * @param id Product ID
+     * @return Product details
+     */
+    @GET(ApiEndpoints.Products.DETAIL)
+    suspend fun getProductDetail(
+        @Path("id") id: String
+    ): Response<ApiResponse<ProductDto>>
+
+    /**
+     * Searches products by query.
+     *
+     * @param query Search query string
+     * @param page Page number
+     * @param limit Items per page
+     * @return Paginated search results
+     */
+    @GET(ApiEndpoints.Products.SEARCH)
+    suspend fun searchProducts(
+        @Query(ApiEndpoints.QueryParams.QUERY) query: String,
+        @Query(ApiEndpoints.QueryParams.PAGE) page: Int = 1,
+        @Query(ApiEndpoints.QueryParams.LIMIT) limit: Int = 20
+    ): Response<PaginatedResponse<ProductDto>>
+
+    /**
+     * Fetches products by category.
+     *
+     * @param categoryId Category ID
+     * @param page Page number
+     * @param limit Items per page
+     * @return Paginated products for category
+     */
+    @GET(ApiEndpoints.Products.BY_CATEGORY)
+    suspend fun getProductsByCategory(
+        @Path("categoryId") categoryId: String,
+        @Query(ApiEndpoints.QueryParams.PAGE) page: Int = 1,
+        @Query(ApiEndpoints.QueryParams.LIMIT) limit: Int = 20
+    ): Response<PaginatedResponse<ProductDto>>
+
+    // ============ CATEGORIES ENDPOINTS ============
+
+    /**
+     * Fetches all product categories.
+     *
+     * @return List of categories
+     */
+    @GET(ApiEndpoints.Categories.LIST)
+    suspend fun getCategories(): Response<ApiResponse<List<CategoryDto>>>
+
+    /**
+     * Fetches a single category by ID.
+     *
+     * @param id Category ID
+     * @return Category details
+     */
+    @GET(ApiEndpoints.Categories.DETAIL)
+    suspend fun getCategoryDetail(
+        @Path("id") id: String
+    ): Response<ApiResponse<CategoryDto>>
+
+    // ============ PRICING ENDPOINTS ============
+
+    /**
+     * Fetches current live silver price.
+     *
+     * @return Current silver price information
+     */
+    @GET(ApiEndpoints.Prices.LIVE)
+    suspend fun getLivePrice(): Response<ApiResponse<SilverPriceDto>>
+
+    /**
+     * Fetches historical silver price data.
+     *
+     * @param days Number of days to fetch history for (default 30)
+     * @return List of historical prices
+     */
+    @GET(ApiEndpoints.Prices.HISTORY)
+    suspend fun getPriceHistory(
+        @Query(ApiEndpoints.QueryParams.DAYS) days: Int = 30
+    ): Response<ApiResponse<List<SilverPriceDto>>>
+
+    /**
+     * Calculates final price based on weight and purity.
+     *
+     * @param request Calculation request with weight and purity
+     * @return Calculated price
+     */
+    @POST(ApiEndpoints.Prices.CALCULATE)
+    suspend fun calculatePrice(
+        @Body request: PriceCalculationRequest
+    ): Response<ApiResponse<PriceCalculationResponse>>
+
+    // ============ AUTHENTICATION ENDPOINTS ============
+
+    /**
+     * Logs in a user with email and password.
+     *
+     * @param request Login credentials
+     * @return Authentication response with tokens
      */
     @POST(ApiEndpoints.Auth.LOGIN)
     suspend fun login(
@@ -24,8 +143,10 @@ interface ApiService {
     ): Response<ApiResponse<AuthResponse>>
 
     /**
-     * Register a new user
-     * POST /auth/register
+     * Registers a new user.
+     *
+     * @param request Registration details
+     * @return Authentication response with tokens
      */
     @POST(ApiEndpoints.Auth.REGISTER)
     suspend fun register(
@@ -33,233 +154,54 @@ interface ApiService {
     ): Response<ApiResponse<AuthResponse>>
 
     /**
-     * Refresh access token
-     * POST /auth/refresh
+     * Refreshes access token using refresh token.
+     *
+     * @param request Refresh token request
+     * @return New access token
      */
-    @POST(ApiEndpoints.Auth.REFRESH_TOKEN)
+    @POST(ApiEndpoints.Auth.REFRESH)
     suspend fun refreshToken(
         @Body request: RefreshTokenRequest
-    ): Response<ApiResponse<AuthResponse>>
+    ): Response<RefreshTokenResponse>
 
     /**
-     * Logout user
-     * POST /auth/logout
+     * Logs out the current user.
+     * Revokes the refresh token on server.
+     *
+     * @return Logout response
      */
     @POST(ApiEndpoints.Auth.LOGOUT)
     suspend fun logout(): Response<ApiResponse<Unit>>
 
-    // ===== Product Endpoints =====
-    /**
-     * Get paginated list of products
-     * GET /api/products?page={page}&limit={limit}&category={category}&sort={sort}
-     */
-    @GET(ApiEndpoints.Products.LIST)
-    suspend fun getProducts(
-        @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20,
-        @Query("category") category: String? = null,
-        @Query("sort") sort: String? = null
-    ): Response<ApiResponse<PaginatedResponse<ProductDto>>>
+    // ============ USER ENDPOINTS ============
 
     /**
-     * Get product by ID
-     * GET /api/products/{id}
+     * Fetches current user profile.
+     *
+     * @return User profile data
      */
-    @GET(ApiEndpoints.Products.DETAIL)
-    suspend fun getProductById(
-        @Path("id") id: String
-    ): Response<ApiResponse<ProductDto>>
-
-    /**
-     * Search products
-     * GET /api/products/search?q={query}&page={page}&limit={limit}
-     */
-    @GET(ApiEndpoints.Products.SEARCH)
-    suspend fun searchProducts(
-        @Query("q") query: String,
-        @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20
-    ): Response<ApiResponse<PaginatedResponse<ProductDto>>>
-
-    /**
-     * Get trending products
-     * GET /api/products/trending
-     */
-    @GET(ApiEndpoints.Products.TRENDING)
-    suspend fun getTrendingProducts(
-        @Query("limit") limit: Int = 10
-    ): Response<ApiResponse<List<ProductDto>>>
-
-    /**
-     * Get featured products
-     * GET /api/products/featured
-     */
-    @GET(ApiEndpoints.Products.FEATURED)
-    suspend fun getFeaturedProducts(
-        @Query("limit") limit: Int = 10
-    ): Response<ApiResponse<List<ProductDto>>>
-
-    // ===== Category Endpoints =====
-    /**
-     * Get all categories
-     * GET /api/categories
-     */
-    @GET(ApiEndpoints.Categories.LIST)
-    suspend fun getCategories(): Response<ApiResponse<List<CategoryDto>>>
-
-    /**
-     * Get category by ID
-     * GET /api/categories/{id}
-     */
-    @GET(ApiEndpoints.Categories.DETAIL)
-    suspend fun getCategoryById(
-        @Path("id") id: String
-    ): Response<ApiResponse<CategoryDto>>
-
-    // ===== Silver Price Endpoints =====
-    /**
-     * Get current live silver price
-     * GET /api/prices/live
-     */
-    @GET(ApiEndpoints.Prices.LIVE_PRICE)
-    suspend fun getLiveSilverPrice(): Response<ApiResponse<SilverPriceDto>>
-
-    /**
-     * Get silver price history
-     * GET /api/prices/history?days={days}
-     */
-    @GET(ApiEndpoints.Prices.PRICE_HISTORY)
-    suspend fun getPriceHistory(
-        @Query("days") days: Int = 30
-    ): Response<ApiResponse<List<SilverPriceDto>>>
-
-    /**
-     * Calculate price based on weight and silver price
-     * POST /api/prices/calculate
-     */
-    @POST(ApiEndpoints.Prices.CALCULATE_PRICE)
-    suspend fun calculatePrice(
-        @Body request: PriceCalculationRequest
-    ): Response<ApiResponse<PriceCalculationResponse>>
-
-    /**
-     * Get price trends
-     * GET /api/prices/trends
-     */
-    @GET(ApiEndpoints.Prices.PRICE_TRENDS)
-    suspend fun getPriceTrends(
-        @Query("days") days: Int = 30
-    ): Response<ApiResponse<PriceTrendsDto>>
-
-    // ===== User Profile Endpoints =====
-    /**
-     * Get user profile
-     * GET /api/user/profile
-     */
-    @GET(ApiEndpoints.User.PROFILE)
+    @GET(ApiEndpoints.Users.PROFILE)
     suspend fun getUserProfile(): Response<ApiResponse<UserDto>>
 
     /**
-     * Update user profile
-     * PUT /api/user/profile
+     * Updates user profile information.
+     *
+     * @param request Updated user information
+     * @return Updated user profile
      */
-    @PUT(ApiEndpoints.User.UPDATE_PROFILE)
-    suspend fun updateUserProfile(
+    @PUT(ApiEndpoints.Users.UPDATE_PROFILE)
+    suspend fun updateProfile(
         @Body request: UpdateProfileRequest
     ): Response<ApiResponse<UserDto>>
 
     /**
-     * Change password
-     * POST /api/user/change-password
+     * Changes user password.
+     *
+     * @param request Current and new passwords
+     * @return Success response
      */
-    @POST(ApiEndpoints.User.CHANGE_PASSWORD)
+    @POST(ApiEndpoints.Users.CHANGE_PASSWORD)
     suspend fun changePassword(
         @Body request: ChangePasswordRequest
     ): Response<ApiResponse<Unit>>
-
-    // ===== Wishlist Endpoints =====
-    /**
-     * Get user wishlist
-     * GET /api/user/wishlist
-     */
-    @GET(ApiEndpoints.Wishlist.LIST)
-    suspend fun getWishlist(
-        @Query("page") page: Int = 1,
-        @Query("limit") limit: Int = 20
-    ): Response<ApiResponse<PaginatedResponse<ProductDto>>>
-
-    /**
-     * Add product to wishlist
-     * POST /api/user/wishlist/add
-     */
-    @POST(ApiEndpoints.Wishlist.ADD)
-    suspend fun addToWishlist(
-        @Body request: WishlistRequest
-    ): Response<ApiResponse<Unit>>
-
-    /**
-     * Remove product from wishlist
-     * POST /api/user/wishlist/remove
-     */
-    @POST(ApiEndpoints.Wishlist.REMOVE)
-    suspend fun removeFromWishlist(
-        @Body request: WishlistRequest
-    ): Response<ApiResponse<Unit>>
-
-    /**
-     * Check if product is in wishlist
-     * GET /api/user/wishlist/check/{productId}
-     */
-    @GET(ApiEndpoints.Wishlist.CHECK)
-    suspend fun isInWishlist(
-        @Path("productId") productId: String
-    ): Response<ApiResponse<Boolean>>
 }
-
-// ===== Request DTOs =====
-data class LoginRequest(
-    val email: String,
-    val password: String,
-    val rememberMe: Boolean = false
-)
-
-data class RegisterRequest(
-    val name: String,
-    val email: String,
-    val password: String,
-    val phone: String? = null
-)
-
-data class RefreshTokenRequest(
-    val refreshToken: String
-)
-
-data class UpdateProfileRequest(
-    val name: String? = null,
-    val phone: String? = null,
-    val bio: String? = null,
-    val profileImageUrl: String? = null
-)
-
-data class ChangePasswordRequest(
-    val currentPassword: String,
-    val newPassword: String,
-    val confirmPassword: String
-)
-
-data class WishlistRequest(
-    val productId: String
-)
-
-data class PriceCalculationRequest(
-    val weight: Double,
-    val purity: String = "950" // 950, 900, 800, 750
-)
-
-data class PriceCalculationResponse(
-    val weight: Double,
-    val purity: String,
-    val pricePerGram: Double,
-    val totalPrice: Double,
-    val currency: String = "IRR"
-)
