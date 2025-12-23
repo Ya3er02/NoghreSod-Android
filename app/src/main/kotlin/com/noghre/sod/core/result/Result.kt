@@ -1,26 +1,27 @@
 package com.noghre.sod.core.result
 
-import com.noghre.sod.core.result.AppError
-
 /**
- * Sealed class representing the result of an operation.
- * Used throughout the app to handle success, error, and loading states in a type-safe manner.
+ * Sealed class representing the result of an asynchronous operation.
+ * Supports three states: Loading, Success, and Error.
  *
- * Generic over T - the type of successful result data.
+ * @param T The type of data being loaded
  */
 sealed class Result<out T> {
+
     /**
      * Represents a successful operation with data.
-     * @param data The successful result data
+     *
+     * @param data The resulting data from the operation
      */
     data class Success<T>(
         val data: T
     ) : Result<T>()
 
     /**
-     * Represents a failed operation with error information.
-     * @param error The AppError containing error details
-     * @param data Optional data that might be available (e.g., cached data on network error)
+     * Represents an error state.
+     *
+     * @param error The error that occurred
+     * @param data Optional data that was emitted before the error (for offline-first pattern)
      */
     data class Error<T>(
         val error: AppError,
@@ -28,139 +29,153 @@ sealed class Result<out T> {
     ) : Result<T>()
 
     /**
-     * Represents an operation in progress.
-     * @param data Optional data that might be available (e.g., cached data while loading new data)
+     * Represents a loading state.
+     *
+     * @param data Optional data that can be emitted while loading (for offline-first pattern)
      */
     data class Loading<T>(
         val data: T? = null
     ) : Result<T>()
 
     /**
-     * Returns the data if this is a Success, otherwise returns null.
+     * Maps the success data to a different type.
+     *
+     * @param transform Function to transform the data
+     * @return A new Result with the transformed data
      */
-    val dataOrNull: T?
-        get() = when (this) {
+    inline fun <R> map(transform: (T) -> R): Result<R> {
+        return when (this) {
+            is Success -> Success(transform(data))
+            is Error -> Error(error, data?.let { transform(it) })
+            is Loading -> Loading(data?.let { transform(it) })
+        }
+    }
+
+    /**
+     * Applies a function that returns another Result to the current data.
+     *
+     * @param transform Function that returns a Result
+     * @return The result of the transform
+     */
+    suspend inline fun <R> flatMap(transform: suspend (T) -> Result<R>): Result<R> {
+        return when (this) {
+            is Success -> transform(data)
+            is Error -> Error(error)
+            is Loading -> Loading()
+        }
+    }
+
+    /**
+     * Gets the data from any state.
+     *
+     * @return The data if available, null otherwise
+     */
+    fun getOrNull(): T? {
+        return when (this) {
             is Success -> data
             is Error -> data
             is Loading -> data
         }
-
-    /**
-     * Returns the error if this is an Error, otherwise returns null.
-     */
-    val errorOrNull: AppError?
-        get() = (this as? Error)?.error
-
-    /**
-     * Applies the given function to the data if this is a Success.
-     */
-    inline fun <R> map(transform: (T) -> R): Result<R> = when (this) {
-        is Success -> Success(transform(data))
-        is Error -> Error(error, data?.let(transform))
-        is Loading -> Loading(data?.let(transform))
     }
 
     /**
-     * Applies the given function to the data if this is a Success or Error.
+     * Gets the error from this result.
+     *
+     * @return The error if this is an Error state, null otherwise
      */
-    inline fun <R> mapData(transform: (T) -> R): Result<R> = when (this) {
-        is Success -> Success(transform(data))
-        is Error -> Error(error, data?.let(transform))
-        is Loading -> Loading(data?.let(transform))
-    }
-
-    /**
-     * Applies the given function to the error if this is an Error.
-     */
-    inline fun <R> mapError(transform: (AppError) -> R): Result<T> = when (this) {
-        is Success -> this
-        is Error -> Error(transform(error) as AppError, data)
-        is Loading -> this
-    }
-
-    /**
-     * Calls the given function if this is a Success.
-     */
-    inline fun onSuccess(action: (T) -> Unit): Result<T> {
-        if (this is Success) action(data)
-        return this
-    }
-
-    /**
-     * Calls the given function if this is an Error.
-     */
-    inline fun onError(action: (AppError) -> Unit): Result<T> {
-        if (this is Error) action(error)
-        return this
-    }
-
-    /**
-     * Calls the given function if this is Loading.
-     */
-    inline fun onLoading(action: () -> Unit): Result<T> {
-        if (this is Loading) action()
-        return this
-    }
-
-    /**
-     * Executes the appropriate action based on the result state.
-     */
-    inline fun fold(
-        onSuccess: (T) -> Unit,
-        onError: (AppError) -> Unit,
-        onLoading: () -> Unit = {}
-    ) {
-        when (this) {
-            is Success -> onSuccess(data)
-            is Error -> onError(error)
-            is Loading -> onLoading()
+    fun getErrorOrNull(): AppError? {
+        return when (this) {
+            is Error -> error
+            else -> null
         }
     }
 
     /**
-     * Checks if this is a Success result.
+     * Checks if this result is a success.
      */
     fun isSuccess(): Boolean = this is Success
 
     /**
-     * Checks if this is an Error result.
+     * Checks if this result is an error.
      */
     fun isError(): Boolean = this is Error
 
     /**
-     * Checks if this is a Loading result.
+     * Checks if this result is loading.
      */
     fun isLoading(): Boolean = this is Loading
-}
 
-/**
- * Extension function to convert a nullable value and error to a Result.
- */
-fun <T> Result<T>?.asResult(): Result<T> = this ?: Result.Loading()
+    /**
+     * Executes a block if this result is a success.
+     *
+     * @param block The block to execute with the success data
+     * @return This result for chaining
+     */
+    inline fun onSuccess(block: (T) -> Unit): Result<T> {
+        if (this is Success) {
+            block(data)
+        }
+        return this
+    }
 
-/**
- * Extension function to safely transform one Result type to another.
- */
-inline fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> = when (this) {
-    is Result.Success -> transform(data)
-    is Result.Error -> Result.Error(error, null)
-    is Result.Loading -> Result.Loading(null)
-}
+    /**
+     * Executes a block if this result is an error.
+     *
+     * @param block The block to execute with the error
+     * @return This result for chaining
+     */
+    inline fun onError(block: (AppError) -> Unit): Result<T> {
+        if (this is Error) {
+            block(error)
+        }
+        return this
+    }
 
-/**
- * Extension function to combine multiple results.
- */
-suspend inline fun <T1, T2, R> combineResults(
-    result1: Result<T1>,
-    result2: Result<T2>,
-    transform: (T1, T2) -> R
-): Result<R> {
-    return when {
-        result1 is Result.Error -> Result.Error(result1.error)
-        result2 is Result.Error -> Result.Error(result2.error)
-        result1 is Result.Loading || result2 is Result.Loading -> Result.Loading()
-        result1 is Result.Success && result2 is Result.Success -> 
-            Result.Success(transform(result1.data, result2.data))
-        else -> Result.Error(AppError.UnknownError("Invalid result state"))
+    /**
+     * Executes a block if this result is loading.
+     *
+     * @param block The block to execute
+     * @return This result for chaining
+     */
+    inline fun onLoading(block: () -> Unit): Result<T> {
+        if (this is Loading) {
+            block()
+        }
+        return this
+    }
+
+    /**
+     * Executes a block regardless of the result state.
+     *
+     * @param block The block to execute
+     * @return This result for chaining
+     */
+    inline fun <R> fold(
+        onLoading: () -> R,
+        onError: (error: AppError, data: T?) -> R,
+        onSuccess: (data: T) -> R
+    ): R {
+        return when (this) {
+            is Loading -> onLoading()
+            is Error -> onError(error, data)
+            is Success -> onSuccess(data)
+        }
+    }
+
+    companion object {
+        /**
+         * Creates a success result.
+         */
+        fun <T> success(data: T): Result<T> = Success(data)
+
+        /**
+         * Creates an error result.
+         */
+        fun <T> error(error: AppError, data: T? = null): Result<T> = Error(error, data)
+
+        /**
+         * Creates a loading result.
+         */
+        fun <T> loading(data: T? = null): Result<T> = Loading(data)
     }
 }
