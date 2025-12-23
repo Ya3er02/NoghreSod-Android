@@ -1,79 +1,79 @@
 package com.noghre.sod.data.remote
 
 import android.util.Log
-import com.noghre.sod.data.local.TokenManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
-import okhttp3.Request
 import okhttp3.Response
-import java.io.IOException
-import java.util.concurrent.atomic.AtomicBoolean
+from com.noghre.sod.data.local.TokenManager
 
 /**
- * OkHttp interceptor for automatic token injection and refresh.
- * 
- * Responsibilities:
- * - Automatically inject access token in Authorization header
- * - Skip auth for login/register/refresh endpoints
- * - Automatically refresh expired tokens
- * - Handle 401 responses by refreshing token and retrying request
- * - Thread-safe token refresh with synchronization
+ * OkHttp interceptor that automatically handles JWT token injection and refresh.
+ * Features:
+ * - Adds Authorization header to requests
+ * - Skips auth for login/register endpoints
+ * - Detects and refreshes expired tokens
+ * - Retries failed requests after token refresh
+ * - Synchronizes token refresh to avoid race conditions
+ * - Clears tokens on permanent refresh failure
  */
 class AuthInterceptor(
     private val tokenManager: TokenManager,
     private val apiService: ApiService
 ) : Interceptor {
 
-    private val isRefreshing = AtomicBoolean(false)
-    private val tokenRefreshLock = Any()
-
-    companion object {
-        private const val TAG = "AuthInterceptor"
-        private const val AUTHORIZATION_HEADER = "Authorization"
-        private const val BEARER_PREFIX = "Bearer "
-
-        // Endpoints that don't require authentication
-        private val PUBLIC_ENDPOINTS = listOf(
-            "auth/login",
-            "auth/register",
-            "auth/refresh",
-            "auth/reset-password",
-            "auth/verify-email"
-        )
-    }
+    private val TAG = "AuthInterceptor"
+    private val tokenLock = Object() // For synchronizing token refresh
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        var request = chain.request()
-        val path = request.url.encodedPath
+        val originalRequest = chain.request()
+        val url = originalRequest.url.toString()
 
-        // Skip auth for public endpoints
-        if (isPublicEndpoint(path)) {
-            return chain.proceed(request)
+        // Skip adding auth header for login/register endpoints
+        if (shouldSkipAuth(url)) {
+            return chain.proceed(originalRequest)
         }
 
-        // Add authorization header if token exists
-        val accessToken = tokenManager.getAccessToken()
-        if (accessToken != null) {
-            request = request.withBearerToken(accessToken)
+        // Check if token needs refresh before making request
+        if (!tokenManager.hasValidAccessToken()) {
+            Log.d(TAG, "Token expired, attempting refresh")
+            if (!refreshTokenSynchronized()) {
+                // Refresh failed, proceed with expired token and let the 401 handling below deal with it
+                Log.e(TAG, "Token refresh failed")
+            }
         }
 
-        // Proceed with original request
-        var response = chain.proceed(request)
+        // Add authorization header
+        val token = tokenManager.getAccessToken()
+        val requestWithAuth = if (token != null) {
+            originalRequest.newBuilder()
+                .header("Authorization", "Bearer $token")
+                .build()
+        } else {
+            originalRequest
+        }
 
-        // Handle 401 Unauthorized - try to refresh token and retry
-        if (response.code == 401 && !isPublicEndpoint(path)) {
-            // Try to refresh the token
-            val refreshedToken = refreshToken()
+        var response = chain.proceed(requestWithAuth)
 
-            if (refreshedToken != null) {
-                // Retry original request with new token
-                request = request.withBearerToken(refreshedToken)
-                response.close()
-                response = chain.proceed(request)
+        // Handle 401 response (unauthorized)
+        if (response.code == 401 && token != null) {
+            Log.d(TAG, "Received 401 Unauthorized, attempting token refresh")
+            response.close()
+
+            // Try to refresh token
+            if (refreshTokenSynchronized()) {
+                // Get new token and retry original request
+                val newToken = tokenManager.getAccessToken()
+                if (newToken != null) {
+                    Log.d(TAG, "Token refreshed successfully, retrying request")
+                    val retryRequest = originalRequest.newBuilder()
+                        .header("Authorization", "Bearer $newToken")
+                        .build()
+                    response = chain.proceed(retryRequest)
+                }
             } else {
-                // Token refresh failed - clear tokens and return 401
+                // Token refresh failed, clear tokens and let request fail
+                Log.e(TAG, "Token refresh failed after 401")
                 tokenManager.clearTokens()
-                Log.w(TAG, "Token refresh failed. Cleared tokens.")
             }
         }
 
@@ -81,156 +81,80 @@ class AuthInterceptor(
     }
 
     /**
-     * Refresh the access token using the refresh token.
-     * Thread-safe with synchronization to prevent multiple simultaneous refresh requests.
+     * Refreshes the access token synchronously.
+     * Uses a lock to prevent multiple simultaneous refresh attempts.
      *
-     * @return New access token if refresh successful, null otherwise
+     * @return true if refresh was successful, false otherwise
      */
-    private fun refreshToken(): String? {
-        // Check if refresh is already in progress
-        if (isRefreshing.getAndSet(true)) {
-            // Wait for refresh to complete
-            synchronized(tokenRefreshLock) {
-                return tokenManager.getAccessToken()
+    private fun refreshTokenSynchronized(): Boolean {
+        synchronized(tokenLock) {
+            // Double-check if token was already refreshed by another thread
+            if (tokenManager.hasValidAccessToken()) {
+                Log.d(TAG, "Token already refreshed by another thread")
+                return true
             }
-        }
 
-        return try {
-            synchronized(tokenRefreshLock) {
-                val refreshToken = tokenManager.getRefreshToken()
-                    ?: return null.also { Log.w(TAG, "No refresh token available") }
+            val refreshToken = tokenManager.getRefreshToken()
+            if (refreshToken == null) {
+                Log.e(TAG, "No refresh token available")
+                return false
+            }
 
-                // Make synchronous API call within coroutine context
+            return try {
+                // Synchronously call refresh endpoint
+                val request = RefreshTokenRequest(refreshToken)
                 val response = runBlocking {
-                    apiService.refreshToken(
-                        RefreshTokenRequest(refreshToken = refreshToken)
+                    apiService.refreshToken(request)
+                }
+
+                if (response.isSuccessful && response.body() != null) {
+                    val body = response.body()!!
+                    Log.d(TAG, "Token refreshed successfully")
+                    tokenManager.updateAccessToken(
+                        body.accessToken,
+                        body.expiresIn
                     )
-                }
-
-                if (response.isSuccessful) {
-                    val authResponse = response.body()?.data
-                    if (authResponse != null) {
-                        tokenManager.saveTokens(
-                            accessToken = authResponse.accessToken,
-                            refreshToken = authResponse.refreshToken,
-                            expiresInSeconds = authResponse.expiresIn
-                        )
-                        Log.d(TAG, "Token refreshed successfully")
-                        return authResponse.accessToken
-                    }
+                    true
                 } else {
-                    Log.e(TAG, "Token refresh failed: ${response.code()} - ${response.message()}")
+                    Log.e(TAG, "Token refresh failed: ${response.code()}")
+                    false
                 }
-                null
+            } catch (e: Exception) {
+                Log.e(TAG, "Token refresh exception: ", e)
+                false
             }
-        } catch (e: IOException) {
-            Log.e(TAG, "Token refresh error: Network error", e)
-            null
-        } catch (e: Exception) {
-            Log.e(TAG, "Token refresh error: Unexpected error", e)
-            null
-        } finally {
-            isRefreshing.set(false)
         }
     }
 
     /**
-     * Check if the endpoint is public (doesn't require authentication).
+     * Determines if this endpoint should skip authentication.
+     *
+     * @param url The request URL
+     * @return true if auth should be skipped
      */
-    private fun isPublicEndpoint(path: String): Boolean {
-        return PUBLIC_ENDPOINTS.any { path.contains(it, ignoreCase = true) }
-    }
-
-    /**
-     * Add Bearer token to request Authorization header.
-     */
-    private fun Request.withBearerToken(token: String): Request {
-        return this.newBuilder()
-            .header(AUTHORIZATION_HEADER, "$BEARER_PREFIX$token")
-            .build()
+    private fun shouldSkipAuth(url: String): Boolean {
+        val skipEndpoints = listOf(
+            "/auth/login",
+            "/auth/register",
+            "/auth/refresh",
+            "/auth/forgot-password",
+            "/auth/reset-password"
+        )
+        return skipEndpoints.any { url.contains(it) }
     }
 }
 
 /**
- * Logging interceptor for debugging API requests and responses.
+ * Request body for token refresh endpoint.
  */
-class LoggingInterceptor : Interceptor {
-    companion object {
-        private const val TAG = "ApiLogging"
-    }
-
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-
-        Log.d(TAG, "---> REQUEST")
-        Log.d(TAG, "Method: ${request.method}")
-        Log.d(TAG, "URL: ${request.url}")
-        Log.d(TAG, "Headers:")
-        request.headers.forEach { (name, value) ->
-            // Mask sensitive headers
-            val displayValue = if (name.equals("Authorization", ignoreCase = true)) {
-                "Bearer ${value.substringAfter("Bearer ").take(20)}..."
-            } else {
-                value
-            }
-            Log.d(TAG, "  $name: $displayValue")
-        }
-
-        val startTime = System.currentTimeMillis()
-        val response = chain.proceed(request)
-        val duration = System.currentTimeMillis() - startTime
-
-        Log.d(TAG, "<--- RESPONSE")
-        Log.d(TAG, "Status: ${response.code}")
-        Log.d(TAG, "Duration: ${duration}ms")
-        Log.d(TAG, "Headers:")
-        response.headers.forEach { (name, value) ->
-            Log.d(TAG, "  $name: $value")
-        }
-
-        return response
-    }
-}
+data class RefreshTokenRequest(
+    val refreshToken: String
+)
 
 /**
- * Retry interceptor for automatic retry on network failures.
+ * Response from token refresh endpoint.
  */
-class RetryInterceptor(
-    private val maxRetries: Int = 3,
-    private val initialDelayMs: Long = 1000,
-    private val backoffMultiplier: Double = 2.0,
-    private val maxDelayMs: Long = 10000
-) : Interceptor {
-
-    companion object {
-        private const val TAG = "RetryInterceptor"
-    }
-
-    override fun intercept(chain: Interceptor.Chain): Response {
-        var retryCount = 0
-        var delayMs = initialDelayMs
-        var lastException: IOException? = null
-
-        while (retryCount < maxRetries) {
-            try {
-                return chain.proceed(chain.request())
-            } catch (e: IOException) {
-                lastException = e
-                retryCount++
-
-                if (retryCount >= maxRetries) {
-                    Log.e(TAG, "Max retries ($maxRetries) reached. Giving up.")
-                    throw e
-                }
-
-                Log.w(TAG, "Request failed (attempt $retryCount/$maxRetries). Retrying in ${delayMs}ms...")
-                Thread.sleep(delayMs)
-
-                // Calculate next delay with exponential backoff
-                delayMs = (delayMs * backoffMultiplier).toLong().coerceAtMost(maxDelayMs)
-            }
-        }
-
-        throw lastException ?: IOException("Unknown error after $maxRetries retries")
-    }
-}
+data class RefreshTokenResponse(
+    val accessToken: String,
+    val expiresIn: Long
+)
