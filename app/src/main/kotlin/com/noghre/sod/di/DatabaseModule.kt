@@ -1,48 +1,44 @@
 package com.noghre.sod.di
 
-from dagger.Module
-from dagger.hilt.InstallIn
-from dagger.hilt.components.SingletonComponent
-from dagger.Provides
 import android.content.Context
-from com.noghre.sod.data.local.AppDatabase
-from com.noghre.sod.data.local.ProductDao
-from com.noghre.sod.data.local.CartDao
-from com.noghre.sod.data.local.UserDao
-from com.noghre.sod.data.local.CategoryDao
-from javax.inject.Singleton
+import com.noghre.sod.data.local.AppDatabase
+import com.noghre.sod.data.local.dao.CategoryDao
+import com.noghre.sod.data.local.dao.ProductDao
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
+/**
+ * Hilt dependency injection module for database-related dependencies.
+ * Provides Room database instance and all DAOs.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    /**
+     * Provides singleton instance of AppDatabase.
+     */
     @Provides
     @Singleton
-    fun provideAppDatabase(context: Context): AppDatabase {
-        return AppDatabase.getInstance(context)
-    }
+    fun provideAppDatabase(
+        @ApplicationContext context: Context
+    ): AppDatabase = AppDatabase.getInstance(context)
 
+    /**
+     * Provides ProductDao from AppDatabase.
+     */
     @Provides
     @Singleton
-    fun provideProductDao(database: AppDatabase): ProductDao {
-        return database.productDao()
-    }
+    fun provideProductDao(database: AppDatabase): ProductDao = database.productDao()
 
+    /**
+     * Provides CategoryDao from AppDatabase.
+     */
     @Provides
     @Singleton
-    fun provideCartDao(database: AppDatabase): CartDao {
-        return database.cartDao()
-    }
-
-    @Provides
-    @Singleton
-    fun provideUserDao(database: AppDatabase): UserDao {
-        return database.userDao()
-    }
-
-    @Provides
-    @Singleton
-    fun provideCategoryDao(database: AppDatabase): CategoryDao {
-        return database.categoryDao()
-    }
+    fun provideCategoryDao(database: AppDatabase): CategoryDao = database.categoryDao()
 }
