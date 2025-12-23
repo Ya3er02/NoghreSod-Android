@@ -2,139 +2,70 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.domain.model.Address
-import com.noghre.sod.domain.usecase.GetProfileUseCase
-import com.noghre.sod.domain.usecase.UpdateProfileUseCase
-import com.noghre.sod.domain.usecase.GetOrdersUseCase
-import com.noghre.sod.domain.usecase.GetAddressesUseCase
-import com.noghre.sod.domain.usecase.LogoutUseCase
-import com.noghre.sod.presentation.profile.ProfileUiState
-import com.noghre.sod.presentation.common.UiEvent
+import com.noghre.sod.domain.model.User
+import com.noghre.sod.domain.usecase.profile.UpdateProfileUseCase
+import com.noghre.sod.domain.usecase.profile.ChangePasswordUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
-/**
- * ViewModel for user profile screen.
- */
+data class ProfileUiState(
+    val user: User? = null,
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val successMessage: String? = null
+)
+
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val getProfileUseCase: GetProfileUseCase,
     private val updateProfileUseCase: UpdateProfileUseCase,
-    private val getOrdersUseCase: GetOrdersUseCase,
-    private val getAddressesUseCase: GetAddressesUseCase,
-    private val logoutUseCase: LogoutUseCase
+    private val changePasswordUseCase: ChangePasswordUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
-    private val _events = Channel<UiEvent>()
-    val events = _events.receiveAsFlow()
-
-    init {
-        loadProfile()
-        loadOrders()
-        loadAddresses()
-    }
-
-    /**
-     * Load user profile
-     */
-    fun loadProfile() {
+    fun updateProfile(fullName: String, email: String?, avatarUrl: String?) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                updateState { copy(isLoading = true, error = null) }
-                val user = getProfileUseCase()
-                updateState { copy(user = user, isLoading = false) }
+                val updatedUser = updateProfileUseCase(
+                    UpdateProfileUseCase.Params(fullName, email, avatarUrl)
+                )
+                _uiState.value = _uiState.value.copy(
+                    user = updatedUser,
+                    isLoading = false,
+                    successMessage = "پروفایل با موفقیت به روز‌رسانی شد"
+                )
             } catch (e: Exception) {
-                Timber.e(e, "Error loading profile")
-                updateState { copy(isLoading = false, error = e.message) }
+                _uiState.value = _uiState.value.copy(
+                    error = e.message,
+                    isLoading = false
+                )
             }
         }
     }
 
-    /**
-     * Load user orders
-     */
-    fun loadOrders() {
+    fun changePassword(currentPassword: String, newPassword: String) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val orders = getOrdersUseCase()
-                updateState { copy(orders = orders) }
+                changePasswordUseCase(
+                    ChangePasswordUseCase.Params(currentPassword, newPassword)
+                )
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    successMessage = "رمز عبور با موفقیت تغییر کرد"
+                )
             } catch (e: Exception) {
-                Timber.e(e, "Error loading orders")
+                _uiState.value = _uiState.value.copy(
+                    error = e.message,
+                    isLoading = false
+                )
             }
         }
-    }
-
-    /**
-     * Load user addresses
-     */
-    fun loadAddresses() {
-        viewModelScope.launch {
-            try {
-                val addresses = getAddressesUseCase()
-                updateState { copy(addresses = addresses) }
-            } catch (e: Exception) {
-                Timber.e(e, "Error loading addresses")
-            }
-        }
-    }
-
-    /**
-     * Update user profile
-     *
-     * @param fullName Full name
-     * @param email Email address
-     */
-    fun updateProfile(fullName: String, email: String? = null) {
-        viewModelScope.launch {
-            try {
-                updateState { copy(isLoading = true, error = null) }
-                val updatedUser = updateProfileUseCase(fullName, email)
-                updateState { copy(user = updatedUser, isLoading = false) }
-                _events.send(UiEvent.ShowSnackbar("Profile updated"))
-            } catch (e: Exception) {
-                Timber.e(e, "Error updating profile")
-                updateState { copy(isLoading = false, error = e.message) }
-                _events.send(UiEvent.ShowSnackbar("Failed to update profile"))
-            }
-        }
-    }
-
-    /**
-     * Logout user
-     */
-    fun logout() {
-        viewModelScope.launch {
-            try {
-                updateState { copy(isLogoutInProgress = true) }
-                logoutUseCase()
-                _events.send(UiEvent.Navigate("login"))
-            } catch (e: Exception) {
-                Timber.e(e, "Error logging out")
-                updateState { copy(isLogoutInProgress = false) }
-                _events.send(UiEvent.ShowSnackbar("Logout failed"))
-            }
-        }
-    }
-
-    /**
-     * Retry loading
-     */
-    fun retry() {
-        loadProfile()
-    }
-
-    private fun updateState(block: ProfileUiState.() -> ProfileUiState) {
-        _uiState.update(block)
     }
 }
