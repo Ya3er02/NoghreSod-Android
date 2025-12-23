@@ -1,233 +1,295 @@
 package com.noghre.sod.data.repository
 
-import androidx.paging.ExperimentalPagingApi
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
-import androidx.paging.map
-import com.noghre.sod.core.config.AppConfig
-import com.noghre.sod.core.result.Result
-import com.noghre.sod.data.local.AppDatabase
-import com.noghre.sod.data.mapper.toDomain
-import com.noghre.sod.data.mapper.toEntity
-import com.noghre.sod.data.remote.ApiService
+import com.noghre.sod.data.dto.ProductDto
+import com.noghre.sod.data.local.dao.ProductDao
+import com.noghre.sod.data.mapper.CachePolicy
+import com.noghre.sod.data.mapper.ProductMapper.toDomain
+import com.noghre.sod.data.mapper.ProductMapper.toEntity
+import com.noghre.sod.data.remote.api.NoghreSodApiService
+import com.noghre.sod.data.remote.exception.ApiException
+import com.noghre.sod.data.remote.network.NetworkMonitor
+import com.noghre.sod.domain.Result
 import com.noghre.sod.domain.model.Product
 import com.noghre.sod.domain.repository.ProductRepository
-import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
+import timber.log.Timber
+import javax.inject.Inject
 
 /**
- * Implementation of ProductRepository.
- * Implements offline-first strategy using Room and Retrofit.
- *
- * Data flow:
- * 1. CACHE FIRST: Load from local Room database
- * 2. CHECK VALIDITY: If cache is fresh (< 24h), return cached data
- * 3. NETWORK: If cache is stale, fetch from API
- * 4. SAVE: Store API response in Room database
- * 5. EMIT: Return updated data to UI
- *
- * @param apiService Retrofit API client
- * @param database Room database instance
- * @param ioDispatcher IO dispatcher for background operations
+ * Product Repository Implementation with offline-first strategy.
+ * Caches data locally and syncs with server when online.
  */
-class ProductRepositoryImpl(
-    private val apiService: ApiService,
-    private val database: AppDatabase,
-    private val ioDispatcher: CoroutineDispatcher
+class ProductRepositoryImpl @Inject constructor(
+    private val api: NoghreSodApiService,
+    private val productDao: ProductDao,
+    private val networkMonitor: NetworkMonitor
 ) : ProductRepository {
 
-    private val productDao = database.productDao()
-    private val categoryDao = database.categoryDao()
-
     /**
-     * Gets paginated list of products with offline-first strategy.
-     * 
-     * Flow:
-     * 1. Emit cached products as Loading state
-     * 2. Fetch from API if cache is invalid
-     * 3. Save to database
-     * 4. Emit fresh products as Success
-     * 5. On error, emit Error with cached data as fallback
+     * Get products with offline-first strategy:
+     * 1. Emit Loading state
+     * 2. Try to emit cached data if available
+     * 3. Fetch fresh data from API if online
+     * 4. Update cache and emit fresh data
+     * 5. Emit error if offline and no cache
      */
     override fun getProducts(
         page: Int,
-        limit: Int,
-        category: String?,
-        sort: String?
-    ): Flow<Result<List<Product>>> = networkBoundResource(
-        query = {
-            if (category != null) {
-                productDao.getProductsByCategoryFlow(category)
-            } else {
-                productDao.getAllProductsFlow()
-            }
-        },
-        fetch = {
-            val response = if (category != null) {
-                apiService.getProductsByCategory(category, page, limit).body()
-            } else {
-                apiService.getProducts(page, limit, category, sort).body()
-            }
-            response?.data ?: emptyList()
-        },
-        saveFetchResult = { products ->
-            withContext(ioDispatcher) {
-                productDao.insertProducts(products.map { it.toEntity() })
-            }
-        },
-        shouldFetch = { cached ->
-            cached.isEmpty() || cached.firstOrNull()?.isCacheValid(24) == false
-        }
-    ).map { result ->
-        when (result) {
-            is Result.Loading -> Result.Loading(result.data?.toDomain())
-            is Result.Success -> Result.Success(result.data.toDomain())
-            is Result.Error -> Result.Error(result.error, result.data?.toDomain())
-        }
-    }
-
-    /**
-     * Gets infinite scrolling paginated products using Paging 3.
-     * 
-     * Supports automatic page loading with:
-     * - Pull-to-refresh
-     * - Infinite scroll
-     * - Cache + Network coordination via RemoteMediator
-     */
-    @OptIn(ExperimentalPagingApi::class)
-    override fun getProductsPaged(
-        category: String?
-    ): Flow<PagingData<Product>> = Pager(
-        config = PagingConfig(
-            pageSize = AppConfig.Pagination.DEFAULT_PAGE_SIZE,
-            prefetchDistance = AppConfig.Pagination.PREFETCH_DISTANCE,
-            enablePlaceholders = true
-        ),
-        remoteMediator = ProductRemoteMediator(
-            apiService = apiService,
-            database = database,
-            category = category
-        ),
-        pagingSourceFactory = {
-            if (category != null) {
-                productDao.pagingSourceByCategory(category)
-            } else {
-                productDao.pagingSource()
-            }
-        }
-    ).flow.map { pagingData ->
-        pagingData.map { entity -> entity.toDomain() }
-    }
-
-    /**
-     * Gets a single product with offline-first approach.
-     */
-    override fun getProductDetail(id: String): Flow<Result<Product>> = networkBoundResource(
-        query = { productDao.getProductFlow(id) },
-        fetch = {
-            val response = apiService.getProductDetail(id).body()
-            response?.data ?: throw Exception("Product not found")
-        },
-        saveFetchResult = { product ->
-            withContext(ioDispatcher) {
-                productDao.insertProduct(product.toEntity())
-            }
-        }
-    ).map { result ->
-        when (result) {
-            is Result.Loading -> Result.Loading(result.data?.toDomain())
-            is Result.Success -> Result.Success(result.data.toDomain())
-            is Result.Error -> Result.Error(result.error, result.data?.toDomain())
-        }
-    }
-
-    /**
-     * Searches products locally and remotely.
-     */
-    override fun searchProducts(
-        query: String,
-        page: Int,
-        limit: Int
-    ): Flow<Result<List<Product>>> = networkBoundResource(
-        query = { productDao.searchProducts(query) },
-        fetch = {
-            val response = apiService.searchProducts(query, page, limit).body()
-            response?.data ?: emptyList()
-        },
-        saveFetchResult = { products ->
-            withContext(ioDispatcher) {
-                productDao.insertProducts(products.map { it.toEntity() })
-            }
-        }
-    ).map { result ->
-        when (result) {
-            is Result.Loading -> Result.Loading(result.data?.toDomain())
-            is Result.Success -> Result.Success(result.data.toDomain())
-            is Result.Error -> Result.Error(result.error, result.data?.toDomain())
-        }
-    }
-
-    /**
-     * Gets products filtered by category.
-     */
-    override fun getProductsByCategory(
-        categoryId: String,
-        page: Int,
-        limit: Int
-    ): Flow<Result<List<Product>>> = getProducts(
-        page = page,
-        limit = limit,
-        category = categoryId
-    )
-
-    /**
-     * Gets products within a price range.
-     * Note: Filtering is done locally; consider adding server-side filtering.
-     */
-    override fun getProductsByPriceRange(
-        minPrice: Double,
-        maxPrice: Double
-    ): Flow<Result<List<Product>>> = flowOf(
+        categoryId: String?,
+        sortBy: String?
+    ): Flow<Result<List<Product>>> = flow {
         try {
-            val cached = productDao.getProductsByPriceRange(minPrice, maxPrice).lastOrNull() ?: emptyList()
-            Result.Success(cached.toDomain())
+            emit(Result.Loading)
+
+            // Try to emit cached data
+            val cachedData = productDao.getRecentProducts(limit = 20)
+                .map { entities -> entities.map { it.toDomain() } }
+                .catch { Timber.e(it, "Error reading cache") }
+                .collect { cached ->
+                    if (cached.isNotEmpty()) {
+                        emit(Result.Success(cached))
+                    }
+                }
+
+            // Fetch from API if online
+            if (networkMonitor.isNetworkAvailable()) {
+                try {
+                    val response = api.getProducts(
+                        page = page,
+                        categoryId = categoryId,
+                        sort = sortBy
+                    )
+
+                    if (response.success && response.data != null) {
+                        val domainProducts = response.data.map { it.toDomain() }
+                        val entities = response.data.map { dto ->
+                            dto.run {
+                                com.noghre.sod.data.local.entity.ProductEntity(
+                                    id = id,
+                                    name = name,
+                                    nameEn = nameEn,
+                                    description = description,
+                                    descriptionEn = descriptionEn,
+                                    price = price,
+                                    discountPrice = discountPrice,
+                                    images = com.google.gson.Gson().toJson(images),
+                                    categoryId = categoryId ?: "",
+                                    stock = stock,
+                                    rating = rating,
+                                    reviewCount = reviewCount,
+                                    weight = weight,
+                                    material = material,
+                                    specifications = specifications?.let {
+                                        com.google.gson.Gson().toJson(it)
+                                    },
+                                    sellerId = sellerId,
+                                    sellerName = sellerName,
+                                    sellerRating = sellerRating
+                                )
+                            }
+                        }
+                        productDao.insertProducts(entities)
+                        emit(Result.Success(domainProducts))
+                        Timber.d("Products fetched and cached: ${response.data.size} items")
+                    } else {
+                        emit(Result.Error(response.message ?: "Unknown error"))
+                    }
+                } catch (e: ApiException) {
+                    Timber.e(e, "API Error fetching products")
+                    emit(Result.Error(e.message ?: "Network error"))
+                } catch (e: Exception) {
+                    Timber.e(e, "Unexpected error fetching products")
+                    emit(Result.Error(e.message ?: "Unknown error"))
+                }
+            }
         } catch (e: Exception) {
-            Result.Error(e.toAppError())
+            Timber.e(e, "Error in getProducts")
+            emit(Result.Error(e.message ?: "Unknown error"))
         }
-    )
+    }.flowOn(Dispatchers.IO)
 
-    /**
-     * Manually refresh products cache.
-     * Forces fetch from API regardless of cache validity.
-     */
-    override fun refreshProducts(): Flow<Result<Unit>> = networkBoundResource(
-        query = { flowOf(Unit) },
-        fetch = {
-            val response = apiService.getProducts(1, AppConfig.Pagination.DEFAULT_PAGE_SIZE).body()
-            response?.data ?: emptyList()
-        },
-        saveFetchResult = { products ->
-            withContext(ioDispatcher) {
-                productDao.deleteAllProducts()
-                productDao.insertProducts(products.map { it.toEntity() })
-            }
-        },
-        shouldFetch = { true } // Always fetch
-    ).map { Result.Success(Unit) }
-
-    /**
-     * Clears all cached products.
-     */
-    override suspend fun clearCache(): Result<Unit> = withContext(ioDispatcher) {
+    override fun getProductById(id: String): Flow<Result<Product>> = flow {
         try {
-            productDao.deleteAllProducts()
+            emit(Result.Loading)
+
+            // Try cache first
+            val cached = productDao.getProductById(id)
+            if (cached != null && CachePolicy.isCacheValid(cached.cachedAt)) {
+                emit(Result.Success(cached.toDomain()))
+                Timber.d("Product from cache: $id")
+            }
+
+            // Fetch from API if online
+            if (networkMonitor.isNetworkAvailable()) {
+                try {
+                    val response = api.getProductById(id)
+                    if (response.success && response.data != null) {
+                        val entity = response.data.run {
+                            com.noghre.sod.data.local.entity.ProductEntity(
+                                id = id,
+                                name = name,
+                                nameEn = nameEn,
+                                description = description,
+                                descriptionEn = descriptionEn,
+                                price = price,
+                                discountPrice = discountPrice,
+                                images = com.google.gson.Gson().toJson(images),
+                                categoryId = categoryId,
+                                stock = stock,
+                                rating = rating,
+                                reviewCount = reviewCount,
+                                weight = weight,
+                                material = material,
+                                specifications = specifications?.let {
+                                    com.google.gson.Gson().toJson(it)
+                                },
+                                sellerId = sellerId,
+                                sellerName = sellerName,
+                                sellerRating = sellerRating
+                            )
+                        }
+                        productDao.insertProducts(listOf(entity))
+                        emit(Result.Success(response.data.toDomain()))
+                    } else {
+                        emit(Result.Error(response.message ?: "Product not found"))
+                    }
+                } catch (e: ApiException) {
+                    Timber.e(e, "API Error fetching product: $id")
+                    emit(Result.Error(e.message ?: "Network error"))
+                }
+            } else if (cached == null) {
+                emit(Result.Error("No internet and no cached data"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error in getProductById")
+            emit(Result.Error(e.message ?: "Unknown error"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override fun searchProducts(query: String): Flow<Result<List<Product>>> = flow {
+        try {
+            emit(Result.Loading)
+
+            // Local search
+            val localResults = productDao.searchProducts(query)
+                .map { entities -> entities.map { it.toDomain() } }
+                .catch { Timber.e(it, "Error searching cache") }
+
+            // Fetch from API
+            if (networkMonitor.isNetworkAvailable()) {
+                try {
+                    val response = api.searchProducts(query)
+                    if (response.success && response.data != null) {
+                        emit(Result.Success(response.data.map { it.toDomain() }))
+                    } else {
+                        emit(Result.Error(response.message ?: "Search failed"))
+                    }
+                } catch (e: ApiException) {
+                    Timber.e(e, "API Error searching products")
+                    emit(Result.Error(e.message ?: "Network error"))
+                }
+            } else {
+                localResults.collect { emit(Result.Success(it)) }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error searching products")
+            emit(Result.Error(e.message ?: "Unknown error"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override fun getFeaturedProducts(): Flow<Result<List<Product>>> = flow {
+        try {
+            emit(Result.Loading)
+
+            if (networkMonitor.isNetworkAvailable()) {
+                try {
+                    val response = api.getFeaturedProducts()
+                    if (response.success && response.data != null) {
+                        emit(Result.Success(response.data.map { it.toDomain() }))
+                    } else {
+                        emit(Result.Error(response.message ?: "Failed to fetch"))
+                    }
+                } catch (e: ApiException) {
+                    emit(Result.Error(e.message ?: "Network error"))
+                }
+            } else {
+                emit(Result.Error("No internet connection"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error fetching featured products")
+            emit(Result.Error(e.message ?: "Unknown error"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override fun getNewArrivals(): Flow<Result<List<Product>>> = flow {
+        try {
+            emit(Result.Loading)
+
+            if (networkMonitor.isNetworkAvailable()) {
+                try {
+                    val response = api.getNewArrivals()
+                    if (response.success && response.data != null) {
+                        emit(Result.Success(response.data.map { it.toDomain() }))
+                    } else {
+                        emit(Result.Error(response.message ?: "Failed to fetch"))
+                    }
+                } catch (e: ApiException) {
+                    emit(Result.Error(e.message ?: "Network error"))
+                }
+            } else {
+                emit(Result.Error("No internet connection"))
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error fetching new arrivals")
+            emit(Result.Error(e.message ?: "Unknown error"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun refreshProducts(): Result<Unit> = try {
+        if (!networkMonitor.isNetworkAvailable()) {
+            return Result.Error("No internet connection")
+        }
+
+        val response = api.getProducts()
+        if (response.success && response.data != null) {
+            val entities = response.data.map { dto ->
+                dto.run {
+                    com.noghre.sod.data.local.entity.ProductEntity(
+                        id = id,
+                        name = name,
+                        nameEn = nameEn,
+                        description = description,
+                        descriptionEn = descriptionEn,
+                        price = price,
+                        discountPrice = discountPrice,
+                        images = com.google.gson.Gson().toJson(images),
+                        categoryId = categoryId,
+                        stock = stock,
+                        rating = rating,
+                        reviewCount = reviewCount,
+                        weight = weight,
+                        material = material,
+                        specifications = specifications?.let {
+                            com.google.gson.Gson().toJson(it)
+                        },
+                        sellerId = sellerId,
+                        sellerName = sellerName,
+                        sellerRating = sellerRating
+                    )
+                }
+            }
+            productDao.insertProducts(entities)
             Result.Success(Unit)
-        } catch (e: Exception) {
-            Result.Error(e.toAppError())
+        } else {
+            Result.Error(response.message ?: "Refresh failed")
         }
+    } catch (e: Exception) {
+        Timber.e(e, "Error refreshing products")
+        Result.Error(e.message ?: "Unknown error")
     }
 }
