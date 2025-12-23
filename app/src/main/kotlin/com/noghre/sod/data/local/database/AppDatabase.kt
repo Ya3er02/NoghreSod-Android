@@ -4,101 +4,58 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
-import com.noghre.sod.data.local.dao.CartDao
-import com.noghre.sod.data.local.dao.OrderDao
-import com.noghre.sod.data.local.dao.ProductDao
-import com.noghre.sod.data.local.dao.UserDao
-import com.noghre.sod.data.model.CartEntity
-import com.noghre.sod.data.model.CartItemEntity
-import com.noghre.sod.data.model.OrderEntity
-import com.noghre.sod.data.model.OrderItemEntity
-import com.noghre.sod.data.model.OrderStatusHistoryEntity
-import com.noghre.sod.data.model.ProductEntity
-import com.noghre.sod.data.model.UserEntity
-import com.noghre.sod.data.utils.Converters
+import com.noghre.sod.data.local.dao.*
+import com.noghre.sod.data.local.entity.*
 
 /**
- * Noghre Sod Room Database
- * Central SQLite database for all local data storage
- *
- * Database Version: 1
- * Includes entities for:
- * - Products (jewelry catalog)
- * - Cart & Cart Items
- * - Orders & Order Items
- * - Users & Authentication
- * - Order Status History
- *
- * Features:
- * - Encryption support (SQLCipher)
- * - Type converters for complex types
- * - Automatic migrations (export schema)
+ * Room Database for Noghresod application
+ * Handles local data persistence for products, orders, cart, and user information
  */
 @Database(
     entities = [
-        // Product Management
+        // Product entities
         ProductEntity::class,
-        // Shopping Cart
+        ProductReviewEntity::class,
+        FavoriteProductEntity::class,
+        // Cart entities
         CartEntity::class,
         CartItemEntity::class,
-        // Orders
+        SavedCartEntity::class,
+        // Order entities
         OrderEntity::class,
-        OrderItemEntity::class,
-        OrderStatusHistoryEntity::class,
-        // User
-        UserEntity::class
+        OrderTrackingEntity::class,
+        ReturnRequestEntity::class,
+        // User entities
+        UserEntity::class,
+        AddressEntity::class,
+        UserPreferencesEntity::class,
+        AuthTokenEntity::class,
     ],
     version = 1,
-    exportSchema = true // Enable schema export for migrations
+    exportSchema = true,
 )
-@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
-    // ==================== Data Access Objects ====================
-
+    // DAOs
     abstract fun productDao(): ProductDao
     abstract fun cartDao(): CartDao
     abstract fun orderDao(): OrderDao
     abstract fun userDao(): UserDao
 
     companion object {
-        @Volatile
+        private const val DATABASE_NAME = "noghresod_database"
         private var instance: AppDatabase? = null
 
+        @Synchronized
         fun getInstance(context: Context): AppDatabase {
-            return instance ?: synchronized(this) {
-                instance ?: buildDatabase(context).also { instance = it }
-            }
-        }
-
-        private fun buildDatabase(context: Context): AppDatabase {
-            return Room.databaseBuilder(
+            return instance ?: Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
-                DATABASE_NAME
+                DATABASE_NAME,
             )
-                .apply {
-                    // Fallback to clear database if migrations fail
-                    fallbackToDestructiveMigration()
-
-                    // Enable Write-Ahead Logging for better performance
-                    enableMultiInstanceInvalidation()
-
-                    // Enable auto-checkpoint for optimization
-                    setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                }
+                .fallbackToDestructiveMigration() // For development
                 .build()
+                .also { instance = it }
         }
-
-        private const val DATABASE_NAME = "noghre_sod.db"
     }
-}
-
-/**
- * Helper function to get database instance
- * Usage: val db = getAppDatabase(context)
- */
-fun getAppDatabase(context: Context): AppDatabase {
-    return AppDatabase.getInstance(context)
 }
