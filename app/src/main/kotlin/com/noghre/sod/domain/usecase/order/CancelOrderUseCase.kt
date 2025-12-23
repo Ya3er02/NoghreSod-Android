@@ -17,9 +17,9 @@ class CancelOrderUseCase @Inject constructor(
     )
 
     override suspend fun execute(params: Params): Order {
-        if (params.orderId.isEmpty()) {
-            throw IllegalArgumentException("شناسه سفارش نامعتبر است")
-        }
-        return orderRepository.cancelOrder(params.orderId, params.reason)
+        return orderRepository.cancelOrder(
+            orderId = params.orderId,
+            reason = params.reason
+        )
     }
 }

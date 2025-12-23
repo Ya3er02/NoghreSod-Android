@@ -2,7 +2,6 @@ package com.noghre.sod.domain.usecase.order
 
 import com.noghre.sod.domain.base.UseCase
 import com.noghre.sod.domain.model.Order
-import com.noghre.sod.domain.model.OrderStatus
 import com.noghre.sod.domain.repository.OrderRepository
 import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
@@ -14,10 +13,10 @@ class GetOrdersUseCase @Inject constructor(
 
     data class Params(
         val page: Int = 1,
-        val status: OrderStatus? = null
+        val status: String? = null
     )
 
     override suspend fun execute(params: Params): List<Order> {
-        return orderRepository.getOrders(params.page, params.status)
+        return orderRepository.getOrders(page = params.page, status = params.status)
     }
 }
