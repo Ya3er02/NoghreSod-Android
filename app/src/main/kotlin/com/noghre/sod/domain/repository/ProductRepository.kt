@@ -1,108 +1,172 @@
 package com.noghre.sod.domain.repository
 
-import androidx.paging.PagingData
-import com.noghre.sod.core.result.Result
-import com.noghre.sod.domain.model.Product
+import com.noghre.sod.domain.Result
+import com.noghre.sod.domain.model.*
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Repository interface for product-related operations.
- * Defines the contract that data layer must implement.
- * Abstracts network and database operations from business logic.
+ * Repository interface for product data operations
+ * Abstracts the data layer from domain and presentation layers
  */
 interface ProductRepository {
-
     /**
-     * Gets a paginated list of all products.
-     * Uses offline-first strategy: loads from cache first, then syncs with server.
-     *
-     * @param page Page number (1-indexed)
-     * @param limit Number of items per page
-     * @param category Optional category filter
-     * @param sort Optional sort parameter
-     * @return Flow of Result containing paginated products
+     * Get all products
      */
-    fun getProducts(
-        page: Int = 1,
-        limit: Int = 20,
-        category: String? = null,
-        sort: String? = null
-    ): Flow<Result<List<Product>>>
+    fun getAllProducts(
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductSummary>>>
 
     /**
-     * Gets paginated products using Paging 3.
-     * Supports infinite scrolling with automatic page loading.
-     *
-     * @param category Optional category filter
-     * @return Flow of PagingData for Paging 3 integration
+     * Get product by ID
      */
-    fun getProductsPaged(
-        category: String? = null
-    ): Flow<PagingData<Product>>
+    fun getProductById(productId: String): Flow<Result<ProductDetail>>
 
     /**
-     * Gets a single product by ID.
-     * Loads from cache first, then fetches from server if not found or cached data is stale.
-     *
-     * @param id Product ID
-     * @return Flow of Result containing product
-     */
-    fun getProductDetail(id: String): Flow<Result<Product>>
-
-    /**
-     * Searches products by query string.
-     * Searches both local cache and server.
-     *
-     * @param query Search query string
-     * @param page Page number
-     * @param limit Items per page
-     * @return Flow of Result containing search results
+     * Search products
      */
     fun searchProducts(
         query: String,
-        page: Int = 1,
-        limit: Int = 20
-    ): Flow<Result<List<Product>>>
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductSummary>>>
 
     /**
-     * Gets products by category.
-     * Offline-first approach with cache invalidation.
-     *
-     * @param categoryId Category ID
-     * @param page Page number
-     * @param limit Items per page
-     * @return Flow of Result containing category products
+     * Get products by category
      */
     fun getProductsByCategory(
-        categoryId: String,
-        page: Int = 1,
-        limit: Int = 20
-    ): Flow<Result<List<Product>>>
+        category: ProductCategory,
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductSummary>>>
 
     /**
-     * Gets products within a price range.
-     *
-     * @param minPrice Minimum price in Rials
-     * @param maxPrice Maximum price in Rials
-     * @return Flow of Result containing filtered products
+     * Get products by purity
      */
-    fun getProductsByPriceRange(
-        minPrice: Double,
-        maxPrice: Double
-    ): Flow<Result<List<Product>>>
+    fun getProductsByPurity(
+        purity: PurityType,
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductSummary>>>
 
     /**
-     * Manually refresh products cache.
-     * Forces fetch from server regardless of cache validity.
-     *
-     * @return Flow of Result indicating refresh status
+     * Get featured products for homepage
      */
-    fun refreshProducts(): Flow<Result<Unit>>
+    fun getFeaturedProducts(): Flow<Result<List<ProductSummary>>>
 
     /**
-     * Clears all cached products.
-     *
-     * @return Flow of Result indicating clear operation
+     * Get related products
      */
-    suspend fun clearCache(): Result<Unit>
+    fun getRelatedProducts(
+        productId: String,
+        limit: Int = 5,
+    ): Flow<Result<List<ProductSummary>>>
+
+    /**
+     * Get product recommendations
+     */
+    fun getRecommendations(
+        productId: String? = null,
+        limit: Int = 10,
+    ): Flow<Result<List<ProductSummary>>>
+
+    /**
+     * Add product to favorites
+     */
+    suspend fun addToFavorites(productId: String): Result<Unit>
+
+    /**
+     * Remove product from favorites
+     */
+    suspend fun removeFromFavorites(productId: String): Result<Unit>
+
+    /**
+     * Get user favorite products
+     */
+    fun getFavoriteProducts(): Flow<Result<List<ProductSummary>>>
+
+    /**
+     * Check if product is in favorites
+     */
+    fun isFavorite(productId: String): Flow<Result<Boolean>>
+
+    /**
+     * Add review to product
+     */
+    suspend fun addReview(
+        productId: String,
+        rating: Float,
+        comment: String? = null,
+    ): Result<ProductReview>
+
+    /**
+     * Get product reviews
+     */
+    fun getProductReviews(
+        productId: String,
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductReview>>>
+
+    /**
+     * Filter products
+     */
+    fun filterProducts(
+        categories: List<ProductCategory>? = null,
+        purities: List<PurityType>? = null,
+        minPrice: Long? = null,
+        maxPrice: Long? = null,
+        minWeight: Double? = null,
+        maxWeight: Double? = null,
+        minRating: Float? = null,
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductSummary>>>
+
+    /**
+     * Sort products
+     */
+    fun sortProducts(
+        sortBy: ProductSortOption,
+        order: SortOrder = SortOrder.DESCENDING,
+        page: Int = 0,
+        pageSize: Int = 20,
+    ): Flow<Result<List<ProductSummary>>>
+}
+
+/**
+ * Product review model
+ */
+data class ProductReview(
+    val reviewId: String,
+    val productId: String,
+    val userId: String,
+    val userName: String,
+    val rating: Float,
+    val comment: String?,
+    val images: List<String> = emptyList(),
+    val helpful: Int = 0,
+    val unhelpful: Int = 0,
+    val verified: Boolean = false,
+    val createdAt: java.time.LocalDateTime,
+)
+
+/**
+ * Product sort options
+ */
+enum class ProductSortOption {
+    NEWEST,
+    PRICE_LOW_TO_HIGH,
+    PRICE_HIGH_TO_LOW,
+    RATING,
+    POPULARITY,
+    WEIGHT,
+}
+
+/**
+ * Sort order
+ */
+enum class SortOrder {
+    ASCENDING,
+    DESCENDING,
 }
