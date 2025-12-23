@@ -1,29 +1,90 @@
 package com.noghre.sod.data.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
- * Data Transfer Object for Cart API responses.
+ * Cart-related DTOs for API communication
  */
-data class CartDto(
-    @SerializedName("id")
+
+@Serializable
+data class AddToCartRequestDto(
+    @SerialName("product_id")
+    val productId: String,
+    @SerialName("quantity")
+    val quantity: Int,
+    @SerialName("weight")
+    val weight: Double,
+    @SerialName("labor_cost")
+    val laborCost: Long = 0
+)
+
+@Serializable
+data class UpdateCartItemDto(
+    @SerialName("quantity")
+    val quantity: Int
+)
+
+@Serializable
+data class CartItemResponseDto(
+    @SerialName("id")
     val id: String,
+    @SerialName("product_id")
+    val productId: String,
+    @SerialName("product_name")
+    val productName: String,
+    @SerialName("product_image")
+    val productImage: String,
+    @SerialName("purity")
+    val purity: String,
+    @SerialName("quantity")
+    val quantity: Int,
+    @SerialName("weight")
+    val weight: Double,
+    @SerialName("unit_price")
+    val unitPrice: Long,
+    @SerialName("labor_cost")
+    val laborCost: Long = 0,
+    @SerialName("total_price")
+    val totalPrice: Long
+)
 
-    @SerializedName("user_id")
-    val userId: String,
+@Serializable
+data class CartSummaryDto(
+    @SerialName("items")
+    val items: List<CartItemResponseDto>,
+    @SerialName("total_items")
+    val totalItems: Int,
+    @SerialName("total_weight")
+    val totalWeight: Double,
+    @SerialName("subtotal")
+    val subtotal: Long,
+    @SerialName("tax")
+    val tax: Long,
+    @SerialName("shipping_cost")
+    val shippingCost: Long = 0,
+    @SerialName("discount_amount")
+    val discountAmount: Long = 0,
+    @SerialName("total")
+    val total: Long
+)
 
-    @SerializedName("items")
-    val items: List<CartItemDto> = emptyList(),
+@Serializable
+data class ApplyCouponRequestDto(
+    @SerialName("coupon_code")
+    val couponCode: String
+)
 
-    @SerializedName("total_price")
-    val totalPrice: Double = 0.0,
-
-    @SerializedName("discount_amount")
-    val discountAmount: Double = 0.0,
-
-    @SerializedName("final_price")
-    val finalPrice: Double = 0.0,
-
-    @SerializedName("updated_at")
-    val updatedAt: String? = null
+@Serializable
+data class ApplyCouponResponseDto(
+    @SerialName("success")
+    val success: Boolean,
+    @SerialName("discount_amount")
+    val discountAmount: Long,
+    @SerialName("discount_percentage")
+    val discountPercentage: Int,
+    @SerialName("new_total")
+    val newTotal: Long,
+    @SerialName("message")
+    val message: String? = null
 )
