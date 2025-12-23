@@ -1,46 +1,44 @@
 package com.noghre.sod.data.dto
 
-from kotlinx.serialization.Serializable
-import com.noghre.sod.data.model.Order
-import com.noghre.sod.data.model.OrderItem
-import com.noghre.sod.data.model.OrderStatus
+import com.google.gson.annotations.SerializedName
 
-@Serializable
+/**
+ * Data Transfer Object for Order API responses.
+ */
 data class OrderDto(
+    @SerializedName("id")
     val id: String,
+
+    @SerializedName("user_id")
     val userId: String,
+
+    @SerializedName("items")
     val items: List<OrderItemDto>,
-    val status: String = "PENDING",
+
+    @SerializedName("status")
+    val status: String, // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+
+    @SerializedName("total_amount")
     val totalAmount: Double,
-    val shippingAddress: String,
-    val trackingNumber: String? = null,
-    val estimatedDelivery: Long? = null
-)
 
-@Serializable
-data class OrderItemDto(
-    val productId: String,
-    val productName: String,
-    val quantity: Int,
-    val price: Double
-)
+    @SerializedName("shipping_address")
+    val shippingAddress: AddressDto,
 
-fun OrderDto.toEntity(): Order {
-    return Order(
-        id = id,
-        userId = userId,
-        items = items.map {
-            OrderItem(
-                productId = it.productId,
-                productName = it.productName,
-                quantity = it.quantity,
-                price = it.price
-            )
-        },
-        status = OrderStatus.valueOf(status),
-        totalAmount = totalAmount,
-        shippingAddress = shippingAddress,
-        trackingNumber = trackingNumber,
-        estimatedDelivery = estimatedDelivery
-    )
-}
+    @SerializedName("payment_method")
+    val paymentMethod: String,
+
+    @SerializedName("payment_status")
+    val paymentStatus: String,
+
+    @SerializedName("tracking_code")
+    val trackingCode: String? = null,
+
+    @SerializedName("created_at")
+    val createdAt: String? = null,
+
+    @SerializedName("updated_at")
+    val updatedAt: String? = null,
+
+    @SerializedName("delivered_at")
+    val deliveredAt: String? = null
+)
