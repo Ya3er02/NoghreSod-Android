@@ -1,260 +1,314 @@
-# NoghreSod Android Marketplace
+# 💍 Noghresod - Silver Jewelry E-Commerce Android App
 
-> Complete Android marketplace application built with Kotlin and Jetpack Compose
+## Overview
 
-[![Android CI](https://github.com/Ya3er02/NoghreSod-Android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Ya3er02/NoghreSod-Android/actions)
-[![codecov](https://codecov.io/gh/Ya3er02/NoghreSod-Android/branch/main/graph/badge.svg)](https://codecov.io/gh/Ya3er02/NoghreSod-Android)
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-blue.svg)](https://kotlinlang.org/)
-[![Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.5-green.svg)](https://developer.android.com/compose)
-[![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg)](https://android-arsenal.com/api?level=24)
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg)]()
+Noghresod is a **production-ready silver jewelry e-commerce platform** for Android, built with modern Android development practices and Jetpack Compose.
 
-## Features
+### Key Features
 
-### 🛍️ Shopping Experience
-- Browse products by category
-- Search and filter products
-- Detailed product views with ratings and reviews
-- Add to cart and manage cart items
-- Wishlist functionality
-- Order tracking and history
+✅ **Product Management**
+- Comprehensive product catalog with filtering and search
+- High-quality images and detailed product information
+- Category-based browsing
 
-### 👤 User Management
-- User registration and authentication
+✅ **Shopping Experience**
+- Smooth cart management
+- Multiple checkout options
+- Real-time order tracking
+
+✅ **User Management**
+- Secure authentication (Login/Register)
 - Profile management
 - Address management
-- Payment methods
-- Order history
+- Notification preferences
 
-### 🧪 Testing & Quality
-- ✅ 80%+ Code Coverage with JaCoCo
-- ✅ Screenshot Testing with Paparazzi
-- ✅ Unit Tests with MockK
-- ✅ Integration Tests
-- ✅ Automated CI/CD Pipeline
-- ✅ Firebase Test Lab Integration
+✅ **Payment Integration**
+- Multiple payment gateway support
+- Secure transaction handling
+- Order confirmation and tracking
 
-### 🚀 Performance
-- ⚡ Optimized Image Loading (Coil)
-- ⚡ Shimmer Loading States
-- ⚡ Memory Leak Detection (LeakCanary)
-- ⚡ Recomposition Tracking
-- ⚡ Network Connectivity Monitoring
-
-### ♿ Accessibility
-- 🌐 Full RTL Support (Persian/Arabic)
-- 🔊 Screen Reader Support
-- 📱 TalkBack Compatible
-- 🎨 Dark Mode Support
-- 🎯 Semantic Labels
-
-### 🏗️ Technical Architecture
-- **MVVM + Clean Architecture** - Separation of concerns
-- **Jetpack Compose** - Modern declarative UI
-- **Room Database** - Local data persistence
-- **Retrofit + OkHttp** - Network communication
-- **Kotlin Coroutines & Flow** - Asynchronous programming
-- **Hilt** - Dependency injection
-- **Material Design 3** - Modern UI components
-
-### 🔒 Security
-- Network security configuration
-- Certificate pinning for API
-- Secure data storage
-- ProGuard code obfuscation
-- Bearer token authentication
-
-### 📊 Quality
-- Unit tests with MockK
-- UI tests with Compose Testing
-- Lint checks
-- Static code analysis (Detekt)
-- Code coverage reporting
-
-## Quick Start
-
-### Prerequisites
-- Android Studio 2023.1.1+
-- JDK 17+
-- Android SDK 34+
-- Gradle 8.0+
-
-### Setup
-
-1. **Clone repository**
-```bash
-git clone https://github.com/Ya3er02/NoghreSod-Android.git
-cd NoghreSod-Android
-```
-
-2. **Configure local properties**
-```bash
-cp local.properties.example local.properties
-# Edit with your API credentials
-```
-
-3. **Open in Android Studio**
-- File → Open → Select project directory
-- Wait for Gradle sync
-
-4. **Build & Run**
-```bash
-./gradlew assembleDebug
-./gradlew installDebug
-```
-
-For detailed setup instructions, see [README_SETUP.md](README_SETUP.md).
-
-## Project Structure
-```
-app/src/main/
-├── kotlin/com/noghre/sod/
-│   ├── domain/         # Domain layer (entities, use cases, results)
-│   ├── data/           # Data layer (models, DAOs, repositories)
-│   ├── ui/             # UI layer (screens, components, theme)
-│   ├── viewmodel/      # MVVM ViewModels
-│   ├── di/             # Dependency injection modules
-│   ├── utils/          # Utilities and extensions
-│   ├── analytics/      # Analytics tracking
-│   ├── MainActivity.kt
-│   └── NoghreSodApp.kt
-├── res/
-│   ├── values/         # Strings, colors, themes, dimensions
-│   └── xml/            # Network security config
-└── AndroidManifest.xml
-```
-
-## Dependencies
-
-### Core
-- androidx.core:core-ktx:1.13.1
-- androidx.appcompat:appcompat:1.7.0
-- androidx.multidex:multidex:2.0.1
-
-### Compose
-- androidx.compose.ui:ui:1.7.5
-- androidx.compose.material3:material3:1.2.1
-- androidx.activity:activity-compose:1.8.1
-- androidx.navigation:navigation-compose:2.8.0
-
-### Networking
-- com.squareup.retrofit2:retrofit:2.11.0
-- com.squareup.okhttp3:okhttp:4.12.0
-- com.squareup.okhttp3:logging-interceptor:4.12.0
-
-### Database
-- androidx.room:room-runtime:2.6.1
-- androidx.room:room-ktx:2.6.1
-
-### DI
-- com.google.dagger:hilt-android:2.51.1
-- androidx.hilt:hilt-navigation-compose:1.2.0
-
-### Coroutines
-- org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3
-- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3
-
-### Image Loading
-- io.coil-kt:coil-compose:2.5.0
-
-### Testing
-- junit:junit:4.13.2
-- io.mockk:mockk:1.13.8
-- app.cash.turbine:turbine:1.0.0
-- app.cash.paparazzi:paparazzi:1.3.1
-
-## Development Commands
-
-```bash
-# Clean build
-./gradlew clean
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Build release APK
-./gradlew assembleRelease
-
-# Run unit tests
-./gradlew test
-
-# Run screenshot tests
-./gradlew verifyPaparazziDebug
-
-# Generate coverage report
-./gradlew jacocoTestReport
-
-# Run lint
-./gradlew lint
-
-# Run static analysis
-./gradlew detekt
-
-# Generate API documentation
-./gradlew dokkaHtml
-
-# Build and run on device
-./gradlew installDebug
-
-# Run all checks
-./gradlew check
-```
-
-## CI/CD Pipeline
-
-GitHub Actions automatically:
-- ✅ Builds on every push
-- ✅ Runs all tests
-- ✅ Performs lint checks
-- ✅ Validates commits (Conventional Commits)
-- ✅ Generates coverage reports
-- ✅ Scans dependencies for vulnerabilities
-- ✅ Builds debug APK
-- ✅ Updates dependencies (Dependabot)
-
-## Documentation
-
-- **[README_SETUP.md](README_SETUP.md)** - Detailed setup and troubleshooting
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines and conventions
-- **[IMPROVEMENTS_PART_1.md](IMPROVEMENTS_PART_1.md)** - Architecture and domain layer
-- **[IMPROVEMENTS_PART_2.md](IMPROVEMENTS_PART_2.md)** - Utilities and analytics
-- **[IMPLEMENTATION_QUICK_START.md](IMPLEMENTATION_QUICK_START.md)** - Quick reference guide
-
-## Roadmap
-
-- [ ] Payment integration (Stripe/PayPal)
-- [ ] Real-time notifications
-- [ ] Product recommendations
-- [ ] Seller analytics dashboard
-- [ ] Marketplace admin panel
-- [ ] Multi-language support (currently Persian/English)
-- [ ] Offline functionality
-- [ ] Advanced search with AI suggestions
-
-## Contributing
-
-Contributions are welcome! Please:
-1. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-2. Fork the repository
-3. Create a feature branch: `git checkout -b feature/your-feature`
-4. Follow [Conventional Commits](https://www.conventionalcommits.org/)
-5. Add tests for your changes
-6. Submit a pull request
-
-## Troubleshooting
-
-See [README_SETUP.md](README_SETUP.md) for detailed troubleshooting and [CONTRIBUTING.md](CONTRIBUTING.md) for development issues.
-
-## License
-
-Copyright © 2025 NoghreSod. All rights reserved.
-
-## Contact
-
-- **GitHub**: [@Ya3er02](https://github.com/Ya3er02)
-- **Project Issues**: [GitHub Issues](https://github.com/Ya3er02/NoghreSod-Android/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Ya3er02/NoghreSod-Android/discussions)
+✅ **Technical Excellence**
+- 100% Kotlin with Jetpack Compose
+- Clean Architecture + MVVM
+- Type-safe dependency injection (Hilt)
+- Offline-first approach with Room DB
+- Reactive programming with Flow & Coroutines
+- Material Design 3
 
 ---
 
-Built with ❤️ for the NoghreSod Marketplace
+## Architecture
+
+### Layered Architecture
+
+```
+┌────────────────────────────┐
+│   PRESENTATION LAYER                    │
+│   (Screens, ViewModels, Components)     │
+└───────────┬─────────────────┘
+             │
+┌───────────┴─────────────────┐
+│   APPLICATION LAYER                    │
+│   (ViewModels, State Management)        │
+└───────────┬─────────────────┘
+             │
+┌───────────┴─────────────────┐
+│   DOMAIN LAYER                         │
+│   (Use Cases, Business Logic)           │
+└───────────┬─────────────────┘
+             │
+┌───────────┴─────────────────┐
+│   DATA LAYER                           │
+│   (Repositories, DB, APIs)             │
+└────────────────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+app/src/main/kotlin/com/noghre/sod/
+├── di/                          # Dependency Injection
+│   ├── NetworkModule.kt
+│   ├── DatabaseModule.kt
+│   ├── RepositoryModule.kt
+│   └── UseCaseModule.kt
+├── domain/                      # Business Logic
+│   ├── model/
+│   ├── repository/
+│   └── usecase/
+├── data/                        # Data Implementation
+│   ├── local/
+│   │   ├── entity/
+│   │   ├── dao/
+│   │   ├── database/
+│   │   └── datasource/
+│   ├── remote/
+│   │   ├── api/
+│   │   ├── dto/
+│   │   ├── interceptor/
+│   │   └── client/
+│   └── repository/
+├── presentation/                # UI Controllers
+│   ├── ui/
+│   │   ├── home/
+│   │   ├── product/
+│   │   ├── cart/
+│   │   ├── checkout/
+│   │   ├── orders/
+│   │   ├── auth/
+│   │   ├── profile/
+│   ├── viewmodel/
+│   ├── components/
+│   ├── navigation/
+│   ├── theme/
+│   └── MainActivity.kt
+├── utils/
+│   ├── Extensions.kt
+│   ├── InputValidators.kt
+│   ├── AnalyticsHelper.kt
+│   ├── LoggingUtils.kt
+│   └── EncryptionUtils.kt
+├── core/                        # Core Utilities
+└── NoghreSodApp.kt
+```
+
+---
+
+## Tech Stack
+
+### Language & Frameworks
+- **Kotlin** - Modern, concise, and null-safe
+- **Jetpack Compose** - Declarative UI framework
+- **Android Jetpack** - Lifecycle, Navigation, Hilt, Room, DataStore
+
+### Network & Data
+- **Retrofit 2** - Type-safe HTTP client
+- **OkHttp 3** - HTTP client with interceptors
+- **Gson** - JSON serialization/deserialization
+- **Room** - Type-safe local database
+
+### Architecture & DI
+- **Hilt** - Compile-time safe dependency injection
+- **MVVM** - Clean separation of concerns
+- **Clean Architecture** - Layered approach
+
+### Async & Reactive
+- **Coroutines** - Lightweight concurrency
+- **Flow** - Reactive stream handling
+- **StateFlow** - Reactive state management
+
+### Security & Storage
+- **EncryptedSharedPreferences** - Secure local storage
+- **DataStore** - Modern preferences replacement
+- **HTTPS Enforcement** - Secure network communication
+
+### Testing
+- **JUnit 4** - Unit testing
+- **Espresso** - UI testing
+- **Compose Testing** - Compose UI testing
+
+### Firebase & Analytics
+- **Firebase Analytics** - User behavior tracking
+- **Firebase Messaging** - Push notifications
+- **Firebase Crashlytics** - Crash reporting
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Android Studio Arctic Fox or later
+- Android API Level 24 or higher
+- Java 17 or later
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Ya3er02/NoghreSod-Android.git
+   cd NoghreSod-Android
+   ```
+
+2. **Create local.properties**
+   ```properties
+   sdk.dir=/path/to/android/sdk
+   ```
+
+3. **Build the project**
+   ```bash
+   ./gradlew build
+   ```
+
+4. **Run on emulator or device**
+   ```bash
+   ./gradlew installDebug
+   ```
+
+---
+
+## API Integration
+
+### Base URLs
+- **Development**: `https://dev-api.noghresod.com/api/v1/`
+- **Production**: `https://api.noghresod.com/api/v1/`
+
+### Key Endpoints
+
+**Authentication**
+- `POST /auth/login` - User login
+- `POST /auth/register` - User registration
+- `POST /auth/refresh` - Refresh token
+- `POST /auth/logout` - User logout
+
+**Products**
+- `GET /products` - List products
+- `GET /products/{id}` - Product detail
+- `GET /products/search` - Search products
+- `GET /products/categories` - List categories
+
+**Cart**
+- `GET /cart` - Get cart
+- `POST /cart/items` - Add item
+- `PUT /cart/items/{id}` - Update item
+- `DELETE /cart/items/{id}` - Remove item
+
+**Orders**
+- `GET /orders` - List user orders
+- `POST /orders` - Create order
+- `GET /orders/{id}` - Order detail
+- `GET /orders/{id}/tracking` - Order tracking
+
+---
+
+## Database Schema
+
+### Entities
+1. **ProductEntity** - Product catalog
+2. **CartEntity & CartItemEntity** - Shopping cart
+3. **OrderEntity & OrderTrackingEntity** - Orders
+4. **UserEntity & AddressEntity** - User profiles
+5. **AuthTokenEntity** - Auth tokens
+
+---
+
+## Screens
+
+- **HomeScreen** - Featured and trending products
+- **ProductListScreen** - Searchable product catalog
+- **ProductDetailScreen** - Detailed product info
+- **CartScreen** - Shopping cart management
+- **CheckoutScreen** - Address and payment selection
+- **OrdersScreen** - Order history
+- **LoginScreen** - User authentication
+- **RegisterScreen** - New user signup
+- **ProfileScreen** - User profile & settings
+
+---
+
+## Build & Deploy
+
+### Debug Build
+```bash
+./gradlew assembleDebug
+```
+
+### Release Build
+```bash
+./gradlew assembleRelease
+```
+
+### Sign APK
+```bash
+./gradlew bundleRelease
+```
+
+---
+
+## Performance Optimizations
+
+- 🚀 Lazy loading of images with Coil
+- 🚀 Efficient list rendering with LazyColumn/LazyVerticalGrid
+- 🚀 Database indexing for fast queries
+- 🚀 Coroutine-based async operations
+- 🚀 Memory-efficient state management
+
+---
+
+## Security Practices
+
+- 🔐 HTTPS-only API communication
+- 🔐 Encrypted local storage with EncryptedSharedPreferences
+- 🔐 Input validation and sanitization
+- 🔐 Secure token management
+- 🔐 ProGuard/R8 code obfuscation in release builds
+
+---
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. Create a feature branch
+2. Commit with clear messages
+3. Write tests for new features
+4. Submit a pull request
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+## Support
+
+For issues and questions:
+- Open an issue on GitHub
+- Contact: support@noghresod.com
+
+---
+
+**Made with ❤️ by Yaser**
