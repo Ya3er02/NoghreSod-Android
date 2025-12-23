@@ -1,41 +1,37 @@
 package com.noghre.sod.data.remote.interceptor
 
+import android.content.SharedPreferences
 import okhttp3.Interceptor
 import okhttp3.Response
-import java.io.IOException
+import javax.inject.Inject
 
 /**
- * Authentication Interceptor
- * Automatically adds Bearer token to all requests
- * Handles token refresh on 401 responses
+ * OkHttp Interceptor for adding authentication token to requests
  */
-class AuthInterceptor(private val tokenProvider: () -> String?) : Interceptor {
+class AuthInterceptor @Inject constructor(
+    private val sharedPreferences: SharedPreferences,
+) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        var request = chain.request()
-        val token = tokenProvider()
+        val originalRequest = chain.request()
 
-        // Add token if available
-        if (token != null) {
-            request = request.newBuilder()
+        // Skip adding token to auth endpoints
+        if (originalRequest.url.encodedPath.contains("/auth/")) {
+            return chain.proceed(originalRequest)
+        }
+
+        val token = getAccessToken()
+        return if (token.isNotEmpty()) {
+            val authenticatedRequest = originalRequest.newBuilder()
                 .addHeader("Authorization", "Bearer $token")
                 .build()
+            chain.proceed(authenticatedRequest)
+        } else {
+            chain.proceed(originalRequest)
         }
+    }
 
-        val response = chain.proceed(request)
-
-        // Handle 401 Unauthorized
-        if (response.code == 401) {
-            // Token expired or invalid
-            // In a real app, you would:
-            // 1. Try to refresh the token
-            // 2. Retry the request with new token
-            // 3. If refresh fails, logout user
-            
-            // For now, just return the 401 response
-            // The ViewModel will handle logout
-        }
-
-        return response
+    private fun getAccessToken(): String {
+        return sharedPreferences.getString("access_token", "") ?: ""
     }
 }
