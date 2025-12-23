@@ -1,60 +1,47 @@
 package com.noghre.sod
 
 import android.app.Application
+import android.content.res.Configuration
+import androidx.compose.material3.MaterialTheme
+import com.google.firebase.Firebase
+import com.google.firebase.analytics.analytics
+import com.google.firebase.crashlytics.crashlytics
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 
-/**
- * Main Application class for NoghreSod Marketplace.
- * Initializes Hilt dependency injection and Timber logging.
- */
 @HiltAndroidApp
 class NoghreSodApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        initializeLogging()
-        initializeApplication()
-    }
 
-    /**
-     * Initialize Timber logging for development and production.
-     */
-    private fun initializeLogging() {
+        // Initialize Firebase
+        Firebase.analytics.logEvent("app_launch") {
+            param("timestamp", System.currentTimeMillis())
+        }
+
+        // Initialize Timber for logging
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
-            Timber.d("NoghreSodApp initialized in DEBUG mode")
         } else {
-            // Plant release tree in production
             Timber.plant(CrashReportingTree())
-            Timber.d("NoghreSodApp initialized in RELEASE mode")
         }
+
+        Timber.d("NoghreSodApp initialized - Version ${BuildConfig.VERSION_NAME}")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Handle locale and theme changes
     }
 
     /**
-     * Initialize application-wide configurations.
+     * Custom Timber tree for crash reporting in production
      */
-    private fun initializeApplication() {
-        Timber.d("Initializing NoghreSod Marketplace Application")
-        // Add any global configuration here
-    }
-
-    /**
-     * Custom Timber tree for crash reporting in production.
-     */
-    private class CrashReportingTree : Timber.Tree() {
-        override fun log(
-            priority: Int,
-            tag: String?,
-            message: String,
-            t: Throwable?
-        ) {
-            // Log only errors and warnings in production
-            if (priority >= android.util.Log.WARN) {
-                // Send to crash reporting service (Crashlytics, etc.)
-                if (t != null) {
-                    android.util.Log.e(tag, message, t)
-                }
+    private inner class CrashReportingTree : Timber.Tree() {
+        override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+            if (priority >= android.util.Log.ERROR) {
+                Firebase.crashlytics.recordException(t ?: Exception(message))
             }
         }
     }

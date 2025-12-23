@@ -1,29 +1,81 @@
 # Gradle
+.gradle
 .gradle/
 build/
 *.apk
+*.aar
 *.ap_
-*.dex
+*.aab
 
-# IDE
+# Android Studio
 .idea/
+.idea/caches
+.idea/gradle.xml
+.idea/libraries
+.idea/modules.xml
+.idea/workspace.xml
 *.iml
-.DS_Store
+*.iws
+*.ipr
 *.swp
 *.swo
 *~
+.DS_Store
 
-# Local
+# Build output
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.lis
+
+# Local configuration
 local.properties
-gradle.properties
+keystore.properties
+keystore/
 
-# Build outputs
-outputs/
+# Secrets
+.env
+.env.local
+secrets.properties
+fire base.json
 
-# AndroidStudio
-.externalNativeBuild/
-.cxx/
+# IDE
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.nvmrc
 
-# Firebase
-google-services.json
-GoogleService-Info.plist
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Kotlin
+kotlin/
+kotlin-build/
+
+# LLDB
+.lldbinit
+
+# Lint
+lint-baseline.xml
+lint-results.xml
+lint-results.html
+
+# Test reports
+test-results/
+*.coverage
+*.exec
+.jacoco
+.coverage/
+
+# Generated files
+*.g.kt
+*.kt.bak
+
+# Root
+/.idea
+local.properties
+keystore.properties
