@@ -1,123 +1,265 @@
 package com.noghre.sod.data.remote
 
-from retrofit2.http.*
-import com.noghre.sod.data.dto.ApiResponse
-import com.noghre.sod.data.dto.PaginatedResponse
-import com.noghre.sod.data.dto.ProductDto
-import com.noghre.sod.data.dto.OrderDto
-import com.noghre.sod.data.model.User
+import retrofit2.Response
+import retrofit2.http.*
+import com.noghre.sod.data.dto.*
+import com.noghre.sod.core.config.ApiEndpoints
 
 /**
  * Retrofit API service interface for NoghreSod Marketplace.
+ * All endpoints are aligned with the backend API structure.
+ *
+ * Base URL: https://api.noghresod.com/
  */
 interface ApiService {
 
-    // ===== Products =====
-    @GET("products")
+    // ===== Authentication Endpoints =====
+    /**
+     * Login with email and password
+     * POST /auth/login
+     */
+    @POST(ApiEndpoints.Auth.LOGIN)
+    suspend fun login(
+        @Body request: LoginRequest
+    ): Response<ApiResponse<AuthResponse>>
+
+    /**
+     * Register a new user
+     * POST /auth/register
+     */
+    @POST(ApiEndpoints.Auth.REGISTER)
+    suspend fun register(
+        @Body request: RegisterRequest
+    ): Response<ApiResponse<AuthResponse>>
+
+    /**
+     * Refresh access token
+     * POST /auth/refresh
+     */
+    @POST(ApiEndpoints.Auth.REFRESH_TOKEN)
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest
+    ): Response<ApiResponse<AuthResponse>>
+
+    /**
+     * Logout user
+     * POST /auth/logout
+     */
+    @POST(ApiEndpoints.Auth.LOGOUT)
+    suspend fun logout(): Response<ApiResponse<Unit>>
+
+    // ===== Product Endpoints =====
+    /**
+     * Get paginated list of products
+     * GET /api/products?page={page}&limit={limit}&category={category}&sort={sort}
+     */
+    @GET(ApiEndpoints.Products.LIST)
     suspend fun getProducts(
         @Query("page") page: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("category") category: String? = null
-    ): ApiResponse<PaginatedResponse<ProductDto>>
+        @Query("limit") limit: Int = 20,
+        @Query("category") category: String? = null,
+        @Query("sort") sort: String? = null
+    ): Response<ApiResponse<PaginatedResponse<ProductDto>>>
 
-    @GET("products/{id}")
-    suspend fun getProductById(@Path("id") id: String): ApiResponse<ProductDto>
+    /**
+     * Get product by ID
+     * GET /api/products/{id}
+     */
+    @GET(ApiEndpoints.Products.DETAIL)
+    suspend fun getProductById(
+        @Path("id") id: String
+    ): Response<ApiResponse<ProductDto>>
 
-    @GET("products/search")
+    /**
+     * Search products
+     * GET /api/products/search?q={query}&page={page}&limit={limit}
+     */
+    @GET(ApiEndpoints.Products.SEARCH)
     suspend fun searchProducts(
         @Query("q") query: String,
-        @Query("page") page: Int = 1
-    ): ApiResponse<PaginatedResponse<ProductDto>>
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): Response<ApiResponse<PaginatedResponse<ProductDto>>>
 
-    @GET("categories")
-    suspend fun getCategories(): ApiResponse<List<String>>
+    /**
+     * Get trending products
+     * GET /api/products/trending
+     */
+    @GET(ApiEndpoints.Products.TRENDING)
+    suspend fun getTrendingProducts(
+        @Query("limit") limit: Int = 10
+    ): Response<ApiResponse<List<ProductDto>>>
 
-    // ===== Cart =====
-    @GET("cart")
-    suspend fun getCart(): ApiResponse<List<ProductDto>>
+    /**
+     * Get featured products
+     * GET /api/products/featured
+     */
+    @GET(ApiEndpoints.Products.FEATURED)
+    suspend fun getFeaturedProducts(
+        @Query("limit") limit: Int = 10
+    ): Response<ApiResponse<List<ProductDto>>>
 
-    @POST("cart/add")
-    suspend fun addToCart(
-        @Body request: AddToCartRequest
-    ): ApiResponse<String>
+    // ===== Category Endpoints =====
+    /**
+     * Get all categories
+     * GET /api/categories
+     */
+    @GET(ApiEndpoints.Categories.LIST)
+    suspend fun getCategories(): Response<ApiResponse<List<CategoryDto>>>
 
-    @POST("cart/remove/{productId}")
-    suspend fun removeFromCart(@Path("productId") productId: String): ApiResponse<String>
+    /**
+     * Get category by ID
+     * GET /api/categories/{id}
+     */
+    @GET(ApiEndpoints.Categories.DETAIL)
+    suspend fun getCategoryById(
+        @Path("id") id: String
+    ): Response<ApiResponse<CategoryDto>>
 
-    @POST("cart/update/{productId}")
-    suspend fun updateCartItem(
-        @Path("productId") productId: String,
-        @Body request: UpdateCartRequest
-    ): ApiResponse<String>
+    // ===== Silver Price Endpoints =====
+    /**
+     * Get current live silver price
+     * GET /api/prices/live
+     */
+    @GET(ApiEndpoints.Prices.LIVE_PRICE)
+    suspend fun getLiveSilverPrice(): Response<ApiResponse<SilverPriceDto>>
 
-    @POST("cart/clear")
-    suspend fun clearCart(): ApiResponse<String>
+    /**
+     * Get silver price history
+     * GET /api/prices/history?days={days}
+     */
+    @GET(ApiEndpoints.Prices.PRICE_HISTORY)
+    suspend fun getPriceHistory(
+        @Query("days") days: Int = 30
+    ): Response<ApiResponse<List<SilverPriceDto>>>
 
-    // ===== Orders =====
-    @GET("orders")
-    suspend fun getOrders(
-        @Query("page") page: Int = 1
-    ): ApiResponse<PaginatedResponse<OrderDto>>
+    /**
+     * Calculate price based on weight and silver price
+     * POST /api/prices/calculate
+     */
+    @POST(ApiEndpoints.Prices.CALCULATE_PRICE)
+    suspend fun calculatePrice(
+        @Body request: PriceCalculationRequest
+    ): Response<ApiResponse<PriceCalculationResponse>>
 
-    @GET("orders/{id}")
-    suspend fun getOrderById(@Path("id") id: String): ApiResponse<OrderDto>
+    /**
+     * Get price trends
+     * GET /api/prices/trends
+     */
+    @GET(ApiEndpoints.Prices.PRICE_TRENDS)
+    suspend fun getPriceTrends(
+        @Query("days") days: Int = 30
+    ): Response<ApiResponse<PriceTrendsDto>>
 
-    @POST("orders/create")
-    suspend fun createOrder(
-        @Body request: CreateOrderRequest
-    ): ApiResponse<OrderDto>
+    // ===== User Profile Endpoints =====
+    /**
+     * Get user profile
+     * GET /api/user/profile
+     */
+    @GET(ApiEndpoints.User.PROFILE)
+    suspend fun getUserProfile(): Response<ApiResponse<UserDto>>
 
-    @POST("orders/{id}/cancel")
-    suspend fun cancelOrder(@Path("id") id: String): ApiResponse<String>
-
-    // ===== User Profile =====
-    @GET("user/profile")
-    suspend fun getUserProfile(): ApiResponse<User>
-
-    @PUT("user/profile")
+    /**
+     * Update user profile
+     * PUT /api/user/profile
+     */
+    @PUT(ApiEndpoints.User.UPDATE_PROFILE)
     suspend fun updateUserProfile(
-        @Body request: UpdateUserRequest
-    ): ApiResponse<User>
+        @Body request: UpdateProfileRequest
+    ): Response<ApiResponse<UserDto>>
 
-    @GET("user/wishlist")
-    suspend fun getWishlist(): ApiResponse<List<ProductDto>>
+    /**
+     * Change password
+     * POST /api/user/change-password
+     */
+    @POST(ApiEndpoints.User.CHANGE_PASSWORD)
+    suspend fun changePassword(
+        @Body request: ChangePasswordRequest
+    ): Response<ApiResponse<Unit>>
 
-    @POST("user/wishlist/add")
-    suspend fun addToWishlist(@Body request: WishlistRequest): ApiResponse<String>
+    // ===== Wishlist Endpoints =====
+    /**
+     * Get user wishlist
+     * GET /api/user/wishlist
+     */
+    @GET(ApiEndpoints.Wishlist.LIST)
+    suspend fun getWishlist(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): Response<ApiResponse<PaginatedResponse<ProductDto>>>
 
-    @POST("user/wishlist/remove")
-    suspend fun removeFromWishlist(@Body request: WishlistRequest): ApiResponse<String>
+    /**
+     * Add product to wishlist
+     * POST /api/user/wishlist/add
+     */
+    @POST(ApiEndpoints.Wishlist.ADD)
+    suspend fun addToWishlist(
+        @Body request: WishlistRequest
+    ): Response<ApiResponse<Unit>>
+
+    /**
+     * Remove product from wishlist
+     * POST /api/user/wishlist/remove
+     */
+    @POST(ApiEndpoints.Wishlist.REMOVE)
+    suspend fun removeFromWishlist(
+        @Body request: WishlistRequest
+    ): Response<ApiResponse<Unit>>
+
+    /**
+     * Check if product is in wishlist
+     * GET /api/user/wishlist/check/{productId}
+     */
+    @GET(ApiEndpoints.Wishlist.CHECK)
+    suspend fun isInWishlist(
+        @Path("productId") productId: String
+    ): Response<ApiResponse<Boolean>>
 }
 
-// Request models
-data class AddToCartRequest(
-    val productId: String,
-    val quantity: Int
+// ===== Request DTOs =====
+data class LoginRequest(
+    val email: String,
+    val password: String,
+    val rememberMe: Boolean = false
 )
 
-data class UpdateCartRequest(
-    val quantity: Int
+data class RegisterRequest(
+    val name: String,
+    val email: String,
+    val password: String,
+    val phone: String? = null
 )
 
-data class CreateOrderRequest(
-    val items: List<OrderItemRequest>,
-    val shippingAddress: String,
-    val paymentMethodId: String
+data class RefreshTokenRequest(
+    val refreshToken: String
 )
 
-data class OrderItemRequest(
-    val productId: String,
-    val quantity: Int
-)
-
-data class UpdateUserRequest(
+data class UpdateProfileRequest(
     val name: String? = null,
-    val email: String? = null,
     val phone: String? = null,
     val bio: String? = null,
     val profileImageUrl: String? = null
 )
 
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String,
+    val confirmPassword: String
+)
+
 data class WishlistRequest(
     val productId: String
+)
+
+data class PriceCalculationRequest(
+    val weight: Double,
+    val purity: String = "950" // 950, 900, 800, 750
+)
+
+data class PriceCalculationResponse(
+    val weight: Double,
+    val purity: String,
+    val pricePerGram: Double,
+    val totalPrice: Double,
+    val currency: String = "IRR"
 )
