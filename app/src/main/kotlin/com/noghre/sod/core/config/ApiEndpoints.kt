@@ -1,145 +1,103 @@
 package com.noghre.sod.core.config
 
 /**
- * Centralized API endpoints configuration.
- * All API endpoint paths are defined here and organized by feature.
- * This ensures consistency and makes it easy to update endpoints when backend changes.
+ * API endpoint constants organized by feature domain.
+ * These are aligned with the NoghreSod backend API specification.
+ *
+ * All endpoints are relative to [AppConfig.Api.BASE_URL]
+ * Example: GET https://api.noghresod.com/api/products
  */
 object ApiEndpoints {
 
-    // ===== Authentication Endpoints =====
-    object Auth {
-        const val LOGIN = "auth/login"
-        const val REGISTER = "auth/register"
-        const val REFRESH_TOKEN = "auth/refresh"
-        const val LOGOUT = "auth/logout"
-        const val RESET_PASSWORD = "auth/reset-password"
-        const val VERIFY_EMAIL = "auth/verify-email"
-    }
-
-    // ===== Product Endpoints =====
+    // ============ Products Endpoints ============
     object Products {
-        const val LIST = "api/products"
-        const val DETAIL = "api/products/{id}"
-        const val SEARCH = "api/products/search"
-        const val BY_CATEGORY = "api/products/category/{categoryId}"
-        const val TRENDING = "api/products/trending"
-        const val FEATURED = "api/products/featured"
+        const val LIST = "/api/products"
+        const val DETAIL = "/api/products/{id}"
+        const val SEARCH = "/api/products/search"
+        const val BY_CATEGORY = "/api/products/category/{categoryId}"
     }
 
-    // ===== Category Endpoints =====
+    // ============ Categories Endpoints ============
     object Categories {
-        const val LIST = "api/categories"
-        const val DETAIL = "api/categories/{id}"
+        const val LIST = "/api/categories"
+        const val DETAIL = "/api/categories/{id}"
     }
 
-    // ===== Silver Price Endpoints =====
+    // ============ Pricing Endpoints ============
     object Prices {
-        const val LIVE_PRICE = "api/prices/live"
-        const val PRICE_HISTORY = "api/prices/history"
-        const val CALCULATE_PRICE = "api/prices/calculate"
-        const val PRICE_TRENDS = "api/prices/trends"
+        const val LIVE = "/api/prices/live"
+        const val HISTORY = "/api/prices/history"
+        const val CALCULATE = "/api/prices/calculate"
     }
 
-    // ===== User Profile Endpoints =====
-    object User {
-        const val PROFILE = "api/user/profile"
-        const val UPDATE_PROFILE = "api/user/profile"
-        const val CHANGE_PASSWORD = "api/user/change-password"
-        const val DELETE_ACCOUNT = "api/user/account"
+    // ============ Authentication Endpoints ============
+    object Auth {
+        const val LOGIN = "/auth/login"
+        const val REGISTER = "/auth/register"
+        const val REFRESH = "/auth/refresh"
+        const val LOGOUT = "/auth/logout"
     }
 
-    // ===== Wishlist Endpoints =====
-    object Wishlist {
-        const val LIST = "api/user/wishlist"
-        const val ADD = "api/user/wishlist/add"
-        const val REMOVE = "api/user/wishlist/remove"
-        const val CHECK = "api/user/wishlist/check/{productId}"
+    // ============ User Endpoints ============
+    object Users {
+        const val PROFILE = "/api/users/profile"
+        const val UPDATE_PROFILE = "/api/users/profile"
+        const val CHANGE_PASSWORD = "/api/users/password"
     }
 
-    // ===== Address Endpoints (Future) =====
-    object Address {
-        const val LIST = "api/user/addresses"
-        const val ADD = "api/user/addresses"
-        const val UPDATE = "api/user/addresses/{id}"
-        const val DELETE = "api/user/addresses/{id}"
-        const val SET_DEFAULT = "api/user/addresses/{id}/default"
-    }
-
-    // ===== Payment Methods Endpoints (Future) =====
-    object Payment {
-        const val LIST_METHODS = "api/payment-methods"
-        const val ADD_METHOD = "api/payment-methods"
-        const val DELETE_METHOD = "api/payment-methods/{id}"
-        const val SET_DEFAULT = "api/payment-methods/{id}/default"
-    }
-
-    // ===== Cart Endpoints (Not yet implemented in backend) =====
-    object Cart {
-        const val GET = "api/cart"
-        const val ADD_ITEM = "api/cart/items"
-        const val UPDATE_ITEM = "api/cart/items/{itemId}"
-        const val REMOVE_ITEM = "api/cart/items/{itemId}"
-        const val CLEAR = "api/cart/clear"
-    }
-
-    // ===== Order Endpoints (Not yet implemented in backend) =====
-    object Orders {
-        const val LIST = "api/orders"
-        const val DETAIL = "api/orders/{id}"
-        const val CREATE = "api/orders"
-        const val CANCEL = "api/orders/{id}/cancel"
-        const val RETURN = "api/orders/{id}/return"
-        const val TRACKING = "api/orders/{id}/tracking"
-    }
-
-    // ===== Review Endpoints (Future) =====
-    object Reviews {
-        const val LIST = "api/products/{productId}/reviews"
-        const val CREATE = "api/products/{productId}/reviews"
-        const val UPDATE = "api/reviews/{id}"
-        const val DELETE = "api/reviews/{id}"
-    }
-
-    // ===== Notification Endpoints (Future) =====
-    object Notifications {
-        const val LIST = "api/notifications"
-        const val MARK_READ = "api/notifications/{id}/read"
-        const val MARK_ALL_READ = "api/notifications/read-all"
-        const val DELETE = "api/notifications/{id}"
-        const val PREFERENCES = "api/user/notification-preferences"
-    }
-
-    // ===== Search Endpoints =====
-    object Search {
-        const val SEARCH_PRODUCTS = "api/search/products"
-        const val SEARCH_SUGGESTIONS = "api/search/suggestions"
-        const val TRENDING_SEARCHES = "api/search/trending"
-    }
-
-    // ===== Helper Endpoint Properties =====
-    object Params {
-        // Common query parameters
+    // ============ Query Parameters ============
+    object QueryParams {
+        // Pagination
         const val PAGE = "page"
         const val LIMIT = "limit"
-        const val SORT = "sort"
-        const val ORDER = "order"
+
+        // Search
+        const val QUERY = "q"
+
+        // Filtering
+        const val CATEGORY_ID = "category"
         const val CATEGORY = "category"
-        const val SEARCH_QUERY = "q"
-        const val FILTER = "filter"
-        const val INCLUDE = "include"
-        const val EXCLUDE = "exclude"
+        const val SORT = "sort"
 
-        // Sorting options
-        const val SORT_NEWEST = "newest"
-        const val SORT_OLDEST = "oldest"
-        const val SORT_PRICE_LOW_HIGH = "price_asc"
-        const val SORT_PRICE_HIGH_LOW = "price_desc"
-        const val SORT_TRENDING = "trending"
-        const val SORT_RATING = "rating"
+        // Pricing
+        const val DAYS = "days"
+        const val WEIGHT = "weight"
+        const val PURITY = "purity"
+    }
 
-        // Order options
-        const val ORDER_ASC = "asc"
-        const val ORDER_DESC = "desc"
+    // ============ Header Keys ============
+    object Headers {
+        const val AUTHORIZATION = "Authorization"
+        const val CONTENT_TYPE = "Content-Type"
+        const val ACCEPT = "Accept"
+        const val USER_AGENT = "User-Agent"
+    }
+
+    // ============ Response Field Names ============
+    object ResponseFields {
+        const val DATA = "data"
+        const val MESSAGE = "message"
+        const val STATUS = "status"
+        const val ERROR = "error"
+        const val PAGE = "page"
+        const val LIMIT = "limit"
+        const val TOTAL = "total"
+        const val TOTAL_PAGES = "totalPages"
+    }
+
+    // ============ HTTP Status Codes ============
+    object HttpStatus {
+        const val OK = 200
+        const val CREATED = 201
+        const val BAD_REQUEST = 400
+        const val UNAUTHORIZED = 401
+        const val FORBIDDEN = 403
+        const val NOT_FOUND = 404
+        const val CONFLICT = 409
+        const val UNPROCESSABLE_ENTITY = 422
+        const val INTERNAL_SERVER_ERROR = 500
+        const val BAD_GATEWAY = 502
+        const val SERVICE_UNAVAILABLE = 503
+        const val GATEWAY_TIMEOUT = 504
     }
 }
