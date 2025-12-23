@@ -1,41 +1,67 @@
 package com.noghre.sod.data.local
 
-from androidx.room.TypeConverter
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import com.noghre.sod.data.model.Address
-import com.noghre.sod.data.model.OrderItem
+import androidx.room.TypeConverter
+import java.util.Date
 
 /**
  * Type converters for Room database.
+ * Handles conversion of complex types to/from Room-compatible types.
  */
 class Converters {
 
-    private val gson = Gson()
-
+    /**
+     * Converts a comma-separated string of image URLs to a List.
+     * Used for ProductEntity.images field.
+     */
     @TypeConverter
-    fun fromAddressList(value: List<Address>?): String? {
-        return value?.let { gson.toJson(it) }
+    fun fromImageStringToList(value: String?): List<String> {
+        if (value.isNullOrEmpty()) return emptyList()
+        return value.split(",").map { it.trim() }
     }
 
+    /**
+     * Converts a List of image URLs to a comma-separated string.
+     * Used for ProductEntity.images field.
+     */
     @TypeConverter
-    fun toAddressList(value: String?): List<Address>? {
-        return value?.let {
-            val type = object : TypeToken<List<Address>>() {}.type
-            gson.fromJson(it, type)
-        }
+    fun fromImageListToString(list: List<String>?): String {
+        if (list.isNullOrEmpty()) return ""
+        return list.joinToString(",")
     }
 
+    /**
+     * Converts a Long timestamp to a Date object.
+     */
     @TypeConverter
-    fun fromOrderItemList(value: List<OrderItem>?): String? {
-        return value?.let { gson.toJson(it) }
+    fun fromTimestampToDate(value: Long?): Date? {
+        return if (value == null) null else Date(value)
     }
 
+    /**
+     * Converts a Date object to a Long timestamp.
+     */
     @TypeConverter
-    fun toOrderItemList(value: String?): List<OrderItem>? {
-        return value?.let {
-            val type = object : TypeToken<List<OrderItem>>() {}.type
-            gson.fromJson(it, type)
-        }
+    fun fromDateToTimestamp(date: Date?): Long? {
+        return date?.time
+    }
+
+    /**
+     * Converts a comma-separated string to a List of Strings.
+     * Generic utility for any list field.
+     */
+    @TypeConverter
+    fun fromStringToStringList(value: String?): List<String> {
+        if (value.isNullOrEmpty()) return emptyList()
+        return value.split(",").map { it.trim() }
+    }
+
+    /**
+     * Converts a List of Strings to a comma-separated string.
+     * Generic utility for any list field.
+     */
+    @TypeConverter
+    fun fromStringListToString(list: List<String>?): String {
+        if (list.isNullOrEmpty()) return ""
+        return list.joinToString(",")
     }
 }
