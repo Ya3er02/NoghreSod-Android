@@ -1,20 +1,14 @@
 package com.noghre.sod.di
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.analytics.ktx.analytics
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.firebase.crashlytics.ktx.crashlytics
-import com.google.firebase.ktx.Firebase
 import com.noghre.sod.BuildConfig
-import com.noghre.sod.data.local.AppDatabase
-import com.noghre.sod.data.security.CertificatePinnerProvider
-import com.noghre.sod.domain.preferences.UserPreferences
+import com.noghre.sod.data.local.database.NoghreSodDatabase
+import com.noghre.sod.data.remote.api.NoghreSodApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,58 +21,73 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
+// Extension for DataStore
+private val Context.preferencesDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "noghresod_preferences",
+    produceMigrations = { context ->
+        listOf(
+            SharedPreferencesMigration(context, "noghresod_prefs")
+        )
+    }
+)
 
+/**
+ * Hilt dependency injection module for application-level singletons.
+ * Provides database, API, and network configurations.
+ *
+ * @author Yaser
+ * @version 1.0.0
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    /**
+     * Provides OkHttpClient with interceptors and configuration.
+     */
     @Provides
     @Singleton
-    fun provideContext(@ApplicationContext context: Context): Context = context
+    fun provideOkHttpClient(
+        httpLoggingInterceptor: HttpLoggingInterceptor
+    ): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(httpLoggingInterceptor)
+            .addInterceptor { chain ->
+                val originalRequest = chain.request()
+                val requestBuilder = originalRequest.newBuilder()
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json")
+                    .addHeader("User-Agent", "NoghreSod-Android/${BuildConfig.APP_VERSION}")
 
-    @Provides
-    @Singleton
-    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
-        return context.dataStore
+                // Add auth token if available (implement from DataStore)
+                requestBuilder.build()
+                chain.proceed(requestBuilder.build())
+            }
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
     }
 
+    /**
+     * Provides HTTP logging interceptor.
+     */
     @Provides
     @Singleton
-    fun provideUserPreferences(dataStore: DataStore<Preferences>): UserPreferences {
-        return UserPreferences(dataStore)
-    }
-
-    @Provides
-    @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "noghresod.db"
-        ).build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideOkHttpClient(certificatePinnerProvider: CertificatePinnerProvider): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
+    fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
+        return HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
             } else {
                 HttpLoggingInterceptor.Level.NONE
             }
         }
-
-        return OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .certificatePinner(certificatePinnerProvider.get())
-            .build()
     }
 
+    /**
+     * Provides Retrofit instance.
+     */
     @Provides
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
@@ -89,21 +98,40 @@ object AppModule {
             .build()
     }
 
+    /**
+     * Provides Noghresod API service.
+     */
     @Provides
     @Singleton
-    fun provideFirebaseAnalytics(): FirebaseAnalytics {
-        return Firebase.analytics
+    fun provideNoghreSodApi(retrofit: Retrofit): NoghreSodApi {
+        return retrofit.create(NoghreSodApi::class.java)
     }
 
+    /**
+     * Provides Room database instance.
+     */
     @Provides
     @Singleton
-    fun provideFirebaseCrashlytics(): FirebaseCrashlytics {
-        return Firebase.crashlytics
+    fun provideNoghreSodDatabase(
+        @ApplicationContext context: Context
+    ): NoghreSodDatabase {
+        return Room.databaseBuilder(
+            context,
+            NoghreSodDatabase::class.java,
+            "noghresod.db"
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
+    /**
+     * Provides DataStore preferences.
+     */
     @Provides
     @Singleton
-    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
-        return context.getSharedPreferences("noghresod_prefs", Context.MODE_PRIVATE)
+    fun providePreferencesDataStore(
+        @ApplicationContext context: Context
+    ): DataStore<Preferences> {
+        return context.preferencesDataStore
     }
 }
