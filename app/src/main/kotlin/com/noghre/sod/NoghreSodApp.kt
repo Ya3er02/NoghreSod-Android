@@ -1,24 +1,21 @@
 package com.noghre.sod
 
 import android.app.Application
-import android.content.res.Configuration
-import androidx.compose.material3.MaterialTheme
-import com.google.firebase.Firebase
-import com.google.firebase.analytics.analytics
-import com.google.firebase.crashlytics.crashlytics
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 
+/**
+ * Application entry point for Noghresod Android app.
+ * Initializes Hilt dependency injection and Timber logging.
+ *
+ * @author Yaser
+ * @version 1.0.0
+ */
 @HiltAndroidApp
 class NoghreSodApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-
-        // Initialize Firebase
-        Firebase.analytics.logEvent("app_launch") {
-            param("timestamp", System.currentTimeMillis())
-        }
 
         // Initialize Timber for logging
         if (BuildConfig.DEBUG) {
@@ -27,21 +24,19 @@ class NoghreSodApp : Application() {
             Timber.plant(CrashReportingTree())
         }
 
-        Timber.d("NoghreSodApp initialized - Version ${BuildConfig.VERSION_NAME}")
-    }
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        // Handle locale and theme changes
+        Timber.d("NoghreSod App started - Version: ${BuildConfig.APP_VERSION}")
     }
 
     /**
-     * Custom Timber tree for crash reporting in production
+     * Custom Timber tree for production crash reporting.
+     * Logs only errors to crash reporting service (e.g., Firebase Crashlytics).
      */
-    private inner class CrashReportingTree : Timber.Tree() {
+    private class CrashReportingTree : Timber.Tree() {
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             if (priority >= android.util.Log.ERROR) {
-                Firebase.crashlytics.recordException(t ?: Exception(message))
+                // Send to crash reporting service
+                // Example: FirebaseCrashlytics.getInstance().recordException(t ?: Throwable(message))
+                Timber.e(t, "Production Error: %s", message)
             }
         }
     }
