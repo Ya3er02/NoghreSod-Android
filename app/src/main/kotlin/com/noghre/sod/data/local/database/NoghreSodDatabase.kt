@@ -1,68 +1,45 @@
 package com.noghre.sod.data.local.database
 
-import android.content.Context
 import androidx.room.Database
-import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.noghre.sod.data.local.dao.CartDao
-import com.noghre.sod.data.local.dao.CategoryDao
-import com.noghre.sod.data.local.dao.FavoriteDao
-import com.noghre.sod.data.local.dao.ProductDao
-import com.noghre.sod.data.local.dao.SearchHistoryDao
-import com.noghre.sod.data.local.dao.UserDao
-import com.noghre.sod.data.local.entity.CartItemEntity
-import com.noghre.sod.data.local.entity.CategoryEntity
-import com.noghre.sod.data.local.entity.FavoriteEntity
 import com.noghre.sod.data.local.entity.ProductEntity
-import com.noghre.sod.data.local.entity.SearchHistoryEntity
+import com.noghre.sod.data.local.entity.CartEntity
+import com.noghre.sod.data.local.entity.CartItemEntity
+import com.noghre.sod.data.local.entity.OrderEntity
+import com.noghre.sod.data.local.entity.OrderItemEntity
 import com.noghre.sod.data.local.entity.UserEntity
+import com.noghre.sod.data.local.entity.AddressEntity
+import com.noghre.sod.data.local.dao.ProductDao
+import com.noghre.sod.data.local.dao.CartDao
+import com.noghre.sod.data.local.dao.OrderDao
+import com.noghre.sod.data.local.dao.UserDao
 
 /**
- * Room Database for NoghreSod application.
- * Manages all local data storage with version control for migrations.
+ * Room database for Noghresod Android app.
+ * Contains all local database entities and DAOs.
+ *
+ * @author Yaser
+ * @version 1.0.0
  */
 @Database(
     entities = [
         ProductEntity::class,
-        CategoryEntity::class,
+        CartEntity::class,
         CartItemEntity::class,
-        FavoriteEntity::class,
-        SearchHistoryEntity::class,
-        UserEntity::class
+        OrderEntity::class,
+        OrderItemEntity::class,
+        UserEntity::class,
+        AddressEntity::class
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
-@TypeConverters(Converters::class)
+@TypeConverters(DatabaseConverters::class)
 abstract class NoghreSodDatabase : RoomDatabase() {
 
     abstract fun productDao(): ProductDao
-    abstract fun categoryDao(): CategoryDao
     abstract fun cartDao(): CartDao
-    abstract fun favoriteDao(): FavoriteDao
-    abstract fun searchHistoryDao(): SearchHistoryDao
+    abstract fun orderDao(): OrderDao
     abstract fun userDao(): UserDao
-
-    companion object {
-        private const val DATABASE_NAME = "noghre_sod.db"
-        private var INSTANCE: NoghreSodDatabase? = null
-
-        /**
-         * Get database singleton instance.
-         */
-        fun getInstance(context: Context): NoghreSodDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    NoghreSodDatabase::class.java,
-                    DATABASE_NAME
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
-                INSTANCE = instance
-                instance
-            }
-        }
-    }
 }
