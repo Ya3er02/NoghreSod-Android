@@ -12,17 +12,54 @@ android {
 
     defaultConfig {
         applicationId = "com.noghre.sod"
-        minSdk = 24  // Compose minimum requirement
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+    }
+    
+    // ✅ SECURE RELEASE SIGNING
+    signingConfigs {
+        // Debug signing (default)
+        getByName("debug") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         
-        // API key from BuildConfig
-        buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.com/v1/\"")
-        buildConfigField("String", "API_KEY", "\"${project.findProperty("API_KEY") ?: ""}\"") // Inject from gradle.properties
+        // ✅ Release signing from environment variables (NEVER hardcoded)
+        create("release") {
+            val releaseKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val keyAlias = System.getenv("KEY_ALIAS")
+            val keyPassword = System.getenv("KEY_PASSWORD")
+            
+            if (releaseKeystorePath == null || keystorePassword == null || keyAlias == null || keyPassword == null) {
+                throw GradleException(
+                    "Missing required environment variables for release signing:\n" +
+                    "  - RELEASE_KEYSTORE_PATH\n" +
+                    "  - KEYSTORE_PASSWORD\n" +
+                    "  - KEY_ALIAS\n" +
+                    "  - KEY_PASSWORD\n\n" +
+                    "For local builds, set these in your shell profile or CI/CD secrets."
+                )
+            }
+            
+            storeFile = file(releaseKeystorePath)
+            storePassword = keystorePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
+            
+            // ✅ APK v2+ signing (more secure)
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
     }
 
     buildTypes {
@@ -33,19 +70,60 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            
+            // Production optimizations
+            isDebuggable = false
+            isJniDebuggable = false
+            
+            // Crash reporting
+            buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "true")
+            buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.ir/v1/\"")
+            buildConfigField("boolean", "DEBUG_LOGGING", "false")
         }
+        
         debug {
             isMinifyEnabled = false
             isDebuggable = true
+            isJniDebuggable = true
+            
+            buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "false")
+            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.noghresod.ir/v1/\"")
+            buildConfigField("boolean", "DEBUG_LOGGING", "true")
+        }
+    }
+
+    // ✅ BUILD FLAVORS FOR ENVIRONMENT MANAGEMENT
+    flavorDimensions += listOf("environment")
+    
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.noghresod.ir/v1/\"")
+            buildConfigField("boolean", "CERTIFICATE_PINNING_ENABLED", "false")
+        }
+        
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            buildConfigField("String", "API_BASE_URL", "\"https://staging-api.noghresod.ir/v1/\"")
+            buildConfigField("boolean", "CERTIFICATE_PINNING_ENABLED", "true")
+        }
+        
+        create("prod") {
+            dimension = "environment"
+            buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.ir/v1/\"")
+            buildConfigField("boolean", "CERTIFICATE_PINNING_ENABLED", "true")
         }
     }
     
-    // Security - Network configuration
-    sourceSets {
-        getByName("main") {
-            res.srcDirs("src/main/res")
-            assets.srcDirs("src/main/assets")
+    // Filter variants (dev only for debug, prod for release)
+    variantFilter {
+        if (buildType.name == "release" && flavors.any { it.name == "dev" }) {
+            ignore = true
         }
     }
 
@@ -53,9 +131,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    
     kotlinOptions {
         jvmTarget = "17"
     }
+    
     buildFeatures {
         compose = true
         buildConfig = true
@@ -64,14 +144,17 @@ android {
         resValues = false
         shaders = false
     }
+    
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
     }
+    
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    
     lint {
         checkReleaseBuilds = true
         abortOnError = false
@@ -134,6 +217,13 @@ dependencies {
     // ViewModel & LiveData
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.livedata.ktx)
+    
+    // WorkManager for background tasks
+    implementation(libs.androidx.work.runtime.ktx)
+    
+    // DataStore (modern SharedPreferences)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.core)
 
     // Testing
     testImplementation(libs.junit)
@@ -151,7 +241,23 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
-// Detekt configuration
+// ✅ BUILD CONFIGURATION
+configurations.all {
+    resolutionStrategy {
+        // Force specific versions to prevent conflicts
+        force("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
+        force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${libs.versions.kotlin.get()}")
+        
+        // Cache dynamic versions
+        cacheDynamicVersionsFor(10, "m")
+        cacheChangingModulesFor(0, "s")
+        
+        // Prefer project modules
+        preferProjectModules()
+    }
+}
+
+// ✅ DETEKT CONFIGURATION
 detekt {
     config.setFrom(files("detekt.yml"))
     buildUponDefaultConfig = true
