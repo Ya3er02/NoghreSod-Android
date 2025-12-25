@@ -1,97 +1,131 @@
 package com.noghre.sod.domain.model
 
-/**
- * Domain model for Order.
- * Represents a completed purchase order.
- *
- * @property id Order identifier
- * @property userId User ID who placed the order
- * @property orderNumber Human-readable order number
- * @property items List of items in order
- * @property shippingAddress Delivery address
- * @property paymentMethod Payment method used
- * @property subtotal Subtotal before discounts
- * @property shippingCost Shipping cost
- * @property discountAmount Discount applied
- * @property totalAmount Final total amount
- * @property status Order status
- * @property tracking Tracking information
- * @property notes Special notes about order
- * @property createdAt Order creation timestamp
- * @property updatedAt Last update timestamp
- */
-data class Order(
-    val id: String,
-    val userId: String,
-    val orderNumber: String,
-    val items: List<OrderItem>,
-    val shippingAddress: Address,
-    val paymentMethod: PaymentMethod,
-    val subtotal: Double,
-    val shippingCost: Double = 0.0,
-    val discountAmount: Double = 0.0,
-    val totalAmount: Double,
-    val status: OrderStatus = OrderStatus.PENDING,
-    val tracking: OrderTracking? = null,
-    val notes: String = "",
-    val createdAt: String = "",
-    val updatedAt: String = ""
-)
-
-/**
- * Order item model.
- * Represents a product in an order.
- */
-data class OrderItem(
-    val id: String,
-    val product: Product,
-    val quantity: Int,
-    val unitPrice: Double,
-    val selectedColor: String? = null,
-    val selectedSize: String? = null
-)
+import java.math.BigDecimal
+import java.time.LocalDateTime
 
 /**
  * Order status enum.
  */
 enum class OrderStatus {
-    PENDING,        // Awaiting payment
-    CONFIRMED,      // Payment received
-    PROCESSING,     // Being prepared
-    SHIPPED,        // On the way
-    DELIVERED,      // Successfully delivered
-    CANCELLED,      // Order cancelled
-    REFUNDED        // Refund issued
+    PENDING,
+    CONFIRMED,
+    PROCESSING,
+    SHIPPED,
+    DELIVERED,
+    CANCELLED,
+    REFUNDED
 }
 
 /**
- * Order tracking information.
- *
- * @property trackingNumber Tracking number
- * @property carrier Shipping carrier name
- * @property estimatedDelivery Estimated delivery date
- * @property currentLocation Current location of shipment
- * @property events List of tracking events
+ * Domain model representing an order item.
+ * 
+ * @property id Unique order item identifier
+ * @property productId Reference to product
+ * @property productName Name of product at time of order
+ * @property quantity Number of items ordered
+ * @property pricePerUnit Price per unit at time of order
+ * @property subtotal Total for this item (quantity * pricePerUnit)
+ * 
+ * @since 1.0.0
  */
-data class OrderTracking(
-    val trackingNumber: String,
-    val carrier: String,
-    val estimatedDelivery: String,
-    val currentLocation: String,
-    val events: List<TrackingEvent> = emptyList()
+data class OrderItem(
+    val id: String,
+    val productId: String,
+    val productName: String,
+    val quantity: Int,
+    val pricePerUnit: BigDecimal,
+    val subtotal: BigDecimal = BigDecimal.ZERO
+) {
+    
+    /**
+     * Calculate subtotal if not provided.
+     */
+    fun getSubtotal(): BigDecimal {
+        return pricePerUnit * BigDecimal(quantity)
+    }
+}
+
+/**
+ * Shipping information for order.
+ */
+data class ShippingInfo(
+    val address: String,
+    val city: String,
+    val country: String,
+    val postalCode: String,
+    val recipientName: String,
+    val phoneNumber: String
 )
 
 /**
- * Tracking event.
- *
- * @property status Status at this point
- * @property timestamp When this event occurred
- * @property location Location of event
- * @property description Description of event
+ * Domain model representing a complete order.
+ * 
+ * @property id Unique order identifier
+ * @property userId User who placed the order
+ * @property items List of items in order
+ * @property subtotal Sum of all item prices
+ * @property taxAmount Calculated tax
+ * @property shippingCost Shipping fee
+ * @property discountAmount Applied discount
+ * @property total Final total amount
+ * @property status Current order status
+ * @property shippingInfo Shipping address details
+ * @property trackingNumber Shipping tracking number
+ * @property paymentMethod Payment method used
+ * @property createdAt Order creation date
+ * @property updatedAt Last modification date
+ * @property deliveredAt Delivery completion date
+ * 
+ * @since 1.0.0
  */
-data class TrackingEvent(
-    val status: String,
-    val timestamp: String,
-    val location: String,
-    val description: String
-)
+data class Order(
+    val id: String,
+    val userId: String,
+    val items: List<OrderItem> = emptyList(),
+    val subtotal: BigDecimal = BigDecimal.ZERO,
+    val taxAmount: BigDecimal = BigDecimal.ZERO,
+    val shippingCost: BigDecimal = BigDecimal.ZERO,
+    val discountAmount: BigDecimal = BigDecimal.ZERO,
+    val total: BigDecimal = BigDecimal.ZERO,
+    val status: OrderStatus = OrderStatus.PENDING,
+    val shippingInfo: ShippingInfo,
+    val trackingNumber: String? = null,
+    val paymentMethod: String,
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val updatedAt: LocalDateTime = LocalDateTime.now(),
+    val deliveredAt: LocalDateTime? = null
+) {
+    
+    /**
+     * Get total number of items in order.
+     */
+    fun getItemCount(): Int = items.sumOf { it.quantity }
+    
+    /**
+     * Check if order can be cancelled.
+     */
+    fun canBeCancelled(): Boolean {
+        return status in listOf(OrderStatus.PENDING, OrderStatus.CONFIRMED)
+    }
+    
+    /**
+     * Check if order has been delivered.
+     */
+    fun isDelivered(): Boolean = status == OrderStatus.DELIVERED
+    
+    /**
+     * Check if order is pending.
+     */
+    fun isPending(): Boolean = status == OrderStatus.PENDING
+    
+    /**
+     * Get order processing time in days.
+     */
+    fun getProcessingDays(): Long? {
+        return if (deliveredAt != null) {
+            java.time.temporal.ChronoUnit.DAYS.between(createdAt, deliveredAt)
+        } else {
+            null
+        }
+    }
+}
