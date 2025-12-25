@@ -1,215 +1,143 @@
-# ProGuard Rules - Comprehensive & Secure Configuration
-# Last updated: 2025-12-25
-# Level: Enterprise Security
+# NoghreSod ProGuard Rules
+# Minification and obfuscation rules for release build
 
-# ==========================
-# 1. AGGRESSIVE OBFUSCATION
-# ==========================
--optimizationpasses 5
--allowaccessmodification
--dontpreverify
--verbose
+# Keep all public and protected classes and methods
+-keep public class *
+-keep protected class *
 
-# Obfuscation settings
--obfuscationdictionary obfuscation_dictionary.txt
--packageobfuscationdictionary package_dictionary.txt
--classObfuscationDictionary class_dictionary.txt
+# ===== Retrofit Rules =====
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 
-# Aggressive optimization
--optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
-
-# ==========================
-# 2. KEEP ONLY ESSENTIAL CLASSES
-# ==========================
-
-# Entry Points
--keep public class com.noghre.sod.NoghreSodApp extends android.app.Application
--keep public class com.noghre.sod.presentation.MainActivity extends android.app.Activity
-
-# Android Components
--keep public class * extends android.app.Activity
--keep public class * extends android.app.Service
--keep public class * extends android.content.BroadcastReceiver
--keep public class * extends android.content.ContentProvider
--keep public class * extends android.preference.Preference
-
-# Keep Fragments (required for reflection)
--keep public class * extends androidx.fragment.app.Fragment
--keep public class * extends android.app.Fragment
-
-# ==========================
-# 3. ARCHITECTURE COMPONENTS
-# ==========================
-
-# ViewModels (Hilt creates them via reflection)
--keep public class * extends androidx.lifecycle.ViewModel
--keepclasseswithmembers class * extends androidx.lifecycle.ViewModel {
-    <init>(...);
+# Keep Retrofit service interfaces
+-keep class * extends retrofit2.http.Interceptor
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
 }
 
-# Keep UseCase classes
--keep public class com.noghre.sod.domain.usecase.** { *; }
--keepclasseswithmembers class com.noghre.sod.domain.usecase.** {
+# ===== Gson Rules =====
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class sun.misc.Unsafe { *; }
+-keep class com.google.gson.stream.** { *; }
+
+# Keep all data classes from DTOs
+-keep class com.noghre.sod.data.remote.dto.** { *; }
+-keep class com.noghre.sod.data.local.entity.** { *; }
+-keep class com.noghre.sod.domain.model.** { *; }
+
+# Preserve generic type info
+-keepclassmembers class * {
+    <fields>;
+}
+
+# ===== Room Database Rules =====
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao interface * { *; }
+-dontwarn androidx.room.paging.**
+
+# Keep Room entity fields
+-keepclassmembers @androidx.room.Entity class * {
+    @androidx.room.ColumnInfo <init>(...);
     public <init>(...);
 }
 
-# Repositories - OBFUSCATE (not keep all)
--keep public class * extends com.noghre.sod.domain.repository.** { *; }
--keep public class com.noghre.sod.data.repository.** { *; }
+# ===== Hilt/Dagger Rules =====
+-keep class dagger.** { *; }
+-keep class javax.inject.** { *; }
+-keep @dagger.hilt.* class * { *; }
+-keep class * extends dagger.hilt.android.internal.managers.ComponentSupplier
+-keep class * extends dagger.hilt.android.internal.lifecycle.DefaultViewModelFactories.InternalFactoryFactory
+-keepnames @dagger.hilt.android.HiltAndroidApp class *
 
-# ==========================
-# 4. DATA MODELS (for serialization)
-# ==========================
-
-# DTOs - keep fields for JSON mapping
--keep class com.noghre.sod.data.remote.dto.** {
-    <fields>;
-}
--keepclasseswithmembers class com.noghre.sod.data.remote.dto.** {
-    <init>(...);
-}
-
-# Domain Models - keep fields
--keep class com.noghre.sod.domain.model.** {
-    <fields>;
-}
--keepclasseswithmembers class com.noghre.sod.domain.model.** {
-    <init>(...);
+# ===== Kotlin Coroutines Rules =====
+-keep class kotlin.coroutines.** { *; }
+-keepnames class kotlinx.coroutines.** { *; }
+-keepclassmembernames class kotlinx.coroutines.** {
+    volatile <fields>;
 }
 
-# ==========================
-# 5. DATABASE ENTITIES
-# ==========================
+# ===== Android Framework Rules =====
+-keep public class android.** { public protected *; }
+-keep class androidx.** { *; }
+-keep class com.google.android.** { *; }
 
-# Room entities
--keep @androidx.room.Entity class * {
-    <init>(...);
-    <fields>;
-}
-
-# Room DAOs
--keep @androidx.room.Dao interface * {
-    <methods>;
-}
-
-# Room database
--keep @androidx.room.Database class * {
-    <init>(...);
-}
-
-# ==========================
-# 6. DEPENDENCY INJECTION (Hilt)
-# ==========================
-
-# Hilt generated code
--keep class hilt_aggregated_deps.** { *; }
--keep class **_HiltModules.** { *; }
--keep class **_Factory { *; }
--keep class **_Provide* { *; }
-
-# Hilt Annotations
--keep @dagger.hilt.android.HiltAndroidApp class *
--keep @dagger.hilt.android.AndroidEntryPoint class *
--keep @dagger.Module class * {
-    <methods>;
-}
--keep @dagger.Provides class * {
-    <methods>;
-}
-
-# ==========================
-# 7. SERIALIZATION & JSON
-# ==========================
-
-# Keep Gson-related classes if used
--keep class com.google.gson.** { *; }
--keep class **.GsonFactory { *; }
--keepclasseswithmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
-
-# Kotlin Serialization
--keep class kotlinx.serialization.json.** { *; }
--keepclasseswithmembers class * {
-    @kotlinx.serialization.Serializable <methods>;
-}
-
-# ==========================
-# 8. RETROFIT & NETWORK
-# ==========================
-
-# Retrofit
--keep interface * {
-    @retrofit2.** <methods>;
-}
--keep class retrofit2.** { *; }
--keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
-
-# Keep API interfaces
--keep public interface com.noghre.sod.data.remote.api.** { *; }
-
-# ==========================
-# 9. JETPACK COMPOSE
-# ==========================
-
-# Compose runtime
--keep class androidx.compose.runtime.** { *; }
--keep class androidx.compose.ui.** { *; }
+# ===== Jetpack Compose Rules =====
+-keep class androidx.compose.** { *; }
+-keep class androidx.compose.foundation.** { *; }
 -keep class androidx.compose.material3.** { *; }
+-keep class androidx.compose.runtime.** { *; }
 
-# ==========================
-# 10. REMOVE DEBUG INFO
-# ==========================
+# ===== Firebase Rules =====
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
 
-# Remove logging
+# ===== OkHttp Rules =====
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+
+# ===== General Rules =====
+# Keep class names for reflection
+-keepnames class * implements android.os.Parcelable { *; }
+-keepnames class * implements java.io.Serializable { *; }
+
+# Keep native method names
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Keep enums
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# Keep View subclasses for inflation
+-keep public class * extends android.view.View {
+    public <init>(android.content.Context);
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+    public void set*(...);
+}
+
+# Keep Activity, Fragment, Service, etc.
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Fragment
+-keep public class * extends androidx.fragment.app.Fragment
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+
+# Keep Application subclass
+-keep public class * extends android.app.Application
+
+# Remove logging in release
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);
     public static *** i(...);
 }
 
-# Remove source file and line numbers
--renamesourcefileattribute SourceFile
--keepattributes SourceFile,LineNumberTable
+# ===== Custom Application Rules =====
+# Keep NativeKeys for JNI
+-keep class com.noghre.sod.core.security.NativeKeys { *; }
 
-# ==========================
-# 11. REMOVE UNUSED CODE
-# ==========================
+# Keep RootDetector
+-keep class com.noghre.sod.core.security.RootDetector { *; }
 
-# Remove unused attributes
--dontwarn android.**
--dontwarn androidx.**
--dontwarn com.google.**
--dontwarn retrofit2.**
--dontwarn okhttp3.**
+# Keep security-related classes
+-keep class com.noghre.sod.core.security.** { *; }
 
-# Remove unused interfaces implementations
--dontwarn java.lang.invoke.*
--dontwarn **$$Lambda$*
+# Keep network configuration
+-keep class com.noghre.sod.core.network.** { *; }
 
-# ==========================
-# 12. KEEP NATIVE METHODS
-# ==========================
-
-# Keep native methods for JNI (NDK keys)
--keepclasseswithmembernames class * {
-    native <methods>;
-}
-
-# ==========================
-# 13. VERIFICATION
-# ==========================
-
-# Verify obfuscation
--printmapping build/outputs/mapping/release/mapping.txt
--printusage build/outputs/usage/release/usage.txt
--printseeds build/outputs/seeds/release/seeds.txt
-
-# ==========================
-# FINAL SECURITY CHECK
-# ==========================
-
-# Ensure NO classes are kept as-is
-# All business logic MUST be obfuscated
-# Only keep what's absolutely necessary for Android framework
+# ===== Verbose Output =====
+-verbose
+-keepdirectories libs
