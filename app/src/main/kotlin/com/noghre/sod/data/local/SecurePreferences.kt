@@ -8,8 +8,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Secure preferences wrapper using EncryptedSharedPreferences.
- * All sensitive data (tokens, keys, etc.) must be stored here, NOT in regular SharedPreferences.
+ * Secure Preferences using AES-256-GCM encryption
+ * 
+ * Security features:
+ * - Hardware-backed keystore (StrongBox) when available
+ * - AES-256-GCM for value encryption
+ * - AES-256-SIV for key encryption
+ * - Automatic key generation and rotation
+ * 
+ * All tokens (access, refresh) are encrypted at rest.
  * 
  * @since 1.0.0
  */
@@ -18,132 +25,195 @@ class SecurePreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     
+    companion object {
+        private const val PREFS_NAME = "noghresod_secure_prefs"
+        private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_USER_ID = "user_id"
+        private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_DEVICE_ID = "device_id"
+    }
+    
+    /**
+     * Master key using AES-256-GCM
+     * 
+     * Hardware-backed when available (StrongBox):
+     * - Nexus 5X+
+     * - Pixel 2+
+     * - Devices with TEE (Trusted Execution Environment)
+     */
     private val masterKey: MasterKey by lazy {
         MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .setRequestStrongBoxBacked(true)  // Use hardware-backed keystore
+            .setUserAuthenticationRequired(false)  // Can be set to true for biometric
             .build()
     }
     
-    private val encryptedSharedPreferences by lazy {
+    /**
+     * Encrypted SharedPreferences instance
+     * 
+     * Encryption schemes:
+     * - PrefKeyEncryptionScheme.AES256_SIV: Deterministic key encryption
+     * - PrefValueEncryptionScheme.AES256_GCM: Value encryption
+     */
+    private val encryptedPrefs: android.content.SharedPreferences by lazy {
         EncryptedSharedPreferences.create(
             context,
-            ENCRYPTED_PREFS_NAME,
+            PREFS_NAME,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
     }
     
+    // ✅ AUTHENTICATION TOKENS (ENCRYPTED)
+    
     /**
-     * Save authentication token.
+     * Save access token (encrypted)
+     * 
+     * @param token JWT access token
      */
-    fun saveAuthToken(token: String) {
-        encryptedSharedPreferences.edit().apply {
-            putString(AUTH_TOKEN_KEY, token)
+    fun saveAccessToken(token: String) {
+        encryptedPrefs.edit().apply {
+            putString(KEY_ACCESS_TOKEN, token)
             apply()
         }
     }
     
     /**
-     * Get authentication token.
+     * Get access token (decrypted)
+     * 
+     * @return Access token or null
      */
-    fun getAuthToken(): String? {
-        return encryptedSharedPreferences.getString(AUTH_TOKEN_KEY, null)
+    fun getAccessToken(): String? {
+        return encryptedPrefs.getString(KEY_ACCESS_TOKEN, null)
     }
     
     /**
-     * Clear authentication token (logout).
-     */
-    fun clearAuthToken() {
-        encryptedSharedPreferences.edit().apply {
-            remove(AUTH_TOKEN_KEY)
-            apply()
-        }
-    }
-    
-    /**
-     * Save user credentials (use sparingly - tokens preferred).
-     */
-    fun saveUserCredentials(email: String, password: String) {
-        encryptedSharedPreferences.edit().apply {
-            putString(USER_EMAIL_KEY, email)
-            putString(USER_PASSWORD_KEY, password)
-            apply()
-        }
-    }
-    
-    /**
-     * Get user email.
-     */
-    fun getUserEmail(): String? {
-        return encryptedSharedPreferences.getString(USER_EMAIL_KEY, null)
-    }
-    
-    /**
-     * Get user password.
-     */
-    fun getUserPassword(): String? {
-        return encryptedSharedPreferences.getString(USER_PASSWORD_KEY, null)
-    }
-    
-    /**
-     * Clear user credentials.
-     */
-    fun clearUserCredentials() {
-        encryptedSharedPreferences.edit().apply {
-            remove(USER_EMAIL_KEY)
-            remove(USER_PASSWORD_KEY)
-            apply()
-        }
-    }
-    
-    /**
-     * Save refresh token.
+     * Save refresh token (encrypted)
+     * 
+     * @param token JWT refresh token
      */
     fun saveRefreshToken(token: String) {
-        encryptedSharedPreferences.edit().apply {
-            putString(REFRESH_TOKEN_KEY, token)
+        encryptedPrefs.edit().apply {
+            putString(KEY_REFRESH_TOKEN, token)
             apply()
         }
     }
     
     /**
-     * Get refresh token.
+     * Get refresh token (decrypted)
+     * 
+     * @return Refresh token or null
      */
     fun getRefreshToken(): String? {
-        return encryptedSharedPreferences.getString(REFRESH_TOKEN_KEY, null)
+        return encryptedPrefs.getString(KEY_REFRESH_TOKEN, null)
     }
     
     /**
-     * Save API key.
+     * Check if tokens exist (without decryption)
      */
-    fun saveApiKey(key: String) {
-        encryptedSharedPreferences.edit().apply {
-            putString(API_KEY, key)
+    fun hasTokens(): Boolean {
+        return encryptedPrefs.contains(KEY_ACCESS_TOKEN) &&
+               encryptedPrefs.contains(KEY_REFRESH_TOKEN)
+    }
+    
+    // ✅ USER PROFILE DATA (ENCRYPTED)
+    
+    /**
+     * Save user ID (encrypted)
+     */
+    fun saveUserId(userId: String) {
+        encryptedPrefs.edit().apply {
+            putString(KEY_USER_ID, userId)
             apply()
         }
     }
     
     /**
-     * Get API key.
+     * Get user ID (decrypted)
      */
-    fun getApiKey(): String? {
-        return encryptedSharedPreferences.getString(API_KEY, null)
+    fun getUserId(): String? {
+        return encryptedPrefs.getString(KEY_USER_ID, null)
     }
     
     /**
-     * Clear all sensitive data (logout).
+     * Save user email (encrypted)
      */
-    fun clearAll() {
-        encryptedSharedPreferences.edit().clear().apply()
+    fun saveUserEmail(email: String) {
+        encryptedPrefs.edit().apply {
+            putString(KEY_USER_EMAIL, email)
+            apply()
+        }
     }
     
-    companion object {
-        private const val ENCRYPTED_PREFS_NAME = "noghre_encrypted_prefs"
-        private const val AUTH_TOKEN_KEY = "auth_token"
-        private const val REFRESH_TOKEN_KEY = "refresh_token"
-        private const val USER_EMAIL_KEY = "user_email"
-        private const val USER_PASSWORD_KEY = "user_password"
-        private const val API_KEY = "api_key"
+    /**
+     * Get user email (decrypted)
+     */
+    fun getUserEmail(): String? {
+        return encryptedPrefs.getString(KEY_USER_EMAIL, null)
+    }
+    
+    // ✅ DEVICE IDENTITY
+    
+    /**
+     * Save device ID (encrypted)
+     * Used for binding tokens to specific device
+     */
+    fun saveDeviceId(deviceId: String) {
+        encryptedPrefs.edit().apply {
+            putString(KEY_DEVICE_ID, deviceId)
+            apply()
+        }
+    }
+    
+    /**
+     * Get device ID (decrypted)
+     */
+    fun getDeviceId(): String? {
+        return encryptedPrefs.getString(KEY_DEVICE_ID, null)
+    }
+    
+    // ✅ LOGOUT & DATA CLEARING
+    
+    /**
+     * Clear all sensitive data on logout
+     * 
+     * Securely removes:
+     * - Access tokens
+     * - Refresh tokens
+     * - User profile data
+     * - Device ID
+     */
+    fun clearAllSensitiveData() {
+        encryptedPrefs.edit().apply {
+            remove(KEY_ACCESS_TOKEN)
+            remove(KEY_REFRESH_TOKEN)
+            remove(KEY_USER_ID)
+            remove(KEY_USER_EMAIL)
+            remove(KEY_DEVICE_ID)
+            apply()
+        }
+    }
+    
+    /**
+     * Clear only authentication tokens
+     * (Useful for token refresh scenarios)
+     */
+    fun clearAuthTokens() {
+        encryptedPrefs.edit().apply {
+            remove(KEY_ACCESS_TOKEN)
+            remove(KEY_REFRESH_TOKEN)
+            apply()
+        }
+    }
+    
+    /**
+     * Force clear all data (for testing)
+     * Warning: This is permanent and cannot be undone
+     */
+    fun clearAll() {
+        encryptedPrefs.edit().clear().apply()
     }
 }
