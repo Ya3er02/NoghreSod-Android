@@ -1,143 +1,137 @@
-# NoghreSod ProGuard Rules
-# Minification and obfuscation rules for release build
+# ============================================
+# 🛡️ ProGuard Configuration for NoghreSod
+# ============================================
 
-# Keep all public and protected classes and methods
--keep public class *
--keep protected class *
+# Keep main application classes
+-keep class com.noghre.sod.MainActivity { *; }
+-keep class com.noghre.sod.** { *; }
 
-# ===== Retrofit Rules =====
+# ============================================
+# 📡 Retrofit Configuration
+# ============================================
 -keepattributes Signature, InnerClasses, EnclosingMethod
 -keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
 
-# Keep Retrofit service interfaces
--keep class * extends retrofit2.http.Interceptor
+# Retrofit interfaces
 -keepclassmembers,allowshrinking,allowobfuscation interface * {
     @retrofit2.http.* <methods>;
 }
 
-# ===== Gson Rules =====
+# Retrofit classes
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+
+# ============================================
+# 📦 OkHttp Configuration
+# ============================================
+-keep class okhttp3.internal.** { *; }
+-dontwarn okhttp3.internal.**
+
+# ============================================
+# 📚 Gson Configuration
+# ============================================
 -keepattributes Signature
 -keepattributes *Annotation*
--keep class sun.misc.Unsafe { *; }
 -keep class com.google.gson.stream.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class * implements com.google.gson.TypeAdapterFactory
+-keep class * implements com.google.gson.JsonSerializer
+-keep class * implements com.google.gson.JsonDeserializer
 
-# Keep all data classes from DTOs
+# DTO classes - keep all fields for Gson
 -keep class com.noghre.sod.data.remote.dto.** { *; }
 -keep class com.noghre.sod.data.local.entity.** { *; }
--keep class com.noghre.sod.domain.model.** { *; }
 
-# Preserve generic type info
--keepclassmembers class * {
-    <fields>;
-}
-
-# ===== Room Database Rules =====
+# ============================================
+# 🗄️ Room Database Configuration
+# ============================================
 -keep class * extends androidx.room.RoomDatabase
--keep @androidx.room.Entity class * { *; }
--keep @androidx.room.Dao interface * { *; }
+-keep @androidx.room.Entity class *
+-keep @androidx.room.Dao interface *
 -dontwarn androidx.room.paging.**
 
-# Keep Room entity fields
--keepclassmembers @androidx.room.Entity class * {
-    @androidx.room.ColumnInfo <init>(...);
-    public <init>(...);
-}
-
-# ===== Hilt/Dagger Rules =====
--keep class dagger.** { *; }
+# ============================================
+# 💉 Hilt Dependency Injection
+# ============================================
+-keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
--keep @dagger.hilt.* class * { *; }
--keep class * extends dagger.hilt.android.internal.managers.ComponentSupplier
--keep class * extends dagger.hilt.android.internal.lifecycle.DefaultViewModelFactories.InternalFactoryFactory
--keepnames @dagger.hilt.android.HiltAndroidApp class *
+-keep @dagger.hilt.android.HiltAndroidApp class *
 
-# ===== Kotlin Coroutines Rules =====
--keep class kotlin.coroutines.** { *; }
--keepnames class kotlinx.coroutines.** { *; }
--keepclassmembernames class kotlinx.coroutines.** {
-    volatile <fields>;
+# ============================================
+# 🏗️ Android Lifecycle
+# ============================================
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final android.os.Parcelable$Creator CREATOR;
 }
 
-# ===== Android Framework Rules =====
--keep public class android.** { public protected *; }
--keep class androidx.** { *; }
--keep class com.google.android.** { *; }
-
-# ===== Jetpack Compose Rules =====
--keep class androidx.compose.** { *; }
--keep class androidx.compose.foundation.** { *; }
--keep class androidx.compose.material3.** { *; }
--keep class androidx.compose.runtime.** { *; }
-
-# ===== Firebase Rules =====
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
-
-# ===== OkHttp Rules =====
--dontwarn okhttp3.**
--dontwarn okio.**
--dontwarn javax.annotation.**
--dontwarn org.conscrypt.**
--dontwarn org.bouncycastle.**
--dontwarn org.openjsse.**
-
-# ===== General Rules =====
-# Keep class names for reflection
--keepnames class * implements android.os.Parcelable { *; }
--keepnames class * implements java.io.Serializable { *; }
-
-# Keep native method names
--keepclasseswithmembernames class * {
-    native <methods>;
-}
-
-# Keep enums
--keepclassmembers enum * {
-    public static **[] values();
-    public static ** valueOf(java.lang.String);
-}
-
-# Keep View subclasses for inflation
--keep public class * extends android.view.View {
-    public <init>(android.content.Context);
-    public <init>(android.content.Context, android.util.AttributeSet);
-    public <init>(android.content.Context, android.util.AttributeSet, int);
-    public void set*(...);
-}
-
-# Keep Activity, Fragment, Service, etc.
+# Keep all activities, services, broadcast receivers, etc
 -keep public class * extends android.app.Activity
--keep public class * extends android.app.Fragment
--keep public class * extends androidx.fragment.app.Fragment
 -keep public class * extends android.app.Service
 -keep public class * extends android.content.BroadcastReceiver
 -keep public class * extends android.content.ContentProvider
 
-# Keep Application subclass
--keep public class * extends android.app.Application
-
-# Remove logging in release
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
+# Keep view constructors for inflation
+-keepclasseswithmembers class * {
+    public <init>(android.content.Context, android.util.AttributeSet);
 }
 
-# ===== Custom Application Rules =====
-# Keep NativeKeys for JNI
--keep class com.noghre.sod.core.security.NativeKeys { *; }
+# ============================================
+# 🔐 Kotlin Coroutines
+# ============================================
+-keepclassmembernames class kotlinx.coroutines.internal.MainDispatcherFactory {
+    *** create(...);
+}
+-keepclassmembernames class kotlinx.coroutines.CoroutineExceptionHandler {
+    *** handleException(...);
+}
+-keep class kotlin.coroutines.jvm.internal.** { *; }
 
-# Keep RootDetector
--keep class com.noghre.sod.core.security.RootDetector { *; }
+# ============================================
+# 📊 Jetpack Compose
+# ============================================
+-keep class androidx.compose.** { *; }
+-keep interface androidx.compose.** { *; }
 
-# Keep security-related classes
--keep class com.noghre.sod.core.security.** { *; }
+# ============================================
+# 🎨 Material 3
+# ============================================
+-keep class com.google.android.material.** { *; }
+-keep interface com.google.android.material.** { *; }
 
-# Keep network configuration
--keep class com.noghre.sod.core.network.** { *; }
+# ============================================
+# 📸 Coil Image Loading
+# ============================================
+-keep class coil.** { *; }
+-keep interface coil.** { *; }
 
-# ===== Verbose Output =====
--verbose
--keepdirectories libs
+# ============================================
+# 🔒 Encryption Libraries
+# ============================================
+-keepclassmembers class * {
+    *** encode(...);
+    *** decode(...);
+}
+
+# ============================================
+# 🚫 Warnings to Ignore
+# ============================================
+-dontwarn java.lang.invoke.StringConcatFactory
+-dontwarn com.google.android.material.**
+-dontwarn androidx.**
+-dontwarn org.jetbrains.kotlin.**
+
+# ============================================
+# 🎯 Optimization
+# ============================================
+-optimizationpasses 5
+-allowaccessmodification
+-mergeinterfacesaggressively
+
+# ============================================
+# 📝 Line Numbers for Crash Reports
+# ============================================
+-keepattributes SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile
