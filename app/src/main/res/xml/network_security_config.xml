@@ -1,14 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.noghresod.com</domain>
-        <pin-set expiration="2026-12-31">
-            <pin digest="SHA-256">CERTIFICATE_PIN_HERE</pin>
+    <!-- ============== DEBUG CONFIGURATION (Development) ============== -->
+    <debug-overrides>
+        <!-- Allow HTTP for local development/testing only -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">dev-api.noghresod.com</domain>
+        <!-- Pin debug certificate for development -->
+        <pin-set>
+            <pin digest="SHA-256">placeholder</pin>
         </pin-set>
-    </domain-config>
-    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+
+    <!-- ============== DOMAIN-SPECIFIC CONFIGURATIONS ============== -->
+    <!-- Production API - High security -->
+    <domain-config>
+        <domain includeSubdomains="true">api.noghresod.com</domain>
+        <!-- Certificate pinning for production -->
+        <pin-set expiration="2026-12-31">
+            <!-- Replace with actual certificate SHA-256 hash -->
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+        </pin-set>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
-    </base-config>
+    </domain-config>
+
+    <!-- Staging API - Medium security -->
+    <domain-config>
+        <domain includeSubdomains="true">staging-api.noghresod.com</domain>
+        <pin-set>
+            <pin digest="SHA-256">placeholder_staging</pin>
+        </pin-set>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Development API - Lower security (for testing) -->
+    <domain-config>
+        <domain includeSubdomains="true">dev-api.noghresod.com</domain>
+        <cleartextTrafficPermitted>true</cleartextTrafficPermitted>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- ============== DEFAULT CONFIGURATION ============== -->
+    <!-- Default security policy for all other domains -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">.</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+        <!-- Minimum TLS version -->
+        <ssl-config>
+            <!-- Require TLS 1.2 or higher -->
+            <minimum-tls-version value="tlsv1_2" />
+        </ssl-config>
+    </domain-config>
+
 </network-security-config>
