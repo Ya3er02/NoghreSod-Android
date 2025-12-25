@@ -1,201 +1,219 @@
 package com.noghre.sod.data.repository
 
-import android.util.Log
-import com.noghre.sod.core.di.IoDispatcher
-import com.noghre.sod.core.network.NetworkMonitor
-import com.noghre.sod.data.local.dao.ProductDao
-import com.noghre.sod.data.mapper.toDomain
-import com.noghre.sod.data.mapper.toDomainList
-import com.noghre.sod.data.remote.api.ApiService
+import com.noghre.sod.data.local.ProductDao
+import com.noghre.sod.data.remote.ApiService
+import com.noghre.sod.data.remote.dto.ProductDto
 import com.noghre.sod.domain.model.Product
+import com.noghre.sod.domain.model.Result
 import com.noghre.sod.domain.repository.ProductRepository
+import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
-import javax.inject.Singleton
+import com.noghre.sod.core.di.IoDispatcher
+import com.noghre.sod.core.network.NetworkMonitor
 
 /**
- * Implementation of ProductRepository using offline-first strategy.
- * 
- * Flow:
- * 1. Try to fetch from network
- * 2. Cache results in local database
- * 3. Return cached data if network fails
+ * Product Repository Implementation
+ * Implements offline-first strategy with caching
  */
-@Singleton
+@ViewModelScoped
 class ProductRepositoryImpl @Inject constructor(
     private val apiService: ApiService,
     private val productDao: ProductDao,
     private val networkMonitor: NetworkMonitor,
     @IoDispatcher private val dispatcher: CoroutineDispatcher
 ) : ProductRepository {
-
-    private companion object {
-        const val TAG = "ProductRepository"
-    }
-
+    
     /**
-     * Get all products with offline-first strategy.
+     * Get products with pagination
+     * First tries network, falls back to cache
      */
     override fun getProducts(
         page: Int,
         pageSize: Int,
         query: String?,
-        categoryId: String?,
-        sortBy: String?
+        categoryId: String?
     ): Flow<Result<List<Product>>> = flow {
+        emit(Result.Loading)
+        
         withContext(dispatcher) {
             try {
                 if (networkMonitor.isOnline) {
                     // Fetch from network
                     val response = apiService.getProducts(
                         page = page,
-                        pageSize = pageSize,
-                        query = query,
-                        categoryId = categoryId,
-                        sortBy = sortBy
+                        limit = pageSize,
+                        search = query,
+                        categoryId = categoryId
                     )
-
-                    if (response.isSuccessful) {
-                        val products = response.body()?.data?.toDomainList() ?: emptyList()
-                        
-                        // Cache to database
-                        productDao.insertAll(products.map { it.toEntity() })
-                        
-                        Log.d(TAG, "Fetched ${products.size} products from network")
-                        emit(Result.success(products))
-                    } else {
-                        val cachedProducts = getCachedProducts(query, categoryId)
-                        if (cachedProducts.isNotEmpty()) {
-                            Log.w(TAG, "Network failed, returning cached data")
-                            emit(Result.success(cachedProducts))
-                        } else {
-                            emit(Result.failure(Exception("Server error: ${response.code()}")))
-                        }
-                    }
+                    
+                    val products = response.data.map { it.toDomain() }
+                    
+                    // Cache to database
+                    productDao.insertAll(products.map { it.toEntity() })
+                    
+                    emit(Result.Success(products))
                 } else {
-                    // Offline mode
-                    val cachedProducts = getCachedProducts(query, categoryId)
-                    if (cachedProducts.isNotEmpty()) {
-                        Log.d(TAG, "Offline mode, returning ${cachedProducts.size} cached products")
-                        emit(Result.success(cachedProducts))
+                    // Use cached data
+                    val cached = productDao.getAll().map { it.toDomain() }
+                    if (cached.isNotEmpty()) {
+                        emit(Result.Success(cached))
                     } else {
-                        emit(Result.failure(Exception("No internet and no cached data")))
+                        emit(Result.Error(
+                            Exception("No internet and no cached data")
+                        ))
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error fetching products", e)
-                // Try to return cached data
-                val cachedProducts = getCachedProducts(query, categoryId)
-                if (cachedProducts.isNotEmpty()) {
-                    emit(Result.success(cachedProducts))
+                // Network failed, try cache
+                val cached = productDao.getAll().map { it.toDomain() }
+                if (cached.isNotEmpty()) {
+                    emit(Result.Success(cached))
                 } else {
-                    emit(Result.failure(e))
+                    emit(Result.Error(e))
                 }
             }
         }
-    }.catch { e ->
-        Log.e(TAG, "Flow error", e)
-        emit(Result.failure(e))
     }
-
+    
     /**
-     * Get product by ID.
+     * Get single product by ID
      */
-    override suspend fun getProductById(productId: String): Result<Product> = withContext(dispatcher) {
-        try {
-            if (networkMonitor.isOnline) {
-                val response = apiService.getProductById(productId)
-                if (response.isSuccessful) {
-                    val product = response.body()?.data?.toDomain()
-                    if (product != null) {
-                        productDao.insert(product.toEntity())
-                        Result.success(product)
-                    } else {
-                        Result.failure(Exception("Empty response"))
-                    }
+    override suspend fun getProductById(productId: String): Result<Product> {
+        return withContext(dispatcher) {
+            try {
+                if (networkMonitor.isOnline) {
+                    val response = apiService.getProductById(productId)
+                    val product = response.data.toDomain()
+                    
+                    // Cache
+                    productDao.insert(product.toEntity())
+                    
+                    Result.Success(product)
                 } else {
                     // Try cache
                     val cached = productDao.getById(productId)
                     if (cached != null) {
-                        Result.success(cached.toDomain())
+                        Result.Success(cached.toDomain())
                     } else {
-                        Result.failure(Exception("Server error: ${response.code()}"))
+                        Result.Error(Exception("Offline: Product not found"))
                     }
                 }
-            } else {
-                // Offline mode
-                val cached = productDao.getById(productId)
-                if (cached != null) {
-                    Result.success(cached.toDomain())
-                } else {
-                    Result.failure(Exception("No internet and product not cached"))
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error fetching product $productId", e)
-            val cached = productDao.getById(productId)
-            if (cached != null) {
-                Result.success(cached.toDomain())
-            } else {
-                Result.failure(e)
+            } catch (e: Exception) {
+                Result.Error(e)
             }
         }
     }
-
+    
     /**
-     * Search products.
+     * Search products by query
      */
-    override suspend fun searchProducts(
+    override fun searchProducts(
         query: String,
         page: Int,
         pageSize: Int
-    ): Result<List<Product>> = withContext(dispatcher) {
-        try {
-            if (networkMonitor.isOnline) {
-                val response = apiService.searchProducts(
-                    query = query,
-                    page = page,
-                    pageSize = pageSize
-                )
-                
-                if (response.isSuccessful) {
-                    val products = response.body()?.data?.toDomainList() ?: emptyList()
-                    Result.success(products)
+    ): Flow<Result<List<Product>>> = flow {
+        emit(Result.Loading)
+        
+        withContext(dispatcher) {
+            try {
+                if (networkMonitor.isOnline) {
+                    val response = apiService.searchProducts(
+                        query = query,
+                        page = page,
+                        limit = pageSize
+                    )
+                    val products = response.data.map { it.toDomain() }
+                    emit(Result.Success(products))
                 } else {
-                    Result.failure(Exception("Search failed: ${response.code()}"))
+                    // Local search
+                    val cached = productDao.searchByName("%$query%")
+                        .map { it.toDomain() }
+                    emit(Result.Success(cached))
                 }
-            } else {
-                // Local search
-                val products = productDao.searchByName(query)
-                Result.success(products.map { it.toDomain() })
+            } catch (e: Exception) {
+                emit(Result.Error(e))
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error searching products", e)
-            Result.failure(e)
         }
     }
-
+    
     /**
-     * Get cached products based on filters.
+     * Get products by category
      */
-    private suspend fun getCachedProducts(
-        query: String? = null,
-        categoryId: String? = null
-    ): List<Product> = withContext(dispatcher) {
-        try {
-            val products = when {
-                !query.isNullOrBlank() -> productDao.searchByName(query)
-                !categoryId.isNullOrBlank() -> productDao.getByCategory(categoryId)
-                else -> productDao.getAll()
+    override fun getProductsByCategory(
+        categoryId: String,
+        page: Int,
+        pageSize: Int
+    ): Flow<Result<List<Product>>> = flow {
+        emit(Result.Loading)
+        
+        withContext(dispatcher) {
+            try {
+                if (networkMonitor.isOnline) {
+                    val response = apiService.getProductsByCategory(
+                        categoryId = categoryId,
+                        page = page,
+                        limit = pageSize
+                    )
+                    val products = response.data.map { it.toDomain() }
+                    emit(Result.Success(products))
+                } else {
+                    // Local filter
+                    val cached = productDao.getByCategory(categoryId)
+                        .map { it.toDomain() }
+                    emit(Result.Success(cached))
+                }
+            } catch (e: Exception) {
+                emit(Result.Error(e))
             }
-            products.map { it.toDomain() }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting cached products", e)
-            emptyList()
         }
+    }
+    
+    /**
+     * Clear all cached products
+     */
+    override suspend fun clearCache() {
+        withContext(dispatcher) {
+            productDao.deleteAll()
+        }
+    }
+}
+
+// ============================================
+// 🔄 DTO to Domain Mapper
+// ============================================
+
+fun ProductDto.toDomain(): Product {
+    return Product(
+        id = this.id.orEmpty(),
+        name = this.name.orEmpty(),
+        description = this.description.orEmpty(),
+        longDescription = this.longDescription,
+        price = this.price?.toDomain() ?: throw IllegalArgumentException("Price is required"),
+        originalPrice = this.originalPrice?.toDomain(),
+        images = this.images?.map { it.toDomain() } ?: emptyList(),
+        category = this.category?.toDomain() ?: throw IllegalArgumentException("Category is required"),
+        material = this.material.orEmpty(),
+        weight = this.weight,
+        specifications = this.specifications?.toMap() ?: emptyMap(),
+        availability = this.availability?.toDomain() ?: com.noghre.sod.domain.model.StockStatus.OutOfStock,
+        rating = this.rating?.toDomain() ?: com.noghre.sod.domain.model.Rating(),
+        reviews = this.reviews?.map { it.toDomain() } ?: emptyList(),
+        tags = this.tags?.toList() ?: emptyList(),
+        isNewProduct = this.isNew ?: false,
+        isFeatured = this.featured ?: false,
+        createdAt = parseDateTime(this.createdAt),
+        updatedAt = parseDateTime(this.updatedAt)
+    )
+}
+
+private fun parseDateTime(dateString: String?): java.time.LocalDateTime {
+    return if (dateString != null) {
+        java.time.LocalDateTime.parse(dateString, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+    } else {
+        java.time.LocalDateTime.now()
     }
 }
