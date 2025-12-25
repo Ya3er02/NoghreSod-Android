@@ -1,167 +1,105 @@
 package com.noghre.sod.core.network
 
 import android.util.Log
-import com.noghre.sod.data.remote.dto.response.ResponseDto
+import com.noghre.sod.core.exception.AppException
+import com.noghre.sod.core.exception.HttpException
+import com.noghre.sod.core.exception.NetworkException
+import com.noghre.sod.core.exception.UnknownException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 /**
- * Safe API Call Extension Function
- * 
- * Wraps suspend API calls in try-catch and converts to NetworkResult.
- * Handles:
- * - Successful responses with data
- * - HTTP errors (4xx, 5xx)
- * - Network exceptions
- * - Empty/null data handling
- * 
- * Usage:
- * ```
- * val result = safeApiCall {
- *     apiService.getProducts(page = 1)
- * }
- * 
- * when (result) {
- *     is NetworkResult.Success -> handleSuccess(result.data)
- *     is NetworkResult.Error -> handleError(result.message)
- *     is NetworkResult.Loading -> showLoading()
- *     is NetworkResult.Empty -> showEmpty()
- * }
- * ```
- * 
- * @since 1.0.0
+ * Safe API call wrapper that handles all types of network errors.
+ * Converts exceptions to Result types for better error handling.
  */
-suspend inline fun <T> safeApiCall(
-    crossinline apiCall: suspend () -> Response<ResponseDto<T>>
-): NetworkResult<T> {
-    return try {
+suspend inline fun <reified T> safeApiCall(
+    apiCall: suspend () -> Response<T>
+): Result<T> = withContext(Dispatchers.IO) {
+    try {
         val response = apiCall()
         
-        // Check if response was successful
         if (response.isSuccessful) {
             val body = response.body()
-            
-            when {
-                // Response has success flag and data
-                body?.success == true && body.data != null -> {
-                    Log.d("SafeApiCall", "✅ API call successful")
-                    NetworkResult.Success(body.data)
-                }
-                
-                // Response has success flag but no data
-                body?.success == true && body.data == null -> {
-                    Log.w("SafeApiCall", "📄 Empty response")
-                    NetworkResult.Empty(body.message ?: "داده‌ای یافت نشد")
-                }
-                
-                // Response indicates failure
-                body?.success == false -> {
-                    Log.e("SafeApiCall", "❌ API returned failure: ${body.message}")
-                    NetworkResult.Error(
-                        exception = Exception(body.message),
-                        errorType = ErrorType.UNKNOWN,
-                        code = response.code(),
-                        message = body.message
-                    )
-                }
-                
-                // Response body is null
-                body == null -> {
-                    Log.e("SafeApiCall", "❌ Response body is null")
-                    NetworkResult.Error(
-                        exception = Exception("Response body is null"),
-                        errorType = ErrorType.UNKNOWN,
-                        code = response.code(),
-                        message = "Response body is null"
-                    )
-                }
-                
-                // Default case (shouldn't reach here)
-                else -> {
-                    Log.e("SafeApiCall", "❌ Unexpected response state")
-                    NetworkResult.Error(
-                        exception = Exception("Unexpected response"),
-                        errorType = ErrorType.UNKNOWN,
-                        message = "Unexpected response state"
-                    )
-                }
+            if (body != null) {
+                Result.success(body)
+            } else {
+                Log.w("SafeApiCall", "Empty response body")
+                Result.failure(AppException.EmptyResponseException())
             }
         } else {
-            // HTTP error response
-            Log.e("SafeApiCall", "❌ HTTP error: ${response.code()}")
-            NetworkErrorHandler.handleException(
-                retrofit2.HttpException(response)
+            Log.e("SafeApiCall", "HTTP Error: ${response.code()} - ${response.message()}")
+            
+            val errorBody = response.errorBody()?.string()
+            Result.failure(
+                HttpException(
+                    code = response.code(),
+                    message = response.message(),
+                    errorBody = errorBody
+                )
             )
         }
-        
+    } catch (e: SocketTimeoutException) {
+        Log.e("SafeApiCall", "Request timeout", e)
+        Result.failure(NetworkException.TimeoutException(e))
+    } catch (e: ConnectException) {
+        Log.e("SafeApiCall", "Connection failed", e)
+        Result.failure(NetworkException.ConnectionException(e))
+    } catch (e: UnknownHostException) {
+        Log.e("SafeApiCall", "Unknown host", e)
+        Result.failure(NetworkException.UnknownHostException(e))
+    } catch (e: IOException) {
+        Log.e("SafeApiCall", "Network error", e)
+        Result.failure(NetworkException(e))
     } catch (e: Exception) {
-        // Network or other exceptions
-        Log.e("SafeApiCall", "🚨 Exception: ${e.message}", e)
-        NetworkErrorHandler.handleException(e)
+        Log.e("SafeApiCall", "Unknown error", e)
+        Result.failure(UnknownException(e))
     }
 }
 
 /**
- * Safe API call with automatic null handling
- * 
- * Returns Empty if data is null, Success otherwise
+ * Safe API call with retry logic.
  */
-suspend inline fun <T : Any> safeApiCallNonNull(
-    crossinline apiCall: suspend () -> Response<ResponseDto<T>>
-): NetworkResult<T> {
-    return when (val result = safeApiCall(apiCall)) {
-        is NetworkResult.Empty -> NetworkResult.Empty()
-        is NetworkResult.Success -> {
-            if (result.data != null) {
-                NetworkResult.Success(result.data)
-            } else {
-                NetworkResult.Empty()
-            }
+suspend inline fun <reified T> safeApiCallWithRetry(
+    maxRetries: Int = 3,
+    initialDelayMs: Long = 1000,
+    apiCall: suspend () -> Response<T>
+): Result<T> = withContext(Dispatchers.IO) {
+    var lastException: Exception? = null
+    var delay = initialDelayMs
+
+    repeat(maxRetries) { attempt ->
+        val result = safeApiCall(apiCall)
+        
+        if (result.isSuccess) {
+            return@withContext result
         }
-        else -> result
-    }
-}
 
-/**
- * Safe API call with data transformation
- * 
- * Useful for converting DTOs to domain models
- */
-suspend inline fun <T, R> safeApiCallMap(
-    crossinline apiCall: suspend () -> Response<ResponseDto<T>>,
-    crossinline mapper: (T) -> R
-): NetworkResult<R> {
-    return when (val result = safeApiCall(apiCall)) {
-        is NetworkResult.Success -> NetworkResult.Success(mapper(result.data))
-        is NetworkResult.Error -> result
-        is NetworkResult.Loading -> result
-        is NetworkResult.Empty -> result
-    }
-}
-
-/**
- * Safe API call with list transformation
- * 
- * Useful for converting lists of DTOs to domain models
- */
-suspend inline fun <T, R> safeApiCallListMap(
-    crossinline apiCall: suspend () -> Response<ResponseDto<List<T>>>,
-    crossinline mapper: (T) -> R
-): NetworkResult<List<R>> {
-    return when (val result = safeApiCall(apiCall)) {
-        is NetworkResult.Success -> {
-            try {
-                NetworkResult.Success(result.data.map(mapper))
-            } catch (e: Exception) {
-                Log.e("SafeApiCall", "Error mapping list items: ${e.message}")
-                NetworkResult.Error(
-                    exception = e,
-                    errorType = ErrorType.UNKNOWN,
-                    message = "Error processing data"
-                )
+        lastException = result.exceptionOrNull()
+        
+        // Only retry on specific errors
+        val shouldRetry = lastException?.let { exception ->
+            when (exception) {
+                is SocketTimeoutException -> true
+                is ConnectException -> true
+                is NetworkException.ConnectionException -> true
+                is NetworkException.TimeoutException -> true
+                else -> false
             }
+        } ?: false
+
+        if (shouldRetry && attempt < maxRetries - 1) {
+            Log.d("SafeApiCall", "Retry attempt ${attempt + 1}/$maxRetries after ${delay}ms")
+            kotlinx.coroutines.delay(delay)
+            delay *= 2 // Exponential backoff
         }
-        is NetworkResult.Error -> result
-        is NetworkResult.Loading -> result
-        is NetworkResult.Empty -> result
     }
+
+    return@withContext Result.failure(
+        lastException ?: UnknownException(Exception("Max retries exceeded"))
+    )
 }
