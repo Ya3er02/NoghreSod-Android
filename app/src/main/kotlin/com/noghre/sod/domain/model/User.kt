@@ -1,61 +1,60 @@
 package com.noghre.sod.domain.model
 
+import java.time.LocalDateTime
+
 /**
- * Domain model for User.
- * Represents an authenticated user in the system.
- *
+ * Domain model representing a user in the NoghreSod application.
+ * 
  * @property id Unique user identifier
- * @property email User email address
- * @property phoneNumber User phone number
- * @property firstName User first name
- * @property lastName User last name
- * @property profileImageUrl Profile picture URL
- * @property addresses List of saved addresses
- * @property favoriteProducts List of favorite product IDs
- * @property isVerified Email verification status
- * @property isPhoneVerified Phone verification status
- * @property createdAt Account creation timestamp
+ * @property firstName User's first name
+ * @property lastName User's last name
+ * @property email User's email address (used for login)
+ * @property phone User's phone number
+ * @property profileImage URL to user's profile picture
+ * @property address User's shipping address
+ * @property city City of residence
+ * @property country Country of residence
+ * @property postalCode Postal/ZIP code
+ * @property isVerified Whether email is verified
+ * @property preferredCurrency Preferred currency for prices
+ * @property createdAt Account creation date
  * @property lastLogin Last login timestamp
+ * @property isActive Account status
+ * 
+ * @since 1.0.0
  */
 data class User(
     val id: String,
+    val firstName: String,
+    val lastName: String,
     val email: String,
-    val phoneNumber: String = "",
-    val firstName: String = "",
-    val lastName: String = "",
-    val profileImageUrl: String? = null,
-    val addresses: List<Address> = emptyList(),
-    val favoriteProducts: List<String> = emptyList(),
+    val phone: String?,
+    val profileImage: String?,
+    val address: String?,
+    val city: String?,
+    val country: String?,
+    val postalCode: String?,
     val isVerified: Boolean = false,
-    val isPhoneVerified: Boolean = false,
-    val createdAt: String = "",
-    val lastLogin: String? = null
+    val preferredCurrency: String = "USD",
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val lastLogin: LocalDateTime? = null,
+    val isActive: Boolean = true
 ) {
-    val fullName: String
-        get() = "$firstName $lastName".trim()
+    
+    /**
+     * Get user's full name.
+     */
+    fun getFullName(): String = "$firstName $lastName"
+    
+    /**
+     * Check if user profile is complete.
+     */
+    fun isProfileComplete(): Boolean {
+        return firstName.isNotBlank() &&
+                lastName.isNotBlank() &&
+                email.isNotBlank() &&
+                address != null &&
+                city != null &&
+                country != null
+    }
 }
-
-/**
- * Domain model for User Address.
- *
- * @property id Unique address identifier
- * @property title Address title (Home, Work, etc.)
- * @property fullAddress Complete address
- * @property province Province/State
- * @property city City
- * @property postalCode Postal code
- * @property latitude Latitude coordinate
- * @property longitude Longitude coordinate
- * @property isDefault Default delivery address
- */
-data class Address(
-    val id: String,
-    val title: String,
-    val fullAddress: String,
-    val province: String,
-    val city: String,
-    val postalCode: String,
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val isDefault: Boolean = false
-)
