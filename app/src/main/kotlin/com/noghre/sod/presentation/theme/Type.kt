@@ -2,122 +2,112 @@ package com.noghre.sod.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.noghre.sod.R
 
-// Define font families
-val vazirFontFamily = FontFamily(
-    Font(R.font.vazir_regular, FontWeight.Normal),
-    Font(R.font.vazir_bold, FontWeight.Bold),
-    Font(R.font.vazir_light, FontWeight.Light),
-    Font(R.font.vazir_medium, FontWeight.Medium)
-)
-
-val NoghreSodTypography = Typography(
+val Typography = Typography(
     displayLarge = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 57.sp,
         lineHeight = 64.sp,
-        letterSpacing = (-0.25).sp
+        letterSpacing = 0.sp
     ),
     displayMedium = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 45.sp,
         lineHeight = 52.sp,
         letterSpacing = 0.sp
     ),
     displaySmall = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp
     ),
     headlineSmall = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp
     ),
     titleLarge = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W500,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W500,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.15.sp
     ),
     titleSmall = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W500,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Normal,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
+        letterSpacing = 0.15.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Normal,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Normal,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W400,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.4.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W500,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     labelMedium = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W500,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     ),
     labelSmall = TextStyle(
-        fontFamily = vazirFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.W500,
         fontSize = 11.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
