@@ -1,67 +1,151 @@
 package com.noghre.sod.data.local
 
 import androidx.room.TypeConverter
-import java.util.Date
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
- * Type converters for Room database.
- * Handles conversion of complex types to/from Room-compatible types.
+ * Type converters for Room Database.
+ * Converts complex types to/from strings for storage.
  */
 class Converters {
 
+    private val gson = Gson()
+    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+    private val dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+
+    // ===== String List Converters =====
+
     /**
-     * Converts a comma-separated string of image URLs to a List.
-     * Used for ProductEntity.images field.
+     * Convert List<String> to String for storage.
      */
     @TypeConverter
-    fun fromImageStringToList(value: String?): List<String> {
-        if (value.isNullOrEmpty()) return emptyList()
-        return value.split(",").map { it.trim() }
+    fun fromStringList(value: List<String>?): String? {
+        return if (value == null) null else gson.toJson(value)
     }
 
     /**
-     * Converts a List of image URLs to a comma-separated string.
-     * Used for ProductEntity.images field.
+     * Convert String back to List<String>.
      */
     @TypeConverter
-    fun fromImageListToString(list: List<String>?): String {
-        if (list.isNullOrEmpty()) return ""
-        return list.joinToString(",")
+    fun toStringList(value: String?): List<String>? {
+        return if (value == null) null else {
+            val type = object : TypeToken<List<String>>() {}.type
+            gson.fromJson(value, type)
+        }
+    }
+
+    // ===== Map Converters =====
+
+    /**
+     * Convert Map<String, String> to String for storage.
+     */
+    @TypeConverter
+    fun fromStringMap(value: Map<String, String>?): String? {
+        return if (value == null) null else gson.toJson(value)
     }
 
     /**
-     * Converts a Long timestamp to a Date object.
+     * Convert String back to Map<String, String>.
      */
     @TypeConverter
-    fun fromTimestampToDate(value: Long?): Date? {
-        return if (value == null) null else Date(value)
+    fun toStringMap(value: String?): Map<String, String>? {
+        return if (value == null) null else {
+            val type = object : TypeToken<Map<String, String>>() {}.type
+            gson.fromJson(value, type)
+        }
+    }
+
+    // ===== LocalDate Converters =====
+
+    /**
+     * Convert LocalDate to String for storage.
+     */
+    @TypeConverter
+    fun fromLocalDate(value: LocalDate?): String? {
+        return value?.format(dateFormatter)
     }
 
     /**
-     * Converts a Date object to a Long timestamp.
+     * Convert String back to LocalDate.
      */
     @TypeConverter
-    fun fromDateToTimestamp(date: Date?): Long? {
-        return date?.time
+    fun toLocalDate(value: String?): LocalDate? {
+        return if (value == null) null else {
+            try {
+                LocalDate.parse(value, dateFormatter)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    // ===== LocalDateTime Converters =====
+
+    /**
+     * Convert LocalDateTime to String for storage.
+     */
+    @TypeConverter
+    fun fromLocalDateTime(value: LocalDateTime?): String? {
+        return value?.format(dateTimeFormatter)
     }
 
     /**
-     * Converts a comma-separated string to a List of Strings.
-     * Generic utility for any list field.
+     * Convert String back to LocalDateTime.
      */
     @TypeConverter
-    fun fromStringToStringList(value: String?): List<String> {
-        if (value.isNullOrEmpty()) return emptyList()
-        return value.split(",").map { it.trim() }
+    fun toLocalDateTime(value: String?): LocalDateTime? {
+        return if (value == null) null else {
+            try {
+                LocalDateTime.parse(value, dateTimeFormatter)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    // ===== Boolean List Converters =====
+
+    /**
+     * Convert List<Boolean> to String for storage.
+     */
+    @TypeConverter
+    fun fromBooleanList(value: List<Boolean>?): String? {
+        return if (value == null) null else gson.toJson(value)
     }
 
     /**
-     * Converts a List of Strings to a comma-separated string.
-     * Generic utility for any list field.
+     * Convert String back to List<Boolean>.
      */
     @TypeConverter
-    fun fromStringListToString(list: List<String>?): String {
-        if (list.isNullOrEmpty()) return ""
-        return list.joinToString(",")
+    fun toBooleanList(value: String?): List<Boolean>? {
+        return if (value == null) null else {
+            val type = object : TypeToken<List<Boolean>>() {}.type
+            gson.fromJson(value, type)
+        }
+    }
+
+    // ===== Integer List Converters =====
+
+    /**
+     * Convert List<Int> to String for storage.
+     */
+    @TypeConverter
+    fun fromIntList(value: List<Int>?): String? {
+        return if (value == null) null else gson.toJson(value)
+    }
+
+    /**
+     * Convert String back to List<Int>.
+     */
+    @TypeConverter
+    fun toIntList(value: String?): List<Int>? {
+        return if (value == null) null else {
+            val type = object : TypeToken<List<Int>>() {}.type
+            gson.fromJson(value, type)
+        }
     }
 }
