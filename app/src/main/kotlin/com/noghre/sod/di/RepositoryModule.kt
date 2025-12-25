@@ -1,47 +1,40 @@
 package com.noghre.sod.di
 
-import com.noghre.sod.data.remote.api.ApiService
-import com.noghre.sod.data.repository.*
-import com.noghre.sod.domain.repository.*
+import com.noghre.sod.data.repository.IProductRepository
+import com.noghre.sod.data.repository.ProductRepository
+import com.noghre.sod.data.remote.api.NoghreSodApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * Hilt module for repository bindings.
+ * Provides concrete implementations of repository interfaces.
+ *
+ * @author Yaser
+ * @version 1.0.0
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
 
+    /**
+     * Provides ProductRepository implementation.
+     */
     @Provides
     @Singleton
     fun provideProductRepository(
-        apiService: ApiService,
-    ): ProductRepository {
-        return ProductRepositoryImpl(apiService)
+        api: NoghreSodApi
+    ): IProductRepository {
+        return ProductRepository(api)
     }
 
-    @Provides
-    @Singleton
-    fun provideCartRepository(
-        apiService: ApiService,
-    ): CartRepository {
-        return CartRepositoryImpl(apiService)
-    }
-
-    @Provides
-    @Singleton
-    fun provideOrderRepository(
-        apiService: ApiService,
-    ): OrderRepository {
-        return OrderRepositoryImpl(apiService)
-    }
-
-    @Provides
-    @Singleton
-    fun provideAuthRepository(
-        apiService: ApiService,
-    ): AuthRepository {
-        return AuthRepositoryImpl(apiService)
-    }
+    // Additional repositories will be added here
+    // - CartRepository
+    // - OrderRepository
+    // - UserRepository
+    // - PaymentRepository
+    // - AuthRepository
 }
