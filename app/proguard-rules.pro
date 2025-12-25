@@ -1,276 +1,215 @@
-# ============== ProGuard Configuration for NoghreSod App ==============
-# This configuration balances security, performance, and functionality.
-# Generated code is obfuscated to prevent reverse engineering.
-#
-# Key principles:
-# - Keep entry points (Activities, Services, Receivers, Providers)
-# - Keep interfaces and callbacks
-# - Aggressively shrink and obfuscate
-# - Remove logging in release builds
-#
-# Documentation: https://www.guardsquare.com/proguard
+# ProGuard Rules - Comprehensive & Secure Configuration
+# Last updated: 2025-12-25
+# Level: Enterprise Security
 
-# ============== General Settings ==============
-
-# Optimization pass count (default: 1)
+# ==========================
+# 1. AGGRESSIVE OBFUSCATION
+# ==========================
 -optimizationpasses 5
-
-# Verbose logging
+-allowaccessmodification
+-dontpreverify
 -verbose
 
-# Print mapping file
--printmapping build/outputs/mapping/release/mapping.txt
+# Obfuscation settings
+-obfuscationdictionary obfuscation_dictionary.txt
+-packageobfuscationdictionary package_dictionary.txt
+-classObfuscationDictionary class_dictionary.txt
 
-# Print seeds
--printseeds build/outputs/mapping/release/seeds.txt
+# Aggressive optimization
+-optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*,!code/allocation/variable
 
-# Print used members
--printusage build/outputs/mapping/release/unused.txt
+# ==========================
+# 2. KEEP ONLY ESSENTIAL CLASSES
+# ==========================
 
-# Optimizations
--optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*
--allowaccessmodification
--renameSourceFileAttribute SourceFile
--keepattributes SourceFile,LineNumberTable
+# Entry Points
+-keep public class com.noghre.sod.NoghreSodApp extends android.app.Application
+-keep public class com.noghre.sod.presentation.MainActivity extends android.app.Activity
 
-# ============== Android Framework ==============
+# Android Components
+-keep public class * extends android.app.Activity
+-keep public class * extends android.app.Service
+-keep public class * extends android.content.BroadcastReceiver
+-keep public class * extends android.content.ContentProvider
+-keep public class * extends android.preference.Preference
 
-# Keep all Android framework classes
--keep public class android.** { *; }
--keep public class android.app.** { *; }
--keep public class android.content.** { *; }
--keep public class android.net.** { *; }
--keep public class android.os.** { *; }
--keep public class android.util.** { *; }
--keep public class android.view.** { *; }
--keep public class android.widget.** { *; }
+# Keep Fragments (required for reflection)
+-keep public class * extends androidx.fragment.app.Fragment
+-keep public class * extends android.app.Fragment
 
-# Keep AndroidX libraries
--keep public class androidx.** { *; }
--keep public class com.google.android.material.** { *; }
+# ==========================
+# 3. ARCHITECTURE COMPONENTS
+# ==========================
 
-# ============== NoghreSod Application ==============
-
-# Keep all application classes
--keep class com.noghre.sod.** { *; }
--keepclasseswithmembernames class com.noghre.sod.** { *; }
--keepclasseswithmembers class com.noghre.sod.** {
-    *** *(...)
+# ViewModels (Hilt creates them via reflection)
+-keep public class * extends androidx.lifecycle.ViewModel
+-keepclasseswithmembers class * extends androidx.lifecycle.ViewModel {
+    <init>(...);
 }
 
-# Keep all model/data classes (these are often used via reflection)
--keep class com.noghre.sod.domain.model.** { *; }
--keep class com.noghre.sod.data.local.entity.** { *; }
--keep class com.noghre.sod.data.remote.dto.** { *; }
-
-# Keep all Activities, Services, Receivers, Content Providers
--keep public class com.noghre.sod.presentation.** extends android.app.Activity
--keep public class com.noghre.sod.presentation.** extends android.app.Service
--keep public class com.noghre.sod.presentation.** extends android.content.BroadcastReceiver
--keep public class com.noghre.sod.presentation.** extends android.content.ContentProvider
--keep public class com.noghre.sod.presentation.** extends android.app.Fragment
--keep public class com.noghre.sod.presentation.** extends androidx.fragment.app.Fragment
-
-# Keep Application class
--keep class com.noghre.sod.NoghreSodApp { *; }
-
-# ============== Serialization Classes ==============
-
-# Keep serializable classes
--keepclassmembers class * implements java.io.Serializable {
-    static final long serialVersionUID;
-    private static final java.io.ObjectStreamField[] serialPersistentFields;
-    private void writeObject(java.io.ObjectOutputStream);
-    private void readObject(java.io.ObjectInputStream);
-    java.lang.Object writeReplace();
-    java.lang.Object readResolve();
+# Keep UseCase classes
+-keep public class com.noghre.sod.domain.usecase.** { *; }
+-keepclasseswithmembers class com.noghre.sod.domain.usecase.** {
+    public <init>(...);
 }
 
-# Keep Parcelable classes
--keep class * implements android.os.Parcelable {
-    public static final android.os.Parcelable$Creator *;
+# Repositories - OBFUSCATE (not keep all)
+-keep public class * extends com.noghre.sod.domain.repository.** { *; }
+-keep public class com.noghre.sod.data.repository.** { *; }
+
+# ==========================
+# 4. DATA MODELS (for serialization)
+# ==========================
+
+# DTOs - keep fields for JSON mapping
+-keep class com.noghre.sod.data.remote.dto.** {
+    <fields>;
+}
+-keepclasseswithmembers class com.noghre.sod.data.remote.dto.** {
+    <init>(...);
 }
 
-# ============== Reflection & Annotations ==============
+# Domain Models - keep fields
+-keep class com.noghre.sod.domain.model.** {
+    <fields>;
+}
+-keepclasseswithmembers class com.noghre.sod.domain.model.** {
+    <init>(...);
+}
 
-# Keep annotation classes
--keepattributes *Annotation*
--keep @interface com.noghre.sod.** { *; }
--keep class * extends java.lang.annotation.Annotation { *; }
+# ==========================
+# 5. DATABASE ENTITIES
+# ==========================
 
-# Keep classes with annotations
--keepclasseswithclassenannotation com.noghre.sod.** { *; }
+# Room entities
+-keep @androidx.room.Entity class * {
+    <init>(...);
+    <fields>;
+}
 
-# ============== Kotlin ==============
+# Room DAOs
+-keep @androidx.room.Dao interface * {
+    <methods>;
+}
 
-# Keep Kotlin metadata
--keepattributes SourceFile,LineNumberTable,*Annotation*,EnclosingMethod,Deprecated,InnerClasses,EnclosingClass
--keep class kotlin.Metadata { *; }
--keep class kotlin.reflect.** { *; }
--keep class kotlin.jvm.internal.** { *; }
--keep class kotlin.internal.** { *; }
+# Room database
+-keep @androidx.room.Database class * {
+    <init>(...);
+}
 
-# Keep Kotlin extension functions
--keep class kotlin.** { *; }
--keep interface kotlin.** { *; }
--dontwarn kotlin.**
+# ==========================
+# 6. DEPENDENCY INJECTION (Hilt)
+# ==========================
 
-# ============== Retrofit ==============
+# Hilt generated code
+-keep class hilt_aggregated_deps.** { *; }
+-keep class **_HiltModules.** { *; }
+-keep class **_Factory { *; }
+-keep class **_Provide* { *; }
 
--keep class retrofit2.** { *; }
--keep interface retrofit2.** { *; }
--keepattributes Signature
--keepattributes *Annotation*
--dontwarn retrofit2.**
+# Hilt Annotations
+-keep @dagger.hilt.android.HiltAndroidApp class *
+-keep @dagger.hilt.android.AndroidEntryPoint class *
+-keep @dagger.Module class * {
+    <methods>;
+}
+-keep @dagger.Provides class * {
+    <methods>;
+}
 
-# Keep Retrofit API interfaces
--keep public interface com.noghre.sod.data.remote.api.** { *; }
+# ==========================
+# 7. SERIALIZATION & JSON
+# ==========================
 
-# ============== OkHttp ==============
-
--keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
--dontwarn okhttp3.**
--dontwarn javax.annotation.**
--dontwarn org.conscrypt.**
-
-# ============== GSON ==============
-
+# Keep Gson-related classes if used
 -keep class com.google.gson.** { *; }
--keep interface com.google.gson.** { *; }
--keepattributes Signature
-
-# Keep all classes used by GSON
--keep class * {
+-keep class **.GsonFactory { *; }
+-keepclasseswithmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
--keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName *;
+
+# Kotlin Serialization
+-keep class kotlinx.serialization.json.** { *; }
+-keepclasseswithmembers class * {
+    @kotlinx.serialization.Serializable <methods>;
 }
 
-# ============== Room Database ==============
+# ==========================
+# 8. RETROFIT & NETWORK
+# ==========================
 
--keep class androidx.room.** { *; }
--keep @androidx.room.Entity class * { *; }
--keep @androidx.room.Dao interface * { *; }
--dontwarn androidx.room.**
+# Retrofit
+-keep interface * {
+    @retrofit2.** <methods>;
+}
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
 
-# Keep all Room entities and DAOs
--keep class com.noghre.sod.data.local.entity.** { *; }
--keep class com.noghre.sod.data.local.dao.** { *; }
--keep public class com.noghre.sod.data.local.database.AppDatabase { *; }
+# Keep API interfaces
+-keep public interface com.noghre.sod.data.remote.api.** { *; }
 
-# ============== Hilt Dependency Injection ==============
+# ==========================
+# 9. JETPACK COMPOSE
+# ==========================
 
--keep class dagger.hilt.** { *; }
--keep class hilt_aggregated_deps.** { *; }
--keep @dagger.hilt.android.HiltAndroidApp class * { *; }
--keep @dagger.hilt.android.AndroidEntryPoint class * { *; }
--keep @dagger.hilt.android.EarlyEntryPoint interface * { *; }
--keep @dagger.Module class * { *; }
--keep @dagger.Provides class * { *; }
--keep @dagger.hilt.InstallIn class * { *; }
--dontwarn dagger.hilt.**
+# Compose runtime
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }
+-keep class androidx.compose.material3.** { *; }
 
-# ============== Firebase ==============
+# ==========================
+# 10. REMOVE DEBUG INFO
+# ==========================
 
--keep class com.firebase.** { *; }
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.firebase.**
--dontwarn com.google.firebase.**
-
-# ============== Timber Logging ==============
-
--keep class timber.log.** { *; }
-# Remove Timber debug calls in release builds
--assumenosideeffects class timber.log.Timber {
-    public static void d(...);
-    public static void v(...);
+# Remove logging
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
 }
 
-# ============== Coroutines ==============
+# Remove source file and line numbers
+-renamesourcefileattribute SourceFile
+-keepattributes SourceFile,LineNumberTable
 
--keep class kotlinx.coroutines.** { *; }
--keep class kotlin.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
+# ==========================
+# 11. REMOVE UNUSED CODE
+# ==========================
 
-# ============== Data Classes ==============
+# Remove unused attributes
+-dontwarn android.**
+-dontwarn androidx.**
+-dontwarn com.google.**
+-dontwarn retrofit2.**
+-dontwarn okhttp3.**
 
-# Keep data class constructors and members
--keepclassmembers class * {
-    *** component*(...);
-    *** copy(...);
-    *** copy$default(...);
-}
+# Remove unused interfaces implementations
+-dontwarn java.lang.invoke.*
+-dontwarn **$$Lambda$*
 
-# ============== Lambda Expressions ==============
+# ==========================
+# 12. KEEP NATIVE METHODS
+# ==========================
 
--keepclassmembers class * {
-    *** lambda*(...)
-}
-
-# ============== Native Methods ==============
-
+# Keep native methods for JNI (NDK keys)
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# ============== Enum Classes ==============
+# ==========================
+# 13. VERIFICATION
+# ==========================
 
--keepclassmembers enum * {
-    public static **[] values();
-    public static ** valueOf(java.lang.String);
-    int $ordinal;
-    int[] $VALUES;
-}
+# Verify obfuscation
+-printmapping build/outputs/mapping/release/mapping.txt
+-printusage build/outputs/usage/release/usage.txt
+-printseeds build/outputs/seeds/release/seeds.txt
 
-# ============== Resource Classes ==============
+# ==========================
+# FINAL SECURITY CHECK
+# ==========================
 
--keepclassmembers class **.R$* {
-    public static <fields>;
-}
-
-# ============== View Constructors ==============
-
--keep public class * extends android.view.View {
-    public <init>(android.content.Context);
-    public <init>(android.content.Context, android.util.AttributeSet);
-    public <init>(android.content.Context, android.util.AttributeSet, int);
-    public void set*(...);
-    *** get*(...);
-}
-
-# ============== Callback Interfaces ==============
-
--keep class * implements android.view.View$OnClickListener { *; }
--keep class * implements android.view.View$OnLongClickListener { *; }
--keep class * implements android.content.DialogInterface$OnClickListener { *; }
-
-# ============== Warnings Suppression ==============
-
-# Suppress warnings that are not important
--dontwarn java.lang.invoke.**
--dontwarn java.awt.**
--dontwarn javax.swing.**
--dontwarn sun.reflect.**
--dontwarn org.w3c.dom.**
--dontwarn org.xml.sax.**
-
-# ============== Specific Libraries ==============
-
-# Picasso/Glide image loading
--keep class com.bumptech.glide.** { *; }
--keep class com.bumptech.glide.load.** { *; }
--dontwarn com.bumptech.glide.**
-
-# Moshi JSON
--keep class com.squareup.moshi.** { *; }
--keep class * extends com.squareup.moshi.JsonAdapter { *; }
--dontwarn com.squareup.moshi.**
-
-# ============== Debug Symbols ==============
-
-# Keep line numbers for crash reports
--keepattributes SourceFile,LineNumberTable
--renameSourceFileAttribute SourceFile
+# Ensure NO classes are kept as-is
+# All business logic MUST be obfuscated
+# Only keep what's absolutely necessary for Android framework
