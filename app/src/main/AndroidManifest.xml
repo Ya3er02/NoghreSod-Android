@@ -1,106 +1,131 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.noghre.sod">
 
-    <!-- Required Permissions -->
+    <!-- ============== INTERNET & NETWORK PERMISSIONS ============== -->
+    <!-- Required for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- Required to check network connectivity status -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    
+    <!-- Optional: For WiFi connectivity info -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- Camera Permission (optional for product images) -->
+    <!-- ============== CAMERA PERMISSIONS (for future features) ============== -->
+    <!-- For product image capture -->
     <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- For file access from camera -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 
-    <!-- Location Permission (optional for delivery tracking) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- ============== LOCATION PERMISSIONS (optional) ============== -->
+    <!-- For delivery location tracking -->
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        tools:node="remove" />
+    
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        tools:node="remove" />
 
-    <!-- Push Notification -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- ============== ANDROID 12+ PERMISSIONS ============== -->
+    <!-- For schedule exact alarms (if needed) -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:node="remove" />
 
-    <!-- Device Features -->
+    <!-- ============== FEATURE DECLARATIONS ============== -->
+    <!-- Not required but allows filtering on Google Play -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
+
+    <uses-feature
+        android:name="android.hardware.location"
+        android:required="false" />
+
     <uses-feature
         android:name="android.hardware.location.gps"
         android:required="false" />
 
+    <!-- ============== APPLICATION CONFIG ============== -->
     <application
-        android:name=".NoghreSodApp"
+        android:name="com.noghre.sod.NoghreSodApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
+        android:debuggable="false"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:largeHeap="false"
+        android:requestLegacyExternalStorage="false"
         android:supportsRtl="true"
         android:theme="@style/Theme.NoghreSod"
         android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="34">
 
-        <!-- Main Activity -->
+        <!-- ============== ACTIVITIES ============== -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.noghre.sod.MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-            <!-- Deep Linking Support -->
-            <intent-filter android:autoVerify="true">
+            
+            <!-- Deep linking support -->
+            <intent-filter
+                android:autoVerify="true"
+                android:label="@string/app_name">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:host="noghresod.com"
-                    android:pathPattern="/app.*"
+                    android:pathPrefix="/product"
                     android:scheme="https" />
             </intent-filter>
         </activity>
 
-        <!-- Firebase Services -->
+        <!-- ============== SERVICES ============== -->
+        <!-- FCM Push Notifications (if using Firebase) -->
         <service
-            android:name=".services.NoghreSodMessagingService"
+            android:name="com.noghre.sod.service.PushNotificationService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
 
-        <!-- Firebase Analytics -->
-        <receiver
-            android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
-            android:exported="true"
-            android:permission="com.google.android.c2dm.permission.SEND">
-            <intent-filter>
-                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
-                <category android:name="." />
-            </intent-filter>
-        </receiver>
-
-        <!-- Meta Data -->
-        <meta-data
-            android:name="com.google.android.gms.version"
-            android:value="@integer/google_play_services_version" />
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="noghresod_notifications" />
-
-        <!-- File Provider for Camera/Gallery -->
+        <!-- ============== CONTENT PROVIDERS ============== -->
+        <!-- For sharing files securely -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"
-            tools:replace="android:authorities">
+            android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- ============== META-DATA ============== -->
+        <!-- Firebase configuration -->
+        <meta-data
+            android:name="com.google.firebase.ml.vision.DEPENDENCIES"
+            android:value="barcode" />
+
+        <!-- RenderScript support level -->
+        <meta-data
+            android:name="com.android.graphics.hwui.drop_shadow_cache_size"
+            android:value="6" />
+
     </application>
 
 </manifest>
