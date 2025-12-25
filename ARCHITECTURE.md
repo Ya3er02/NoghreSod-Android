@@ -1,363 +1,392 @@
-# 🎗️ Noghresod Android Architecture
+# NoghreSod Android App - Architecture Guide
 
-## Overview
+## 📐 Overall Architecture
 
-Noghresod follows a **Clean Architecture** approach combined with **MVVM** pattern, ensuring scalability, testability, and maintainability.
+This project follows **Clean Architecture** principles combined with **MVVM** pattern:
 
----
-
-## Architectural Layers
-
-### 1. **Presentation Layer**
-
-**Responsibility:** Display data to users and handle user interactions
-
-**Components:**
-- **Screens** (`HomeScreen`, `ProductDetailScreen`, etc.)
-  - Composable functions that build UI
-  - Handle user interactions
-  - Call ViewModel methods
-
-- **ViewModels** (`HomeViewModel`, `CartViewModel`, etc.)
-  - Manage UI state with `StateFlow`
-  - Call use cases
-  - Handle events from UI
-  - Survive configuration changes
-
-- **Components** (Reusable UI elements)
-  - `ProductCard` - Product display card
-  - `LoadingScreen` - Loading indicator
-  - `ErrorMessage` - Error display
-  - `PrimaryButton` - Action buttons
-
-- **Navigation**
-  - `NavGraph` - Navigation structure
-  - `Routes` - Screen routes
-  - `BottomNavigationBar` - Tab navigation
-
-- **Theme**
-  - Material 3 theming
-  - Color scheme (light/dark)
-  - Typography definitions
-
-**Data Flow:**
 ```
-User Interaction → Screen → ViewModel → UseCase → Repository
+Presentation Layer (Jetpack Compose, ViewModel)
+         ↓
+Domain Layer (Use Cases, Entities, Repositories Interface)
+         ↓
+Data Layer (Remote API, Local Database, Repositories Implementation)
 ```
 
 ---
 
-### 2. **Domain Layer**
+## 📂 Project Structure
 
-**Responsibility:** Define business logic and rules
-
-**Components:**
-- **Models** - Business entities
-  - `Product` - Product domain model
-  - `User` - User profile
-  - `Cart` - Shopping cart
-  - `Order` - Customer order
-
-- **Use Cases** - Business operations
-  - `GetProductsUseCase` - Fetch products
-  - `AddToCartUseCase` - Add item to cart
-  - `PlaceOrderUseCase` - Create order
-  - `LoginUseCase` - User authentication
-
-- **Repository Interfaces** - Data contracts
-  - `ProductRepository`
-  - `CartRepository`
-  - `OrderRepository`
-  - `AuthRepository`
-
-**Key Principles:**
-- Independent of UI framework
-- No dependencies on external libraries
-- Pure business logic
-- Easy to test
-
----
-
-### 3. **Data Layer**
-
-**Responsibility:** Manage data sources (local and remote)
-
-**Components:**
-
-#### **Remote Data Source** (API)
-- `ApiService` - Retrofit interface
-  - 60+ endpoints
-  - Type-safe requests
-  - Automatic serialization
-
-- `Dtos` - Data Transfer Objects
-  - Request DTOs - Outgoing data
-  - Response DTOs - Incoming data
-  - Auto-mapping to domain models
-
-- `AuthInterceptor` - Token management
-  - Automatic token injection
-  - Token refresh handling
-  - Request signing
-
-- `RetrofitClient` - HTTP client setup
-  - OkHttp configuration
-  - Logging
-  - SSL configuration
-
-#### **Local Data Source** (Database)
-- `Entities` - Room database models
-  - `ProductEntity`
-  - `CartEntity` & `CartItemEntity`
-  - `OrderEntity` & `OrderTrackingEntity`
-  - `UserEntity` & `AddressEntity`
-
-- `DAOs` - Data Access Objects
-  - `ProductDao` - Product CRUD
-  - `CartDao` - Cart operations
-  - `OrderDao` - Order management
-  - `UserDao` - User profile
-
-- `AppDatabase` - Room database
-  - Database configuration
-  - Entity definitions
-  - Migration handling
-
-- `LocalDataSources` - Local data operations
-  - `LocalProductDataSource`
-  - `LocalCartDataSource`
-  - `LocalOrderDataSource`
-  - `LocalUserDataSource`
-
-#### **Repositories** - Data orchestration
-- `ProductRepositoryImpl` - Product operations
-- `CartRepositoryImpl` - Cart management
-- `OrderRepositoryImpl` - Order handling
-- `AuthRepositoryImpl` - Authentication
-
-**Data Flow:**
 ```
-Remote API ←→ Retrofit ←→ Repository ←→ Local DB
-                                    │
-                            ←→ Domain Model
+app/src/main/kotlin/com/noghre/sod/
+├── di/                          # Dependency Injection (Hilt)
+│   ├── NetworkModuleEnhanced.kt
+│   ├── RepositoryModule.kt
+│   └── UseCaseModule.kt
+│
+├── domain/                      # Domain Layer (Business Logic)
+│   ├── model/
+│   │   ├── AppException.kt      # Exception Hierarchy
+│   │   ├── Result.kt            # Result Wrapper
+│   │   └── *.kt                 # Domain Models
+│   ├── repository/              # Repository Interfaces
+│   └── usecase/                 # Use Cases
+│
+├── data/                        # Data Layer
+│   ├── remote/
+│   │   ├── api/                 # Retrofit Services
+│   │   ├── dto/                 # API DTOs
+│   │   ├── interceptor/         # OkHttp Interceptors
+│   │   └── security/            # Auth & Encryption
+│   ├── local/
+│   │   ├── database/            # Room Entities & DAOs
+│   │   ├── mapper/              # Data Mappers
+│   │   └── security/            # Token Management
+│   └── repository/              # Repository Implementations
+│
+├── presentation/                # Presentation Layer
+│   ├── component/               # Reusable Compose Components
+│   ├── screen/                  # Full Screens
+│   ├── theme/                   # Material Design 3 Theme
+│   ├── viewmodel/               # ViewModels
+│   └── navigation/              # Navigation Setup
+│
+└── util/                        # Utilities & Extensions
+    ├── extension/
+    ├── constant/
+    └── helper/
 ```
 
 ---
 
-## Design Patterns
+## 🏗️ Core Components
 
-### 1. **MVVM (Model-View-ViewModel)**
+### 1. **Exception Handling**
+
+Using sealed class `AppException` for type-safe exception handling:
+
+```kotlin
+sealed class AppException : Exception() {
+    data class NetworkError(...) : AppException()
+    data class ServerError(...) : AppException()
+    data class ValidationError(...) : AppException()
+    data class AuthenticationError(...) : AppException()
+    // ... more types
+}
 ```
-View (Composable)
-    │
-    │ observes StateFlow
-    │
-    ↓
- ViewModel
-    │
-    │ calls UseCase
-    │
-    ↓
- UseCase / Repository
+
+### 2. **Result Wrapper Pattern**
+
+Functional approach to handle success/error states:
+
+```kotlin
+sealed class Result<out T> {
+    data class Success<T>(val data: T) : Result<T>()
+    data class Error(val exception: AppException) : Result<Nothing>()
+    object Loading : Result<Nothing>()
+    
+    fun map(...) : Result<R>
+    fun flatMap(...) : Result<R>
+    fun onSuccess(...) : Result<T>
+    fun onError(...) : Result<T>
+}
 ```
 
-### 2. **Repository Pattern**
-- Single source of truth for data
-- Abstracts data sources (local/remote)
-- Handles data caching
-- Manages data consistency
+### 3. **Network Layer**
 
-### 3. **Use Case Pattern**
-- Encapsulates business logic
-- Single responsibility
-- Easy to test
-- Reusable across features
+**Enhanced OkHttpClient** with:
+- ✅ HTTP Caching (100MB)
+- ✅ Request/Response Logging
+- ✅ Auth Token Management
+- ✅ Certificate Pinning Ready
+- ✅ Connection Pooling
+- ✅ Automatic Retry
 
-### 4. **Dependency Injection (Hilt)**
-- Constructor injection
-- Module-based configuration
-- Scope management
-- Type-safe bindings
+**Retrofit Integration:**
+```kotlin
+// Automatic configuration from BuildConfig
+Retrofit.Builder()
+    .baseUrl(BuildConfig.API_BASE_URL)
+    .client(okHttpClient)
+    .addConverterFactory(GsonConverterFactory.create())
+    .build()
+```
 
-### 5. **State Management (StateFlow)**
-- Reactive state updates
-- Thread-safe
-- Lifecycle-aware
-- Efficient emissions
+### 4. **Database Layer**
+
+**Room Database** with:
+- ✅ Full-Text Search (FTS4)
+- ✅ Smart Indexing
+- ✅ Automatic Migrations
+- ✅ Type-Safe Queries
+
+```kotlin
+// Indexed ProductEntity for performance
+@Entity(
+    indices = [
+        Index(value = ["name"], unique = false),
+        Index(value = ["category"], unique = false),
+        Index(value = ["name", "category"], unique = false)
+    ]
+)
+data class ProductEntity(...)
+
+// FTS for search
+@Fts4
+data class ProductSearchFts(...)
+```
+
+### 5. **Authentication & Security**
+
+**Enhanced Auth Interceptor:**
+- ✅ JWT Token Management
+- ✅ Automatic Token Refresh
+- ✅ 401 Response Handling
+- ✅ Secure Token Storage
+
+```kotlin
+class AuthInterceptorEnhanced {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        // Add Authorization header
+        // Handle 401 and refresh token
+        // Retry request
+    }
+}
+```
+
+### 6. **UI Layer - Jetpack Compose**
+
+**Best Practices:**
+- ✅ `remember` for state management
+- ✅ `derivedStateOf` for computed values
+- ✅ `CompositionLocal` for theme
+- ✅ Preview functions for testing
+
+```kotlin
+@Composable
+fun ProductCardOptimized(
+    product: Product,
+    onClick: (Product) -> Unit
+) {
+    val discountedPrice by remember(...) { derivedStateOf { ... } }
+    // Optimized UI
+}
+```
 
 ---
 
-## Data Flow Examples
-
-### Example 1: Loading Products
+## 🔄 Data Flow
 
 ```
-HomeScreen
-    │
-    ├─→ collects uiState from HomeViewModel
-    │
-    └─ displays ProductCards
-        
- HomeViewModel (init)
-    │
-    ├─→ calls GetProductsUseCase
-    │
-    └─ updates uiState with products
-        
- GetProductsUseCase
-    │
-    ├─→ calls ProductRepository.getProducts()
-    │
-    └─ returns Result<List<Product>>
-        
- ProductRepositoryImpl
-    │
-    ├─→ checks local cache (Room)
-    │
-    ├─→ if empty, fetches from API (Retrofit)
-    │
-    ├─→ saves to local DB
-    │
-    └─ returns products
-```
-
-### Example 2: Adding to Cart
-
-```
-ProductDetailScreen
-    │
-    ├─ user clicks "Add to Cart"
-    │
-    └─→ calls viewModel.addToCart(product, quantity)
-        
-ProductDetailViewModel
-    │
-    ├─→ calls AddToCartUseCase
-    │
-    └─ updates uiState
-        
-AddToCartUseCase
-    │
-    ├─→ calls CartRepository.addItem()
-    │
-    └─ returns Result<Cart>
-        
-CartRepositoryImpl
-    │
-    ├─→ gets current cart from local DB
-    │
-    ├─→ adds item to cart
-    │
-    ├─→ saves to local DB
-    │
-    └─ syncs with API (background)
+┌─────────────────────────────────────────────────────────┐
+│                   UI Layer (Compose)                     │
+│          ProductsScreen → ProductCardOptimized           │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+                   ↓ (observes StateFlow)
+┌─────────────────────────────────────────────────────────┐
+│               Presentation Layer (ViewModel)            │
+│  ProductsViewModel: StateFlow<Result<List<Product>>>    │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+                   ↓ (calls)
+┌─────────────────────────────────────────────────────────┐
+│                 Domain Layer (Use Cases)                │
+│         GetProductsUseCase: suspend () -> ...           │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+                   ↓ (calls)
+┌─────────────────────────────────────────────────────────┐
+│            Data Layer (Repositories)                    │
+│    ProductRepository: suspend getProducts()             │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+        ┌──────────┴───────────┐
+        ↓                      ↓
+┌──────────────┐       ┌──────────────┐
+│ Remote (API) │       │ Local (Room) │
+│  Retrofit    │       │  Database    │
+└──────────────┘       └──────────────┘
 ```
 
 ---
 
-## Dependency Management
-
-### Modules (Hilt)
-
-1. **NetworkModule** - API setup
-   ```kotlin
-   @Singleton Retrofit
-   @Singleton OkHttpClient
-   @Singleton ApiService
-   ```
-
-2. **DatabaseModule** - Database setup
-   ```kotlin
-   @Singleton AppDatabase
-   @Singleton ProductDao
-   @Singleton CartDao
-   ```
-
-3. **RepositoryModule** - Data layer
-   ```kotlin
-   @Singleton ProductRepository
-   @Singleton CartRepository
-   @Singleton OrderRepository
-   ```
-
-4. **UseCaseModule** - Business logic
-   ```kotlin
-   @Singleton GetProductsUseCase
-   @Singleton AddToCartUseCase
-   @Singleton PlaceOrderUseCase
-   ```
-
-### Scopes
-- **@Singleton** - App lifecycle (Repositories, Databases)
-- **@ActivityScoped** - Activity lifecycle
-- **@ViewModelScoped** - ViewModel lifecycle
-
----
-
-## Testing Strategy
+## 🧪 Testing Strategy
 
 ### Unit Tests
-- ViewModel logic
-- UseCase execution
-- Repository operations
-- Utility functions
+```kotlin
+// Using MockK for mocking
+class GetProductsUseCaseTest {
+    @Test
+    fun `invoke returns success when repository returns products`() = runTest {
+        // Given
+        val mockProducts = listOf(...)
+        coEvery { repository.getProducts(...) } returns mockProducts
+        
+        // When
+        val result = useCase.invoke()
+        
+        // Then
+        assertEquals(mockProducts, result)
+    }
+}
+```
 
-### Integration Tests
-- Database operations
-- API interactions
-- Complete feature flows
-
-### UI Tests
-- Screen rendering
-- User interactions
-- Navigation flows
+### Integration Tests (Upcoming)
+- API Integration with Mock Server
+- Database Migration Tests
+- End-to-End UI Tests
 
 ---
 
-## Best Practices
+## 🔐 Security Measures
 
-✅ **Separation of Concerns**
-- Each layer has clear responsibility
-- Minimal dependencies between layers
-
-✅ **Testability**
-- Dependencies injected
-- Use interfaces for mocking
-- No side effects in pure functions
-
-✅ **Maintainability**
-- Clear naming conventions
-- Consistent code structure
-- Comprehensive documentation
-
-✅ **Performance**
-- Lazy loading of data
-- Efficient state management
-- Database indexing
-- Memory-efficient collections
-
-✅ **Security**
-- Encrypted storage
+✅ **API Security:**
+- Certificate Pinning (ready to implement)
 - HTTPS only
-- Token rotation
-- Input validation
+- Request signing
+- JWT tokens with refresh mechanism
+
+✅ **Data Security:**
+- Encrypted SharedPreferences for tokens
+- Database encryption (SQLCipher)
+- No sensitive data in logs
+
+✅ **Code Security:**
+- ProGuard/R8 Obfuscation
+- Sensitive code in BuildConfig removed
+- API keys in local.properties (not committed)
 
 ---
 
-## Migration & Scalability
+## 📊 Build Variants
 
-This architecture supports:
-- Easy feature addition
-- New data source integration
-- Multi-platform expansion
-- Backend migration
-- Third-party service integration
+### Development
+```bash
+./gradlew assembleDevDebug
+# Base URL: https://dev-api.noghresod.com/api/v1/
+```
+
+### Staging
+```bash
+./gradlew assembleStagingRelease
+# Base URL: https://staging-api.noghresod.com/api/v1/
+```
+
+### Production
+```bash
+./gradlew assembleProductionRelease
+# Base URL: https://api.noghresod.com/api/v1/
+```
 
 ---
 
-## References
+## 📈 Performance Optimizations
 
-- [Google Android Architecture Guide](https://developer.android.com/topic/architecture)
-- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
-- [Jetpack Documentation](https://developer.android.com/jetpack)
-- [Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html)
+✅ **Network:**
+- HTTP caching with smart strategies
+- Connection pooling
+- Gzip compression
+- Request timeout: 30s
+
+✅ **Database:**
+- FTS4 for fast search
+- Smart indexing on frequently queried columns
+- Lazy loading with pagination
+
+✅ **UI:**
+- Compose recomposition optimization
+- `remember` for state preservation
+- `derivedStateOf` for computed values
+- LazyColumn for large lists
+
+✅ **Code:**
+- Proguard/R8 optimization
+- Resource shrinking enabled
+- Unnecessary layout inflation removed
+
+---
+
+## 🚀 Deployment
+
+### CI/CD Pipeline
+GitHub Actions automatically:
+1. Builds Debug APK
+2. Runs Unit Tests
+3. Performs Lint Checks
+4. Uploads Artifacts
+5. Builds Release APK/Bundle (on main)
+6. Creates GitHub Releases
+
+### Manual Release
+```bash
+# Build release APK
+./gradlew assembleProductionRelease
+
+# Build release bundle for Google Play
+./gradlew bundleProductionRelease
+```
+
+---
+
+## 📚 Dependencies
+
+### Core
+- Android SDK 34
+- Kotlin 1.9.10+
+- Jetpack Compose 1.6+
+
+### Network
+- Retrofit 2.11.0
+- OkHttp 4.11.0
+- Gson 2.10.1
+
+### Database
+- Room 2.6.0
+- SQLCipher (for encryption)
+
+### DI
+- Hilt 2.48+
+
+### UI
+- Material 3
+- Coil for images
+
+### Testing
+- JUnit 4
+- MockK
+- Coroutines Test
+
+---
+
+## 🔗 Useful Commands
+
+```bash
+# Clean build
+./gradlew clean
+
+# Build & run
+./gradlew installDebug
+
+# Run tests
+./gradlew testDebugUnitTest
+
+# Lint check
+./gradlew lint
+
+# Build analysis
+./gradlew assembleDebug --profile
+
+# Generate dependency graph
+./gradlew app:dependencies
+```
+
+---
+
+## 📞 Support
+
+For issues or questions, please create an issue on GitHub.
+
+---
+
+**Last Updated:** 2025-12-25  
+**Maintainer:** NoghreSod Development Team
