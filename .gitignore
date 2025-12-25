@@ -1,81 +1,198 @@
-# Gradle
-.gradle
+# ============== Gradle & Build ==============
 .gradle/
 build/
-*.apk
+*.jar
 *.aar
+*.exe
+*.dll
+*.so
+
+# ============== IDE - Android Studio ==============
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ============== Local Properties ==============
+local.properties
+keystore.properties
+
+# ============== Keystore Files (Sensitive!) ==============
+*.jks
+*.keystore
+*.p12
+*.pfx
+
+# ============== Firebase & Service Credentials ==============
+google-services.json
+firebase-config.json
+*.json.example
+
+# ============== API Keys & Secrets (DO NOT COMMIT) ==============
+*.key
+*.secret
+*.pem
+*.crt
+.env
+.env.local
+.env.*.local
+secrets/
+
+# ============== Gradle Wrapper ==============
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# ============== Android ==============
+*.apk
 *.ap_
 *.aab
+*.obb
+*.dex
+*.class
+*.o
+*.so
 
-# Android Studio
-.idea/
-.idea/caches
-.idea/gradle.xml
-.idea/libraries
-.idea/modules.xml
-.idea/workspace.xml
-*.iml
-*.iws
-*.ipr
+# ============== Generated Files ==============
+bin/
+gen/
+.generated
+
+# ============== Lint Results ==============
+lint-results*.html
+lint-results*.txt
+lint-results*.xml
+
+# ============== Testing ==============
+.coverage
+coverage/
+*.gcda
+*.gcno
+reports/
+*.trx
+
+# ============== Native Build Artifacts ==============
+.cxx/
+obj/
+
+# ============== VS Code ==============
+.vscode/
+*.code-workspace
+
+# ============== IntelliJ ==============
 *.swp
 *.swo
 *~
-.DS_Store
-
-# Build output
-out/
-*.class
-*.jar
-*.war
-*.ear
-*.lis
-
-# Local configuration
-local.properties
-keystore.properties
-keystore/
-
-# Secrets
-.env
-.env.local
-secrets.properties
-fire base.json
-
-# IDE
-.vscode/
-*.sublime-project
+.project
+.classpath
+.c9/
+*.launch
+.settings/
 *.sublime-workspace
-.nvmrc
 
-# OS
-.DS_Store
+# ============== OS Files ==============
 Thumbs.db
-*.log
+.DS_Store
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
 
-# Kotlin
-kotlin/
-kotlin-build/
-
-# LLDB
-.lldbinit
-
-# Lint
-lint-baseline.xml
-lint-results.xml
-lint-results.html
-
-# Test reports
-test-results/
-*.coverage
-*.exec
-.jacoco
-.coverage/
-
-# Generated files
-*.g.kt
+# ============== Kotlin ==============
 *.kt.bak
+*.kexe
+*.klib
 
-# Root
-/.idea
-local.properties
-keystore.properties
+# ============== Maven ==============
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# ============== NPM (if used) ==============
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ============== Temporary Files ==============
+*.tmp
+*.temp
+*.log
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+.tmp/
+
+# ============== Database ==============
+*.db
+*.sqlite
+*.sqlite3
+
+# ============== Zip Files ==============
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+
+# ============== ProGuard ==============
+proguard/
+mapping.txt
+seeds.txt
+usage.txt
+
+# ============== Robolectric ==============
+.robolectric-cache/
+
+# ============== Google Play services ==============
+gms_adid.txt
+
+# ============== CI/CD ==============
+.github/secrets/
+CI_*
+CI.*
+
+# ============== Documentation ==============
+*.docx
+*.xlsx
+*.pptx
+
+# ============== Directory-specific files ==============
+app/build/
+app/.cxx/
+app/libs/
+
+# ============== Plugin files ==============
+.kotlin/
+.gradle-wrapper/
+gradle/wrapper/gradle-wrapper.jar
+
+# ============== Network security config (if auto-generated) ==============
+# app/src/main/res/xml/network_security_config.xml  # Uncomment to ignore
+
+# ============== Testing-specific ==============
+.jacoco/
+*.exec
+
+# ============== Detekt ==============
+detekt-baseline.xml
+
+# ============== R.java / R.class ==============
+R.java
+R.class
+
+# ============== ASP.NET Core cache ==============
+[Bb]in/
+[Oo]bj/
+
+# ============== NuGet ==============
+.nupkg
+
+# ============== Version control ==============
+.git/
+.gitattributes
