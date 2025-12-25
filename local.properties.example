@@ -1,11 +1,26 @@
-# Copy this file to local.properties and add your values
-# IMPORTANT: DO NOT commit local.properties to version control
-# This file contains sensitive credentials
+# Copy this file to local.properties and fill in your values
 
-# API Configuration
-API_BASE_URL=https://api.noghresod.com
-API_KEY=your_api_key_here
-API_SECRET=your_api_secret_here
+# Development API
+dev.api.url=https://dev-api.noghresod.com/api/v1/
+dev.api.timeout=30
 
-# Android SDK (usually auto-detected)
-# sdk.dir=/path/to/android/sdk
+# Staging API
+staging.api.url=https://staging-api.noghresod.com/api/v1/
+staging.api.timeout=30
+
+# Production API
+prod.api.url=https://api.noghresod.com/api/v1/
+prod.api.timeout=30
+
+# Keystore for signing
+keystore.file=./keystore/noghresod.jks
+keystore.password=YOUR_KEYSTORE_PASSWORD
+keystore.alias=noghresod
+keystore.key.password=YOUR_KEY_PASSWORD
+
+# Firebase
+firebase.enabled=true
+firebase.project.id=YOUR_PROJECT_ID
+
+# Analytics
+analytics.enabled=true
