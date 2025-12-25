@@ -1,213 +1,97 @@
 package com.noghre.sod.domain.model
 
-import java.time.LocalDateTime
-
 /**
- * Order representing a completed purchase
+ * Domain model for Order.
+ * Represents a completed purchase order.
+ *
+ * @property id Order identifier
+ * @property userId User ID who placed the order
+ * @property orderNumber Human-readable order number
+ * @property items List of items in order
+ * @property shippingAddress Delivery address
+ * @property paymentMethod Payment method used
+ * @property subtotal Subtotal before discounts
+ * @property shippingCost Shipping cost
+ * @property discountAmount Discount applied
+ * @property totalAmount Final total amount
+ * @property status Order status
+ * @property tracking Tracking information
+ * @property notes Special notes about order
+ * @property createdAt Order creation timestamp
+ * @property updatedAt Last update timestamp
  */
 data class Order(
-    val orderId: String,
+    val id: String,
     val userId: String,
-    val orderNumber: String, // Customer-friendly order number
+    val orderNumber: String,
     val items: List<OrderItem>,
     val shippingAddress: Address,
-    val billingAddress: Address? = null,
-    val status: OrderStatus,
-    val paymentStatus: PaymentStatus,
     val paymentMethod: PaymentMethod,
-    val subtotal: Long, // Price before tax and shipping
-    val taxAmount: Long,
-    val shippingCost: Long,
-    val discountAmount: Long = 0,
-    val discountCode: String? = null,
-    val total: Long, // Final amount
-    val totalWeight: Double,
-    val totalQuantity: Int,
-    val paymentTransactionId: String? = null,
-    val trackingCode: String? = null, // Shipping tracking number
-    val carrier: ShippingCarrier? = null,
-    val notes: String? = null,
-    val adminNotes: String? = null,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    val updatedAt: LocalDateTime = LocalDateTime.now(),
-    val estimatedDeliveryDate: LocalDateTime? = null,
-    val actualDeliveryDate: LocalDateTime? = null,
-    val cancelledAt: LocalDateTime? = null,
-    val cancellationReason: String? = null,
-    val events: List<OrderEvent> = emptyList(),
-    val returnRequest: ReturnRequest? = null,
+    val subtotal: Double,
+    val shippingCost: Double = 0.0,
+    val discountAmount: Double = 0.0,
+    val totalAmount: Double,
+    val status: OrderStatus = OrderStatus.PENDING,
+    val tracking: OrderTracking? = null,
+    val notes: String = "",
+    val createdAt: String = "",
+    val updatedAt: String = ""
 )
 
 /**
- * Item in an order
+ * Order item model.
+ * Represents a product in an order.
  */
 data class OrderItem(
-    val orderItemId: String,
-    val orderId: String,
-    val productId: String,
-    val productName: String,
-    val productImage: String?,
+    val id: String,
+    val product: Product,
     val quantity: Int,
-    val weight: Double,
-    val purity: PurityType,
-    val unitPrice: Long,
-    val totalPrice: Long,
-    val laborCost: Long = 0,
-    val sku: String? = null,
-    val notes: String? = null,
+    val unitPrice: Double,
+    val selectedColor: String? = null,
+    val selectedSize: String? = null
 )
 
 /**
- * Order status
+ * Order status enum.
  */
 enum class OrderStatus {
-    PENDING,          // در انتظار
-    CONFIRMED,        // تایيد شده
-    PREPARING,        // در حال آماده
-    READY,            // آماده آرسال
-    SHIPPED,          // ارسال شده
-    IN_TRANSIT,       // در مسیر
-    OUT_FOR_DELIVERY, // در انتظار تحويل
-    DELIVERED,        // تحويل اشده
-    CANCELLED,        // لغو شده
-    RETURNED,         // برگردان شده
-    FAILED,           // ناباء برابر
+    PENDING,        // Awaiting payment
+    CONFIRMED,      // Payment received
+    PROCESSING,     // Being prepared
+    SHIPPED,        // On the way
+    DELIVERED,      // Successfully delivered
+    CANCELLED,      // Order cancelled
+    REFUNDED        // Refund issued
 }
 
 /**
- * Payment status
+ * Order tracking information.
+ *
+ * @property trackingNumber Tracking number
+ * @property carrier Shipping carrier name
+ * @property estimatedDelivery Estimated delivery date
+ * @property currentLocation Current location of shipment
+ * @property events List of tracking events
  */
-enum class PaymentStatus {
-    PENDING,      // In progress
-    PROCESSING,   // Payment is being processed
-    COMPLETED,    // Successfully paid
-    FAILED,       // Payment failed
-    CANCELLED,    // Payment cancelled
-    REFUNDED,     // Refunded
-    PARTIALLY_REFUNDED, // Partially refunded
-}
-
-/**
- * Payment method
- */
-enum class PaymentMethod {
-    CREDIT_CARD,
-    DEBIT_CARD,
-    BANK_TRANSFER,
-    ONLINE_GATEWAY, // Zarinpal, IDPay, etc.
-    WALLET,
-    CASH_ON_DELIVERY,
-    INSTALLMENT,
-}
-
-/**
- * Shipping carrier
- */
-enum class ShippingCarrier {
-    Iran_POST,
-    TCI,
-    SNAPP,
-    LOGIC,
-    TIPAX,
-    PICKUP, // Self-pickup
-}
-
-/**
- * Order event for tracking
- */
-data class OrderEvent(
-    val eventId: String,
-    val orderId: String,
-    val eventType: OrderEventType,
-    val status: OrderStatus,
-    val description: String,
-    val metadata: Map<String, String>? = null,
-    val timestamp: LocalDateTime = LocalDateTime.now(),
+data class OrderTracking(
+    val trackingNumber: String,
+    val carrier: String,
+    val estimatedDelivery: String,
+    val currentLocation: String,
+    val events: List<TrackingEvent> = emptyList()
 )
 
 /**
- * Order event types
+ * Tracking event.
+ *
+ * @property status Status at this point
+ * @property timestamp When this event occurred
+ * @property location Location of event
+ * @property description Description of event
  */
-enum class OrderEventType {
-    CREATED,
-    CONFIRMED,
-    PAYMENT_RECEIVED,
-    PREPARING,
-    READY,
-    PICKED,
-    SHIPPED,
-    TRACKING_UPDATE,
-    DELIVERED,
-    CANCELLED,
-    RETURNED,
-    ERROR,
-}
-
-/**
- * Return request for order items
- */
-data class ReturnRequest(
-    val returnId: String,
-    val orderId: String,
-    val items: List<OrderItem>,
-    val reason: ReturnReason,
-    val description: String,
-    val returnStatus: ReturnStatus,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    val approvedAt: LocalDateTime? = null,
-    val returnedAt: LocalDateTime? = null,
-    val refundAmount: Long? = null,
-    val refundDate: LocalDateTime? = null,
-)
-
-/**
- * Return reason
- */
-enum class ReturnReason {
-    DEFECTIVE,
-    DAMAGED,
-    NOT_AS_DESCRIBED,
-    UNWANTED,
-    DIFFERENT_PURITY,
-    WEIGHT_MISMATCH,
-    OTHER,
-}
-
-/**
- * Return status
- */
-enum class ReturnStatus {
-    REQUESTED,      // Return requested
-    APPROVED,       // Approved for return
-    REJECTED,       // Not approved
-    IN_TRANSIT,     // Item in transit to warehouse
-    RECEIVED,       // Item received at warehouse
-    REFUNDED,       // Refund processed
-    CANCELLED,      // Return cancelled
-}
-
-/**
- * Order summary for list display
- */
-data class OrderSummary(
-    val orderId: String,
-    val orderNumber: String,
-    val total: Long,
-    val status: OrderStatus,
-    val paymentStatus: PaymentStatus,
-    val createdAt: LocalDateTime,
-    val estimatedDeliveryDate: LocalDateTime?,
-    val itemCount: Int,
-)
-
-/**
- * Order filter criteria
- */
-data class OrderFilter(
-    val status: OrderStatus? = null,
-    val paymentStatus: PaymentStatus? = null,
-    val fromDate: LocalDateTime? = null,
-    val toDate: LocalDateTime? = null,
-    val minAmount: Long? = null,
-    val maxAmount: Long? = null,
+data class TrackingEvent(
+    val status: String,
+    val timestamp: String,
+    val location: String,
+    val description: String
 )
