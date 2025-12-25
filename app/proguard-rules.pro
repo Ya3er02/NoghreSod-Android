@@ -1,103 +1,168 @@
-# Proguard configuration for NoghreSod Android App
+# ProGuard rules for Noghresod Android App
+# Comprehensive security and optimization rules
 
-# Kotlin
--keep class kotlin.** { *; }
--keep class kotlin.Metadata { *; }
--dontwarn kotlin.**
--keepclassmembers class **$WhenMappings {
-    <fields>;
-}
+# ============== GENERAL RULES ==============
+-verbose
+-optimizationpasses 5
+-mergeinterfacesaggressively
 
-# Coroutines
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keepnames class kotlinx.coroutines.android.AndroidExceptionPreHandler {}
--keepclassmembernames class kotlinx.** {
-    volatile <fields>;
-}
-
-# Jetpack Compose
--keep class androidx.compose.** { *; }
--dontwarn androidx.compose.**
-
-# Hilt
--keep class * extends dagger.hilt.android.lifecycle.HiltViewModel
--keep class dagger.hilt.** { *; }
--dontwarn dagger.hilt.**
-
-# Retrofit
--keep class retrofit2.** { *; }
--keepattributes Signature
--keepattributes *Annotation*
--keep interface retrofit2.** { *; }
--keep class com.google.gson.** { *; }
--keepclasseswithmembers class * {
-    @retrofit2.http.* <methods>;
-}
--dontwarn retrofit2.**
--dontwarn okhttp3.**
--dontwarn okio.**
-
-# Gson
--keepattributes EnclosingMethod
--keepattributes InnerClasses
--keep class com.google.gson.** { *; }
-
-# Room
--keep class androidx.room.Room { *; }
--keep @androidx.room.Entity class * { *; }
--dontwarn androidx.room.**
-
-# Firebase
--keep class com.google.firebase.** { *; }
--keepnames class com.firebase.** { *; }
--keepnames class com.google.firebase.** { *; }
--dontwarn com.google.firebase.**
-
-# Domain Models
--keep class com.noghre.sod.domain.model.** { *; }
--keep class com.noghre.sod.domain.usecase.** { *; }
+# ============== KEEP CORE CLASSES ==============
+# Keep our custom application classes
+-keep class com.noghre.sod.** { *; }
+-keep class com.noghre.sod.presentation.** { *; }
+-keep class com.noghre.sod.domain.** { *; }
 -keep class com.noghre.sod.data.** { *; }
 
-# View Models
--keep class com.noghre.sod.presentation.viewmodel.** { *; }
+# Keep native methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
-# DTOs
--keep class com.noghre.sod.data.remote.dto.** { *; }
--keepclassmembers class com.noghre.sod.data.remote.dto.** { *; }
+# Keep custom view constructors
+-keepclasseswithmembers class * {
+    public <init>(android.content.Context, android.util.AttributeSet);
+}
 
-# Local Classes
--keep class com.noghre.sod.data.local.entity.** { *; }
--keep class com.noghre.sod.data.local.dao.** { *; }
+# ============== ANDROIDX & JETPACK ==============
+-keep class androidx.** { *; }
+-keep interface androidx.** { *; }
+-keep class androidx.compose.** { *; }
+-keep class androidx.lifecycle.** { *; }
+-keep class androidx.room.** { *; }
+-keep class androidx.navigation.** { *; }
+-keep class androidx.hilt.** { *; }
 
-# Enums
+# ============== DEPENDENCY INJECTION (HILT) ==============
+-keep class dagger.hilt.** { *; }
+-keep class dagger.hilt.android.** { *; }
+-keep interface dagger.hilt.** { *; }
+-keep @dagger.hilt.android.HiltAndroidApp class *
+-keep @dagger.hilt.android.AndroidEntryPoint class *
+-keep @dagger.hilt.** class * { *; }
+-keep @javax.inject.** class * { *; }
+
+# ============== DATABASE (ROOM) ==============
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao class * { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep class * extends androidx.room.DatabaseConfiguration { *; }
+-dontwarn androidx.room.**
+
+# ============== NETWORKING (RETROFIT + OKHTTP) ==============
+-keep class retrofit2.** { *; }
+-keep interface retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-keep class com.google.gson.** { *; }
+-keep interface com.google.gson.** { *; }
+-keepclassmembers class * {
+    @retrofit2.http.** <methods>;
+}
+
+# GSON Configuration
+-keep class com.google.gson.stream.** { *; }
+-keep class com.google.gson.** { <fields>; }
+-keep class * extends com.google.gson.TypeAdapter { *; }
+-keep class * implements com.google.gson.JsonSerializable
+-keep class * implements com.google.gson.JsonDeserializer
+
+# Serialization
+-keep class kotlinx.serialization.** { *; }
+-keep class kotlin.serialization.** { *; }
+-keepclassmembers class ** {
+    *** *Field(...);
+}
+
+# ============== KOTLIN SPECIFIC ==============
+-keep class kotlin.** { *; }
+-keep class kotlin.jvm.internal.** { *; }
+-keepclassmembers class kotlin.Metadata {
+    public <methods>;
+}
+-keep class kotlinx.coroutines.** { *; }
+-keep interface kotlinx.coroutines.** { *; }
+-keep class kotlinx.coroutines.flow.** { *; }
+
+# ============== COMPOSE SPECIFIC ==============
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.ui.** { *; }
+-keep class androidx.compose.material3.** { *; }
+-keep class androidx.compose.foundation.** { *; }
+-keep class androidx.compose.animation.** { *; }
+
+# ============== IMAGE LOADING (COIL) ==============
+-keep class coil.** { *; }
+-keep interface coil.** { *; }
+-keep class io.coil_kt.coil.** { *; }
+
+# ============== FIREBASE ==============
+-keep class com.google.firebase.** { *; }
+-keep interface com.google.firebase.** { *; }
+-keep class com.google.android.firebase.** { *; }
+
+# ============== SECURITY & ENCRYPTION ==============
+-keep class androidx.security.crypto.** { *; }
+-keep class javax.crypto.** { *; }
+-keep class java.security.** { *; }
+
+# ============== TIMBER (LOGGING) ==============
+-keep class timber.log.** { *; }
+-keep interface timber.log.** { *; }
+
+# ============== ANNOTATIONS ==============
+-keep @interface androidx.annotation.** { *; }
+-keep @interface kotlin.annotation.** { *; }
+-keep @interface javax.annotation.** { *; }
+-keep @interface dagger.** { *; }
+
+# ============== ENUM CLASSES ==============
 -keepclassmembers enum * {
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
 
-# Native methods
--keepclasseswithmembernames class * {
-    native <methods>;
+# ============== DATA CLASSES ==============
+-keep class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    static final java.io.ObjectStreamField[] serialPersistentFields;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    !static !transient <fields>;
+    private void writeObject(...);
+    private void readObject(...);
+    java.lang.Object writeReplace(...);
+    java.lang.Object readResolve(...);
 }
 
-# Application classes that have overrides
--keep class * extends android.app.Activity
--keep class * extends android.app.Service
--keep class * extends android.app.BroadcastReceiver
--keep class * extends android.content.ContentProvider
--keep class * extends android.app.backup.BackupAgentHelper
--keep class * extends android.preference.Preference
--keep class * extends android.view.View
+# ============== PARAMETER NAMES ==============
+-keepattributes Signature
+-keepattributes SourceFile,LineNumberTable
+-keepattributes LocalVariableTable,LocalVariableTypeTable,MethodParameters
 
-# Keep constructors
--keep public class com.noghre.sod.** {
-    public <init>(...);
+# ============== KOTLIN METADATA ==============
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations
+-keepattributes AnnotationDefault
+-keepattributes InnerClasses
+-keep class kotlin.Metadata {
+    ***;
 }
 
-# Remove logging
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-}
+# ============== OPTIMIZATION ==============
+-optimizations !code/allocation/variable
+-optimizations code/simplification/arithmetic
+-optimizations code/simplification/string
+-optimizations method/marking/private
+-optimizations method/inlining/short
+
+# ============== REMOVALS ==============
+-dontwarn com.google.android.**
+-dontwarn android.support.**
+-dontwarn androidx.legacy.**
+-dontwarn okio.**
+-dontwarn retrofit2.**
+-dontwarn com.squareup.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn com.sun.org.apache.**
+
+# ============== REFLECTION PROTECTION ==============
+-keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,Synthetic,EnclosingMethod,RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations,RuntimeVisibleParameterAnnotations,RuntimeInvisibleParameterAnnotations,AnnotationDefault
