@@ -1,10 +1,1 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
-plugins {
-    id("com.android.application") version "8.2.0" apply false
-    id("com.android.library") version "8.2.0" apply false
-    kotlin("android") version "1.9.21" apply false
-    id("com.google.dagger.hilt.android") version "2.49" apply false
-    id("com.google.gms.google-services") version "4.4.0" apply false
-    id("com.google.firebase.crashlytics") version "2.9.9" apply false
-}
+plugins {\n    alias(libs.plugins.android.application) apply false\n    alias(libs.plugins.android.library) apply false\n    alias(libs.plugins.kotlin.android) apply false\n    alias(libs.plugins.kotlin.jvm) apply false\n    alias(libs.plugins.kotlin.serialization) apply false\n    alias(libs.plugins.hilt) apply false\n    alias(libs.plugins.ksp) apply false\n    alias(libs.plugins.detekt) apply false\n}\n\ntasks.register(\"clean\", Delete::class) {\n    delete(rootProject.buildDir)\n}\n\n// Global quality checks\ntasks.register(\"qualityChecks\") {\n    dependsOn(\":app:detekt\", \":app:ktlint\")\n    doLast {\n        println(\"✅ All quality checks passed!\")\n    }\n}\n
