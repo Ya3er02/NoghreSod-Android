@@ -1,178 +1,255 @@
 package com.noghre.sod.domain.model
 
-import timber.log.Timber
+import java.io.IOException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Sealed class for handling operation results with type safety.
- * Replaces traditional try-catch with functional pattern.
+ * Sealed class representing the result of an asynchronous operation.
+ * 
+ * Provides type-safe handling of success, error, and loading states.
+ * All exceptions are properly captured with stack traces and context.
+ * 
+ * @param T The type of data on success
+ * 
+ * @since 1.0.0
  */
-sealed class Result<out T> {
+seal class Result<out T> {
+    
     /**
-     * Successful result containing data.
+     * Represents successful completion with data.
+     * 
+     * @property data The result data
      */
-    data class Success<T>(
-        val data: T,
-        val cachedAt: Long = System.currentTimeMillis()
+    data class Success<T>(val data: T) : Result<T>()
+    
+    /**
+     * Represents an error state with comprehensive error information.
+     * 
+     * @property exception The underlying exception (never null)
+     * @property message User-friendly error message
+     * @property code Optional error code for categorization
+     */
+    data class Error<T>(
+        val exception: Throwable,
+        val message: String = exception.localizedMessage ?: "Unknown error occurred",
+        val code: Int? = null
     ) : Result<T>() {
-        init {
-            Timber.d("Result.Success: ${data?.javaClass?.simpleName}")
-        }
-    }
-
-    /**
-     * Failed result containing exception.
-     */
-    data class Error(
-        val exception: AppException
-    ) : Result<Nothing>() {
-        init {
-            Timber.e("Result.Error: ${exception.message}")
-        }
-    }
-
-    /**
-     * Loading state.
-     */
-    object Loading : Result<Nothing>() {
-        init {
-            Timber.d("Result.Loading")
-        }
-    }
-
-    /**
-     * Check if result is successful.
-     */
-    fun isSuccess(): Boolean = this is Success
-
-    /**
-     * Check if result is error.
-     */
-    fun isError(): Boolean = this is Error
-
-    /**
-     * Check if result is loading.
-     */
-    fun isLoading(): Boolean = this is Loading
-
-    /**
-     * Get data or null.
-     */
-    fun getOrNull(): T? = when (this) {
-        is Success -> data
-        else -> null
-    }
-
-    /**
-     * Get exception or null.
-     */
-    fun getErrorOrNull(): AppException? = when (this) {
-        is Error -> exception
-        else -> null
-    }
-
-    /**
-     * Map success value to another type.
-     */
-    inline fun <R> map(transform: (T) -> R): Result<R> = when (this) {
-        is Success -> {
-            try {
-                Success(transform(data))
-            } catch (e: Exception) {
-                Error(AppException.UnknownError(e.message ?: "", e))
+        
+        /**
+         * Get the root cause of the error.
+         */
+        fun getRootCause(): Throwable {
+            var current: Throwable? = exception
+            while (current?.cause != null) {
+                current = current.cause
             }
+            return current ?: exception
         }
-        is Error -> this
-        Loading -> Loading
+        
+        /**
+         * Get the full stack trace as a string.
+         */
+        fun getStackTrace(): String {
+            return exception.stackTraceToString()
+        }
+        
+        /**
+         * Check if this is a network-related error.
+         */
+        fun isNetworkError(): Boolean {
+            return exception is IOException || 
+                   exception is SocketTimeoutException ||
+                   exception is UnknownHostException
+        }
+        
+        /**
+         * Check if this is a timeout error.
+         */
+        fun isTimeoutError(): Boolean {
+            return exception is SocketTimeoutException
+        }
     }
-
+    
     /**
-     * Flat map for chaining operations.
+     * Represents loading state.
      */
-    inline fun <R> flatMap(transform: (T) -> Result<R>): Result<R> = when (this) {
-        is Success -> {
-            try {
-                transform(data)
-            } catch (e: Exception) {
-                Error(AppException.UnknownError(e.message ?: "", e))
-            }
-        }
-        is Error -> this
-        Loading -> Loading
-    }
-
+    data class Loading<T>(val progress: Int = 0) : Result<T>()
+    
+    // ============== Helper Functions ==============
+    
     /**
-     * Execute action on success.
+     * Execute a block of code if result is success.
+     * 
+     * Example:
+     * ```
+     * result.onSuccess { data ->
+     *     println("Received: $data")
+     * }
+     * ```
      */
     inline fun onSuccess(action: (T) -> Unit): Result<T> {
         if (this is Success) {
-            try {
-                action(data)
-            } catch (e: Exception) {
-                Timber.e(e, "Error in onSuccess")
-            }
+            action(data)
         }
         return this
     }
-
+    
     /**
-     * Execute action on error.
+     * Execute a block of code if result is error.
+     * 
+     * Example:
+     * ```
+     * result.onError { error ->
+     *     Log.e("Error", error.message, error.exception)
+     * }
+     * ```
      */
-    inline fun onError(action: (AppException) -> Unit): Result<T> {
+    inline fun onError(action: (Error<T>) -> Unit): Result<T> {
         if (this is Error) {
-            try {
-                action(exception)
-            } catch (e: Exception) {
-                Timber.e(e, "Error in onError")
-            }
+            action(this)
         }
         return this
     }
-
+    
     /**
-     * Execute action when loading.
+     * Execute a block of code if result is loading.
      */
-    inline fun onLoading(action: () -> Unit): Result<T> {
+    inline fun onLoading(action: (Loading<T>) -> Unit): Result<T> {
         if (this is Loading) {
-            try {
-                action()
-            } catch (e: Exception) {
-                Timber.e(e, "Error in onLoading")
-            }
+            action(this)
         }
         return this
     }
-
+    
     /**
-     * Get value or default.
+     * Transform success data to another type.
+     * 
+     * Example:
+     * ```
+     * val stringResult: Result<String> = result.map { products ->
+     *     products.size.toString()
+     * }
+     * ```
      */
-    fun getOrDefault(default: T): T = when (this) {
-        is Success -> data
-        else -> default
+    inline fun <R> map(transform: (T) -> R): Result<R> {
+        return when (this) {
+            is Success -> Success(transform(data))
+            is Error -> Error(exception, message, code)
+            is Loading -> Loading(progress)
+        }
     }
-
+    
     /**
-     * Execute action on any result.
+     * Transform error or pass through success.
      */
-    inline fun <R> fold(
-        onSuccess: (T) -> R,
-        onError: (AppException) -> R,
-        onLoading: () -> R
-    ): R = when (this) {
-        is Success -> onSuccess(data)
-        is Error -> onError(exception)
-        Loading -> onLoading()
+    inline fun <R> recover(transform: (Error<T>) -> R): Result<R> {
+        return when (this) {
+            is Success -> Success(data as R)
+            is Error -> Result.Success(transform(this))
+            is Loading -> Loading(progress)
+        }
+    }
+    
+    /**
+     * Get data or null if error/loading.
+     */
+    fun getOrNull(): T? {
+        return (this as? Success)?.data
+    }
+    
+    /**
+     * Get exception or null if not error.
+     */
+    fun exceptionOrNull(): Throwable? {
+        return (this as? Error)?.exception
+    }
+    
+    /**
+     * Check if this result is success.
+     */
+    fun isSuccess(): Boolean = this is Success
+    
+    /**
+     * Check if this result is error.
+     */
+    fun isError(): Boolean = this is Error
+    
+    /**
+     * Check if this result is loading.
+     */
+    fun isLoading(): Boolean = this is Loading
+    
+    /**
+     * Get the data or throw the exception.
+     * 
+     * @throws Throwable The underlying exception if this is an error
+     */
+    fun getOrThrow(): T {
+        return when (this) {
+            is Success -> data
+            is Error -> throw exception
+            is Loading -> throw IllegalStateException("Cannot get data from Loading state")
+        }
     }
 }
 
 /**
- * Extension function to safely execute suspend functions.
+ * Extension function to safely execute a suspend function.
+ * Returns a Result wrapping the success or error.
+ * 
+ * Example:
+ * ```
+ * val result = safeCall {
+ *     repository.getProducts()
+ * }
+ * ```
  */
-suspend inline fun <T> executeResult(
-    block: suspend () -> T
-): Result<T> = try {
-    Result.Success(block())
-} catch (e: AppException) {
-    Result.Error(e)
-} catch (e: Exception) {
-    Result.Error(AppException.UnknownError(e.message ?: "", e))
+suspend inline fun <T> safeCall(
+    crossinline block: suspend () -> T
+): Result<T> {
+    return try {
+        Result.Success(block())
+    } catch (e: CancellationException) {
+        throw e // Don't catch cancellation exceptions
+    } catch (e: Exception) {
+        Result.Error(
+            exception = e,
+            message = e.localizedMessage ?: "An error occurred"
+        )
+    }
+}
+
+/**
+ * Extension function for synchronous safe execution.
+ */
+inline fun <T> safeCallSync(
+    block: () -> T
+): Result<T> {
+    return try {
+        Result.Success(block())
+    } catch (e: Exception) {
+        Result.Error(
+            exception = e,
+            message = e.localizedMessage ?: "An error occurred"
+        )
+    }
+}
+
+/**
+ * Extension to flatten nested Results.
+ * 
+ * Example:
+ * ```
+ * val result: Result<Result<String>> = ...
+ * val flattened: Result<String> = result.flatten()
+ * ```
+ */
+fun <T> Result<Result<T>>.flatten(): Result<T> {
+    return when (this) {
+        is Result.Success -> data
+        is Result.Error -> Result.Error(exception, message, code)
+        is Result.Loading -> Result.Loading(progress)
+    }
 }
