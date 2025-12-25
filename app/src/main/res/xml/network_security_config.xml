@@ -1,76 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Network Security Configuration for NoghreSod App
-    
-    This configuration enforces strict security policies:
-    - No cleartext (HTTP) traffic allowed in production
-    - HTTPS only for all network communications
-    - Certificate pinning for API endpoints
-    - Separate debug configuration for development
-    
-    Docs: https://developer.android.com/training/articles/security-config
+<!-- Network Security Configuration
+     Ensures all network traffic is encrypted and secure
+     Last updated: 2025-12-25
 -->
 <network-security-config>
-    
-    <!-- ============== Production Configuration ============== -->
+    <!-- Production Configuration (api.noghresod.ir) -->
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.noghresod.com</domain>
-        <domain includeSubdomains="true">www.noghresod.com</domain>
-        <domain includeSubdomains="true">cdn.noghresod.com</domain>
+        <domain includeSubdomains="true">api.noghresod.ir</domain>
         
-        <!-- Certificate Pinning for Primary API Domain -->
-        <pin-set expiration="2027-12-31">
-            <!-- Public key hashes (SHA-256) -->
-            <pin digest="SHA-256">+MIIFXwGCN7l4xOnlkJ4/qXvT+0e/6CVGJ/kAWRuPw0=</pin>
-            <pin digest="SHA-256">+MIIFYjCCAx4CCQCvLCqC1234ABCDEFGHIJKLMNOPQR=</pin>
-            <!-- Backup pins (from Let's Encrypt) -->
-            <pin digest="SHA-256">JSMzqOOrZLplQy5kIZ01BHrKQBChmOxCLKx/e+lQsyY=</pin>
+        <!-- Certificate Pinning - Primary & Backup Pins -->
+        <pin-set expiration="2026-12-31">
+            <!-- Primary Certificate Pin (Current) -->
+            <!-- Extract with: openssl s_client -servername api.noghresod.ir -connect api.noghresod.ir:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 -->
+            <pin digest="SHA-256">sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            
+            <!-- Backup Certificate Pin (For Certificate Rotation) -->
+            <pin digest="SHA-256">sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
         </pin-set>
-    </domain-config>
-    
-    <!-- ============== Third-party Services ============== -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">graph.instagram.com</domain>
-        <domain includeSubdomains="true">api.stripe.com</domain>
-        <domain includeSubdomains="true">firebaseinstallations.googleapis.com</domain>
-        <domain includeSubdomains="true">fcm.googleapis.com</domain>
-    </domain-config>
-    
-    <!-- ============== Debug Configuration (Development Only) ============== -->
-    <debug-overrides>
-        <!-- Allow localhost for local testing -->
-        <domain-config cleartextTrafficPermitted="true">
-            <domain includeSubdomains="true">localhost</domain>
-            <domain includeSubdomains="true">127.0.0.1</domain>
-            <domain includeSubdomains="true">192.168.0.0/16</domain>
-        </domain-config>
         
-        <!-- Allow Charles proxy for debugging -->
-        <domain-config cleartextTrafficPermitted="true">
-            <domain includeSubdomains="true">proxy.local</domain>
-        </domain-config>
-        
-        <!-- User-installed CA certificates for testing -->
+        <!-- Trust Only System Certificates in Production -->
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Staging Configuration (staging-api.noghresod.ir) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">staging-api.noghresod.ir</domain>
+        
+        <!-- Looser pinning for staging (certificate changes frequently) -->
+        <pin-set expiration="2026-12-31">
+            <pin digest="SHA-256">sha256/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=</pin>
+        </pin-set>
+        
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Development Configuration (dev-api.noghresod.ir) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">dev-api.noghresod.ir</domain>
+        
+        <!-- No pinning for dev (certificate changes during development) -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" /> <!-- Allow user certificates for debugging -->
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- Debug Overrides (Only for Debug Builds) -->
+    <!-- Configured in build.gradle.kts via debugNetworkSecurityConfig -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" /> <!-- Allow self-signed certificates for debugging -->
+            <certificates src="system" />
         </trust-anchors>
     </debug-overrides>
     
-    <!-- ============== Global Default Configuration ============== -->
+    <!-- Global Configuration -->
+    <!-- Block cleartext traffic everywhere by default -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <!-- System CA certificates (Let's Encrypt, DigiCert, etc.) -->
             <certificates src="system" />
         </trust-anchors>
-        
-        <!-- Configuration Domain for certificate validation -->
-        <domain-config>
-            <domain includeSubdomains="true">.</domain>
-            <trust-anchors>
-                <certificates src="system" />
-            </trust-anchors>
-        </domain-config>
     </base-config>
-    
 </network-security-config>
