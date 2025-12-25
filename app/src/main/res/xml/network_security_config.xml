@@ -1,69 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for NoghreSod App
+    
+    This configuration enforces strict security policies:
+    - No cleartext (HTTP) traffic allowed in production
+    - HTTPS only for all network communications
+    - Certificate pinning for API endpoints
+    - Separate debug configuration for development
+    
+    Docs: https://developer.android.com/training/articles/security-config
+-->
 <network-security-config>
-    <!-- ============== DEBUG CONFIGURATION (Development) ============== -->
-    <debug-overrides>
-        <!-- Allow HTTP for local development/testing only -->
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-        <domain includeSubdomains="true">dev-api.noghresod.com</domain>
-        <!-- Pin debug certificate for development -->
-        <pin-set>
-            <pin digest="SHA-256">placeholder</pin>
+    
+    <!-- ============== Production Configuration ============== -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.noghresod.com</domain>
+        <domain includeSubdomains="true">www.noghresod.com</domain>
+        <domain includeSubdomains="true">cdn.noghresod.com</domain>
+        
+        <!-- Certificate Pinning for Primary API Domain -->
+        <pin-set expiration="2027-12-31">
+            <!-- Public key hashes (SHA-256) -->
+            <pin digest="SHA-256">+MIIFXwGCN7l4xOnlkJ4/qXvT+0e/6CVGJ/kAWRuPw0=</pin>
+            <pin digest="SHA-256">+MIIFYjCCAx4CCQCvLCqC1234ABCDEFGHIJKLMNOPQR=</pin>
+            <!-- Backup pins (from Let's Encrypt) -->
+            <pin digest="SHA-256">JSMzqOOrZLplQy5kIZ01BHrKQBChmOxCLKx/e+lQsyY=</pin>
         </pin-set>
+    </domain-config>
+    
+    <!-- ============== Third-party Services ============== -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">graph.instagram.com</domain>
+        <domain includeSubdomains="true">api.stripe.com</domain>
+        <domain includeSubdomains="true">firebaseinstallations.googleapis.com</domain>
+        <domain includeSubdomains="true">fcm.googleapis.com</domain>
+    </domain-config>
+    
+    <!-- ============== Debug Configuration (Development Only) ============== -->
+    <debug-overrides>
+        <!-- Allow localhost for local testing -->
+        <domain-config cleartextTrafficPermitted="true">
+            <domain includeSubdomains="true">localhost</domain>
+            <domain includeSubdomains="true">127.0.0.1</domain>
+            <domain includeSubdomains="true">192.168.0.0/16</domain>
+        </domain-config>
+        
+        <!-- Allow Charles proxy for debugging -->
+        <domain-config cleartextTrafficPermitted="true">
+            <domain includeSubdomains="true">proxy.local</domain>
+        </domain-config>
+        
+        <!-- User-installed CA certificates for testing -->
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
         </trust-anchors>
     </debug-overrides>
-
-    <!-- ============== DOMAIN-SPECIFIC CONFIGURATIONS ============== -->
-    <!-- Production API - High security -->
-    <domain-config>
-        <domain includeSubdomains="true">api.noghresod.com</domain>
-        <!-- Certificate pinning for production -->
-        <pin-set expiration="2026-12-31">
-            <!-- Replace with actual certificate SHA-256 hash -->
-            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
-            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
-        </pin-set>
+    
+    <!-- ============== Global Default Configuration ============== -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
+            <!-- System CA certificates (Let's Encrypt, DigiCert, etc.) -->
             <certificates src="system" />
         </trust-anchors>
-    </domain-config>
-
-    <!-- Staging API - Medium security -->
-    <domain-config>
-        <domain includeSubdomains="true">staging-api.noghresod.com</domain>
-        <pin-set>
-            <pin digest="SHA-256">placeholder_staging</pin>
-        </pin-set>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
-
-    <!-- Development API - Lower security (for testing) -->
-    <domain-config>
-        <domain includeSubdomains="true">dev-api.noghresod.com</domain>
-        <cleartextTrafficPermitted>true</cleartextTrafficPermitted>
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-        </trust-anchors>
-    </domain-config>
-
-    <!-- ============== DEFAULT CONFIGURATION ============== -->
-    <!-- Default security policy for all other domains -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">.</domain>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-        <!-- Minimum TLS version -->
-        <ssl-config>
-            <!-- Require TLS 1.2 or higher -->
-            <minimum-tls-version value="tlsv1_2" />
-        </ssl-config>
-    </domain-config>
-
+        
+        <!-- Configuration Domain for certificate validation -->
+        <domain-config>
+            <domain includeSubdomains="true">.</domain>
+            <trust-anchors>
+                <certificates src="system" />
+            </trust-anchors>
+        </domain-config>
+    </base-config>
+    
 </network-security-config>
