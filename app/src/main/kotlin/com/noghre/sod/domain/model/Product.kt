@@ -1,178 +1,154 @@
 package com.noghre.sod.domain.model
 
 import java.math.BigDecimal
-import java.time.LocalDateTime
+import java.time.LocalDate
 
 /**
- * Domain model representing a jewelry product in the NoghreSod store.
- * 
- * Uses BigDecimal for price calculations to ensure accurate financial precision.
- * This prevents floating-point rounding errors common with Double.
- * 
- * @property id Unique identifier for the product
- * @property name Product name (e.g., "Silver Bracelet")
- * @property description Detailed product description
- * @property price Product price in currency units (uses BigDecimal for accuracy)
- * @property originalPrice Original price before discount (for display purposes)
- * @property discountPercentage Discount percentage applied (0-100)
- * @property category Product category (e.g., "Bracelets", "Rings", "Necklaces")
- * @property images List of product image URLs
- * @property rating Average customer rating (1-5)
- * @property totalReviews Total number of reviews
- * @property inStock Availability status
- * @property weight Product weight in grams
- * @property material Material composition (e.g., "925 Silver", "14K Gold")
- * @property dimensions Product dimensions
- * @property createdAt Timestamp when product was added
- * @property lastUpdated Timestamp of last modification
- * 
- * @since 1.0.0
- * @see BigDecimal
+ * Domain model for Product.
+ * Independent from data layer DTOs.
  */
 data class Product(
     val id: String,
     val name: String,
     val description: String,
-    val price: BigDecimal,
-    val originalPrice: BigDecimal? = null,
-    val discountPercentage: BigDecimal = BigDecimal.ZERO,
-    val category: String,
-    val images: List<String>,
-    val rating: Double = 0.0,
-    val totalReviews: Int = 0,
-    val inStock: Boolean,
-    val weight: BigDecimal? = null,
-    val material: String? = null,
-    val dimensions: String? = null,
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    val lastUpdated: LocalDateTime = LocalDateTime.now(),
-    val tags: List<String> = emptyList(),
-    val sku: String? = null
+    val price: Money,
+    val images: List<ImageUrl>,
+    val category: Category,
+    val specifications: ProductSpecifications,
+    val availability: StockStatus,
+    val rating: Rating,
+    val reviews: List<ProductReview>,
+    val tags: List<String>,
+    val isNew: Boolean,
+    val isOnSale: Boolean,
+    val createdAt: String,
+    val updatedAt: String
 ) {
-    
     /**
-     * Calculate the discounted price based on discount percentage.
-     * 
-     * @return Discounted price as BigDecimal
-     * 
-     * Example:
-     * ```
-     * val product = Product(price = 100.00, discountPercentage = 10)
-     * val discountedPrice = product.getFinalPrice() // Returns 90.00
-     * ```
+     * Money value object with currency.
      */
-    fun getFinalPrice(): BigDecimal {
-        val discountMultiplier = BigDecimal(100) - discountPercentage
-        return (price * discountMultiplier) / BigDecimal(100)
+    data class Money(
+        val amount: BigDecimal,
+        val currency: Currency = Currency.IRR
+    ) {
+        init {
+            require(amount >= BigDecimal.ZERO) { "Price cannot be negative" }
+        }
+
+        override fun toString(): String = "$amount $currency"
     }
-    
+
     /**
-     * Calculate the discount amount in currency.
-     * 
-     * @return Discount amount as BigDecimal
+     * Image URL with optional alt text.
      */
-    fun getDiscountAmount(): BigDecimal {
-        return price - getFinalPrice()
+    data class ImageUrl(
+        val url: String,
+        val altText: String = "",
+        val isMain: Boolean = false
+    ) {
+        init {
+            require(url.isNotBlank()) { "URL cannot be blank" }
+        }
     }
-    
+
     /**
-     * Check if product has a valid discount applied.
-     * 
-     * @return true if discountPercentage > 0
+     * Stock availability status.
      */
-    fun hasDiscount(): Boolean {
-        return discountPercentage > BigDecimal.ZERO
+    sealed class StockStatus {
+        data class Available(
+            val quantity: Int
+        ) : StockStatus() {
+            init {
+                require(quantity >= 0) { "Quantity cannot be negative" }
+            }
+        }
+
+        object OutOfStock : StockStatus()
+
+        data class PreOrder(
+            val availableDate: LocalDate
+        ) : StockStatus()
+
+        object Discontinued : StockStatus()
     }
-    
+
     /**
-     * Get product rating as percentage (out of 100).
-     * 
-     * @return Rating as percentage (0-100)
+     * Product rating and review count.
      */
-    fun getRatingPercentage(): Double {
-        return (rating / 5.0) * 100
+    data class Rating(
+        val average: Double,
+        val count: Int,
+        val distribution: Map<Int, Int> = emptyMap()
+    ) {
+        init {
+            require(average in 0.0..5.0) { "Rating must be between 0 and 5" }
+            require(count >= 0) { "Count cannot be negative" }
+        }
     }
-    
+
     /**
-     * Validate product data integrity.
-     * 
-     * @return true if product data is valid
+     * Product review.
      */
-    fun isValid(): Boolean {
-        return id.isNotBlank() &&
-                name.isNotBlank() &&
-                description.isNotBlank() &&
-                price > BigDecimal.ZERO &&
-                images.isNotEmpty() &&
-                rating in 0.0..5.0 &&
-                totalReviews >= 0 &&
-                discountPercentage in BigDecimal.ZERO..BigDecimal(100)
+    data class ProductReview(
+        val id: String,
+        val userId: String,
+        val userName: String,
+        val rating: Int,
+        val title: String,
+        val content: String,
+        val helpful: Int = 0,
+        val createdAt: String
+    ) {
+        init {
+            require(rating in 1..5) { "Rating must be between 1 and 5" }
+        }
+    }
+
+    /**
+     * Product specifications.
+     */
+    data class ProductSpecifications(
+        val weight: String? = null,
+        val dimensions: String? = null,
+        val material: String? = null,
+        val color: String? = null,
+        val brand: String? = null,
+        val sku: String? = null,
+        val custom: Map<String, String> = emptyMap()
+    )
+}
+
+/**
+ * Supported currencies.
+ */
+enum class Currency {
+    IRR,    // Iranian Rial
+    USD,    // US Dollar
+    EUR,    // Euro
+    GBP;    // British Pound
+
+    override fun toString(): String = when (this) {
+        IRR -> "﷼"
+        USD -> "$"
+        EUR -> "€"
+        GBP -> "£"
     }
 }
 
 /**
- * Data class representing a product in cart.
- * Extends Product with cart-specific information.
- * 
- * @property product The underlying product
- * @property quantity Quantity of this product in cart
- * @property addedAt Timestamp when added to cart
+ * Category domain model.
  */
-data class CartProduct(
-    val product: Product,
-    val quantity: Int,
-    val addedAt: LocalDateTime = LocalDateTime.now()
-) {
-    
-    /**
-     * Calculate total price for this cart item (quantity × final price).
-     * 
-     * @return Total price as BigDecimal
-     */
-    fun getTotalPrice(): BigDecimal {
-        return product.getFinalPrice() * BigDecimal(quantity)
-    }
-    
-    /**
-     * Validate cart item.
-     * 
-     * @return true if cart item is valid
-     */
-    fun isValid(): Boolean {
-        return product.isValid() && quantity > 0
-    }
-}
-
-/**
- * Lightweight product DTO for list displays.
- * Used to reduce data transfer and improve performance.
- * 
- * @property id Product identifier
- * @property name Product name
- * @property price Final price (with discount applied)
- * @property mainImage Primary product image URL
- * @property rating Average rating
- * @property inStock Stock status
- */
-data class ProductPreview(
+data class Category(
     val id: String,
     val name: String,
-    val price: BigDecimal,
-    val mainImage: String,
-    val rating: Double,
-    val inStock: Boolean
-)
-
-/**
- * Extension function to convert Product to ProductPreview.
- */
-fun Product.toPreview(): ProductPreview {
-    return ProductPreview(
-        id = id,
-        name = name,
-        price = getFinalPrice(),
-        mainImage = images.firstOrNull() ?: "",
-        rating = rating,
-        inStock = inStock
-    )
+    val description: String = "",
+    val imageUrl: String? = null,
+    val parentId: String? = null,
+    val productCount: Int = 0,
+    val isActive: Boolean = true
+) {
+    init {
+        require(id.isNotBlank()) { "Category ID cannot be blank" }
+        require(name.isNotBlank()) { "Category name cannot be blank" }
+    }
 }
