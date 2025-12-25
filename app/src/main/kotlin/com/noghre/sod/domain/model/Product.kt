@@ -1,124 +1,66 @@
 package com.noghre.sod.domain.model
 
-import java.time.LocalDateTime
+import java.io.Serializable
 
 /**
- * Product domain model representing jewelry items in the catalog
- * Specialized for silver jewelry and handicraft products
+ * Domain model for Product.
+ * Represents a silver jewelry product in the catalog.
+ *
+ * @property id Unique product identifier
+ * @property name Product name
+ * @property description Detailed product description
+ * @property price Price in currency
+ * @property originalPrice Original price before discount
+ * @property category Product category
+ * @property imageUrl Primary product image URL
+ * @property images Additional product images
+ * @property rating User rating (0-5)
+ * @property reviewCount Number of reviews
+ * @property quantity Available quantity
+ * @property weight Weight in grams
+ * @property material Material composition
+ * @property colors Available colors
+ * @property sizes Available sizes
+ * @property inStock Stock availability
+ * @property isFavorite Marked as favorite by user
+ * @property createdAt Creation timestamp
+ * @property updatedAt Last update timestamp
  */
 data class Product(
     val id: String,
     val name: String,
-    val nameInFarsi: String,
     val description: String,
-    val descriptionInFarsi: String? = null,
-    val price: Long, // Price in Toman
-    val weight: Double, // Weight in grams
-    val purity: PurityType, // Silver purity (925, 950, etc.)
-    val code: String, // Product code for inventory
-    val category: ProductCategory,
-    val subcategory: String? = null,
-    val images: List<String>, // List of image URLs
-    val thumbnailImage: String?, // Thumbnail image URL
-    val stock: Int, // Available quantity
-    val laborCost: Long? = null, // Labor cost in Toman (for handmade items)
-    val isHandmade: Boolean = false, // Whether product is handmade
-    val isBulk: Boolean = false, // Whether available in bulk
-    val isRawMaterial: Boolean = false, // Whether it's raw material for resale
-    val tags: List<String> = emptyList(), // Search tags
-    val rating: Float = 0f, // Average rating (0-5)
-    val reviewCount: Int = 0, // Number of reviews
-    val sku: String? = null, // Stock Keeping Unit
-    val barcode: String? = null, // Product barcode
-    val metadata: Map<String, String> = emptyMap(), // Additional metadata
-    val createdAt: LocalDateTime = LocalDateTime.now(),
-    val updatedAt: LocalDateTime = LocalDateTime.now(),
-    val isActive: Boolean = true,
-    val isFeatured: Boolean = false, // Featured product for homepage
-)
+    val price: Double,
+    val originalPrice: Double? = null,
+    val category: String,
+    val imageUrl: String,
+    val images: List<String> = emptyList(),
+    val rating: Float = 0f,
+    val reviewCount: Int = 0,
+    val quantity: Int = 0,
+    val weight: Double = 0.0,
+    val material: String = "",
+    val colors: List<String> = emptyList(),
+    val sizes: List<String> = emptyList(),
+    val inStock: Boolean = true,
+    val isFavorite: Boolean = false,
+    val createdAt: String = "",
+    val updatedAt: String = ""
+) : Serializable {
 
-/**
- * Silver purity types
- */
-enum class PurityType {
-    PURITY_925, // 92.5% pure silver
-    PURITY_950, // 95.0% pure silver
-    PURITY_999, // 99.9% pure silver (pure)
-    MIXED, // Mixed metals
+    /**
+     * Calculate discount percentage.
+     */
+    fun getDiscountPercentage(): Int {
+        return if (originalPrice != null && originalPrice > 0) {
+            ((originalPrice - price) / originalPrice * 100).toInt()
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Check if product has discount.
+     */
+    fun hasDiscount(): Boolean = originalPrice != null && originalPrice > price
 }
-
-/**
- * Product categories specific to jewelry store
- */
-enum class ProductCategory {
-    RINGS,           // انگشتری
-    NECKLACES,       // گردنبند
-    BRACELETS,       // دستبند
-    EARRINGS,        // گوشواره
-    ANKLETS,         // پابند
-    BROOCHES,        // سنجاق سینه
-    PENDANTS,        // آویز
-    CHAINS,          // زنجیر
-    HANDICRAFTS,     // صنایع دستی
-    RAW_MATERIALS,   // مواد خام
-    CUSTOM_ORDERS,   // سفارش‌های خاص
-}
-
-/**
- * Compact representation of Product for list displays
- */
-data class ProductSummary(
-    val id: String,
-    val name: String,
-    val price: Long,
-    val weight: Double,
-    val purity: PurityType,
-    val thumbnailImage: String?,
-    val rating: Float,
-    val isAvailable: Boolean,
-)
-
-/**
- * Extended product details including seller information
- */
-data class ProductDetail(
-    val product: Product,
-    val seller: SellerInfo?,
-    val relatedProducts: List<ProductSummary> = emptyList(),
-    val availability: AvailabilityStatus,
-    val shippingInfo: ShippingInfo,
-)
-
-/**
- * Seller information
- */
-data class SellerInfo(
-    val sellerId: String,
-    val sellerName: String,
-    val sellerRating: Float,
-    val sellerReviewCount: Int,
-    val isVerified: Boolean,
-    val responseTime: Int, // Response time in hours
-    val shippingDays: Int, // Typical shipping days
-)
-
-/**
- * Product availability status
- */
-enum class AvailabilityStatus {
-    IN_STOCK,      // موجود
-    LOW_STOCK,     // موجود محدود
-    OUT_OF_STOCK,  // نا موجود
-    PRE_ORDER,     // پیش‌سفارش
-}
-
-/**
- * Shipping information
- */
-data class ShippingInfo(
-    val domesticShipping: Boolean,
-    val internationalShipping: Boolean,
-    val estimatedDays: Int,
-    val shippingCost: Long? = null,
-    val freeShippingThreshold: Long? = null,
-)
