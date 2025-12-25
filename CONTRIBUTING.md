@@ -1,150 +1,226 @@
-# Contributing to NoghreSod Android
+# Contributing to NoghreSod Android App
 
-Thank you for your interest in contributing to the NoghreSod jewelry e-commerce app! We appreciate your efforts to make this project better.
+## 🎯 Code Documentation Guidelines
 
-## Table of Contents
+### KDoc Comments (Required for Public APIs)
 
-- [Development Setup](#development-setup)
-- [Code Style](#code-style)
-- [Commit Messages](#commit-messages)
-- [Pull Request Process](#pull-request-process)
-- [Testing Requirements](#testing-requirements)
-- [Code of Conduct](#code-of-conduct)
+All public classes, functions, and properties must have KDoc comments.
 
----
-
-## Development Setup
-
-### Prerequisites
-
-- **Android Studio:** Hedgehog (2023.1.1) or later
-- **JDK:** Version 17 or later
-- **Android SDK:** API 34 (Android 14)
-- **Gradle:** 8.0+
-
-### Initial Setup
-
-1. **Fork and Clone**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/NoghreSod-Android.git
-   cd NoghreSod-Android
-   ```
-
-2. **Configure Local Properties**
-   ```bash
-   cp local.properties.example local.properties
-   # Edit local.properties with your API credentials
-   ```
-
-3. **Sync Gradle**
-   ```bash
-   ./gradlew clean build
-   ```
-
-4. **Verify Setup**
-   ```bash
-   ./gradlew test
-   ```
-
----
-
-## Code Style
-
-### Kotlin Guidelines
-
-We follow [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html) and [Google's Android Kotlin Style Guide](https://developer.android.com/kotlin/style-guide).
-
-#### Key Rules
-
-- **Naming:** Use meaningful, descriptive names
-  ```kotlin
-  // ✅ Good
-  val isProductAvailable = true
-  fun fetchProductDetails(productId: String)
-  
-  // ❌ Bad
-  val a = true
-  fun getProduct(p: String)
-  ```
-
-- **Functions:** Keep them small and focused
-  ```kotlin
-  // ✅ Good - Single responsibility
-  fun calculateDiscount(price: Double): Double {
-      return price * 0.1
-  }
-  
-  // ❌ Bad - Does multiple things
-  fun processOrder(price: Double, tax: Double): Pair<Double, String> {
-      val discount = price * 0.1
-      val total = price + tax - discount
-      return Pair(total, formatCurrency(total))
-  }
-  ```
-
-- **Documentation:** Write KDoc for public APIs
-  ```kotlin
-  /**
-   * Fetches products from the remote API.
-   *
-   * @param category Optional category filter
-   * @param sortBy Sort order ("price", "rating", "newest")
-   * @return Flow of Result containing product list
-   *
-   * Example:
-   * ```
-   * getProductsUseCase(params).collect { result ->
-   *     result.onSuccess { products -> updateUI(products) }
-   * }
-   * ```
-   */
-  class GetProductsUseCase : UseCase<GetProductsParams, List<Product>>(ioDispatcher) {
-      // ...
-  }
-  ```
-
-- **Class Organization:** Follow standard structure
-  ```kotlin
-  class UserViewModel @Inject constructor(
-      private val getUserUseCase: GetUserUseCase
-  ) : ViewModel() {
-      // 1. Properties
-      private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
-      val uiState = _uiState.asStateFlow()
-
-      // 2. Initialization
-      init { loadUser() }
-
-      // 3. Public methods
-      fun retry() { loadUser() }
-
-      // 4. Private methods
-      private fun loadUser() { /* ... */ }
-  }
-  ```
-
-### Format Configuration
-
-Use the provided `.editorconfig`:
-
-```ini
-[*.kt]
-indent_size = 4
-max_line_length = 120
+#### Class Documentation
+```kotlin
+/**
+ * ProductRepository is responsible for managing product data operations.
+ * It acts as a bridge between the domain layer and data layer, providing
+ * a clean abstraction for data access patterns.
+ *
+ * The repository implements the Repository Pattern with:
+ * - Network calls via Retrofit API
+ * - Local database caching via Room
+ * - Automatic fallback to cached data on network failure
+ *
+ * @see ProductRepositoryImpl
+ * @since 1.0.0
+ */
+interface ProductRepository {
+    // ...
+}
 ```
 
-### IDE Configuration
+#### Function Documentation
+```kotlin
+/**
+ * Retrieves a paginated list of products with optional filtering.
+ *
+ * This function fetches products from the remote API first, and caches the result
+ * in the local database for offline access. If the network request fails, it
+ * automatically returns the cached data.
+ *
+ * @param page The page number (starting from 1) for pagination
+ * @param limit Number of items per page (default 20, max 100)
+ * @param category Optional category filter. If null, no filtering is applied.
+ *
+ * @return List of [Product] objects for the requested page
+ *
+ * @throws AppException.NetworkError if no internet connection and cache is empty
+ * @throws AppException.ServerError if server returns 5xx error
+ *
+ * @since 1.0.0
+ * @see Product
+ *
+ * Example:
+ * ```
+ * val products = repository.getProducts(page = 1, limit = 20, category = "Electronics")
+ * ```
+ */
+suspend fun getProducts(
+    page: Int,
+    limit: Int = 20,
+    category: String? = null
+): List<Product>
+```
 
-In Android Studio:
-1. File → Settings → Editor → Code Style → Kotlin
-2. Import scheme from: [Google Android Kotlin Style Guide](https://developer.android.com/kotlin/style-guide)
-3. Enable "Hard wrap at": 120 characters
+#### Property Documentation
+```kotlin
+/**
+ * The current UI state representing products list view.
+ *
+ * This StateFlow emits:
+ * - [UiState.Loading] when fetching products
+ * - [UiState.Success] when products are loaded successfully
+ * - [UiState.Error] when an error occurs
+ * - [UiState.Empty] when no products are found
+ */
+val uiState: StateFlow<UiState<List<Product>>>
+```
+
+### Inline Comments
+
+Use inline comments sparingly for complex logic only.
+
+```kotlin
+// ❌ AVOID - Too obvious
+val name = product.name // Get product name
+
+// ✅ GOOD - Explains WHY, not WHAT
+// Cache key includes category to enable category-specific offline access
+val cacheKey = "products_${category}_page_$page"
+```
+
+### Code Examples in Documentation
+
+Include practical usage examples in KDoc:
+
+```kotlin
+/**
+ * Filters products by price range.
+ *
+ * Example:
+ * ```kotlin
+ * val products = repository.getProductsByPriceRange(
+ *     minPrice = 50.0,
+ *     maxPrice = 200.0
+ * )
+ * products.forEach { println(it.name) }
+ * ```
+ */
+suspend fun getProductsByPriceRange(
+    minPrice: Double,
+    maxPrice: Double
+): List<Product>
+```
 
 ---
 
-## Commit Messages
+## 📋 Code Style Guidelines
 
-Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+### Naming Conventions
+
+```kotlin
+// Classes: PascalCase
+class ProductRepository
+
+// Functions/Variables: camelCase
+fun getProductById(id: String)
+val productName: String
+
+// Constants: UPPER_SNAKE_CASE
+const val MAX_PAGE_SIZE = 100
+
+// Private properties: _leading underscore
+private val _products = MutableStateFlow<List<Product>>()
+```
+
+### Function Organization
+
+Organize functions in logical sections:
+
+```kotlin
+class ProductViewModel : ViewModel() {
+    
+    // ============== PUBLIC API ============== //
+    fun loadProducts() { ... }
+    fun selectProduct(product: Product) { ... }
+    
+    // ============== PRIVATE FUNCTIONS ============== //
+    private fun fetchProducts() { ... }
+    private fun handleError(exception: Exception) { ... }
+}
+```
+
+### Error Handling
+
+Use sealed classes for type-safe error handling:
+
+```kotlin
+// ❌ AVOID
+try {
+    val data = api.getData()
+} catch (e: Exception) {
+    Log.e("Error", e.message)
+}
+
+// ✅ GOOD
+val result = safeExecute {
+    api.getData()
+}
+when (result) {
+    is Result.Success -> { /* handle success */ }
+    is Result.Error -> { /* handle specific error */ }
+}
+```
+
+---
+
+## 🧪 Testing Standards
+
+### Unit Test Documentation
+
+```kotlin
+/**
+ * Tests for ProductRepository.getProducts() functionality.
+ * Covers:
+ * - Successful product retrieval
+ * - Pagination
+ * - Offline cache fallback
+ * - Network error handling
+ */
+class ProductRepositoryTest {
+    
+    @Test
+    fun `getProducts returns paginated list when successful`() {
+        // Given - setup
+        val expectedProducts = listOf(mockProduct1, mockProduct2)
+        
+        // When - action
+        val result = repository.getProducts(page = 1, limit = 20)
+        
+        // Then - assertion
+        assertEquals(expectedProducts, result)
+    }
+}
+```
+
+### Test Naming
+
+Use descriptive names following the pattern:
+`<functionName>_<scenario>_<expected result>`
+
+```kotlin
+@Test
+fun getProducts_withValidPage_returnsPaginatedList() { }
+
+@Test
+fun getProducts_withNetworkError_returnsCachedData() { }
+
+@Test
+fun getProducts_withEmptyCategory_returnsAllProducts() { }
+```
+
+---
+
+## 📝 Commit Message Guidelines
+
+Follow conventional commits format:
 
 ```
 <type>(<scope>): <subject>
@@ -154,208 +230,112 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 <footer>
 ```
 
-### Commit Types
-
-- **feat:** New feature
-- **fix:** Bug fix
-- **docs:** Documentation changes
-- **style:** Code style changes (formatting, missing semicolons, etc.)
-- **refactor:** Code refactoring without behavior change
-- **perf:** Performance improvements
-- **test:** Adding or updating tests
-- **build:** Build system or dependency changes
-- **ci:** CI/CD configuration changes
-- **chore:** Maintenance tasks
+### Types
+- `feat`: New feature
+- `fix`: Bug fix
+- `refactor`: Code refactoring without feature changes
+- `docs`: Documentation updates
+- `test`: Test additions/modifications
+- `ci`: CI/CD changes
+- `chore`: Build, dependencies, etc.
 
 ### Examples
 
-```bash
-# ✅ Good
-git commit -m "feat(cart): add product quantity adjustment"
-git commit -m "fix(payment): handle network timeout during checkout"
-git commit -m "docs(readme): add setup instructions"
-git commit -m "refactor(domain): simplify Result sealed class"
-git commit -m "perf(image): optimize image caching strategy"
+```
+feat(products): Add pagination support to product listing
 
-# ❌ Bad
-git commit -m "fixed stuff"
-git commit -m "Updated code"
-git commit -m "Changes"
+Implement offset-based pagination with configurable page size.
+Add new getProducts(page, limit) API endpoint.
+Include caching strategy for pagination.
+
+Closes #123
 ```
 
-### Commit Body Template
-
 ```
-feat(feature-name): brief description
+fix(auth): Handle token refresh on 401 response
 
-Detailed explanation of what changed and why.
-Include any relevant context or motivation.
+Previously, 401 responses would always log user out.
+Now attempts to refresh token automatically before logout.
 
-Fixes #issue_number
-Breaking change: No
+Fixes #456
 ```
 
 ---
 
-## Pull Request Process
+## 🏗️ Architecture Guidelines
 
-### Before Creating PR
+### Layer Responsibilities
 
-1. **Create Feature Branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+**Presentation Layer:**
+- UI rendering only
+- State management via ViewModel
+- NO business logic
 
-2. **Make Changes** following code style guidelines
+**Domain Layer:**
+- Business logic
+- Use cases
+- Repository interfaces
 
-3. **Local Testing**
-   ```bash
-   ./gradlew clean build
-   ./gradlew test
-   ./gradlew lint
-   ```
+**Data Layer:**
+- Remote API calls
+- Local database
+- Repository implementations
 
-4. **Commit Changes** with conventional messages
-
-5. **Push to Fork**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-### Creating the PR
-
-1. Go to GitHub and create a Pull Request
-2. Use the PR template (auto-populated)
-3. Fill all sections:
-   - **Description:** Clear overview of changes
-   - **Type:** Select one or more
-   - **Related Issues:** Link any related issues
-   - **Changes:** Bullet list of modifications
-   - **Screenshots:** Visual changes if applicable
-
-4. Complete the **Checklist**
-
-### PR Requirements
-
-Before approval, all of the following must be met:
-
-- ✅ All automated checks pass (CI/CD)
-- ✅ Code review approved
-- ✅ Tests included and passing
-- ✅ Documentation updated
-- ✅ No merge conflicts
-- ✅ PR description is clear
-- ✅ Commits follow conventional format
-
----
-
-## Testing Requirements
-
-### Unit Tests
-
-Write unit tests for all business logic:
+### Import Organization
 
 ```kotlin
-@Test
-fun `Result Success should return data`() {
-    val result = Result.Success("test")
-    assertTrue(result.isSuccess)
-    assertEquals("test", result.getOrNull())
-}
+// 1. Android imports
+import android.content.Context
 
-@Test
-`fun validateEmail returns Valid for correct email`() {
-    val result = InputValidators.validateEmail("test@example.com")
-    assertEquals(ValidationResult.Valid, result)
-}
-```
+// 2. AndroidX imports
+import androidx.compose.runtime.Composable
 
-### Integration Tests
+// 3. Kotlin stdlib
+import kotlinx.coroutines.launch
 
-Test repository and data layer interactions:
+// 4. Third-party libraries
+import retrofit2.http.GET
 
-```kotlin
-@Test
-fun `getUserProfile fetches from database when cached`() = runTest {
-    // Setup
-    val userId = "123"
-    val user = User(id = userId, name = "Test")
-    
-    // Act
-    repository.cacheUser(user)
-    val result = repository.getUserProfile(userId)
-    
-    // Assert
-    assertTrue(result.isSuccess)
-    assertEquals(user, result.getOrNull())
-}
-```
-
-### Screenshot Tests
-
-For UI changes, add Paparazzi screenshot tests:
-
-```kotlin
-@Test
-fun errorView_noInternet() {
-    paparazzi.snapshot {
-        ErrorView(
-            error = NetworkException.NoInternetException(),
-            onRetry = {}
-        )
-    }
-}
-```
-
-### Test Coverage
-
-Maintain minimum 80% code coverage:
-
-```bash
-./gradlew jacocoTestReport
-# View report: app/build/reports/jacoco/index.html
+// 5. Project imports
+import com.noghre.sod.domain.model.Product
 ```
 
 ---
 
-## Code of Conduct
+## ✅ Pre-Commit Checklist
 
-### Be Respectful
+Before committing:
 
-- Treat all contributors with respect
-- Use inclusive language
-- Be open to feedback and different perspectives
-
-### Be Professional
-
-- Avoid offensive or discriminatory language
-- Keep discussions focused on the project
-- Maintain a positive and constructive tone
-
-### Be Collaborative
-
-- Help other contributors
-- Share knowledge and expertise
-- Acknowledge contributions from others
+- [ ] Code follows naming conventions
+- [ ] Public APIs have KDoc comments
+- [ ] No `TODO` comments left behind
+- [ ] No debugging code (Log, println)
+- [ ] Tests pass locally
+- [ ] No API keys or secrets in code
+- [ ] Commit message follows convention
+- [ ] Code formatted with Kotlin style guide
 
 ---
 
-## Getting Help
+## 🔍 Code Review Process
 
-- **Questions:** Check existing issues and documentation first
-- **Setup Issues:** See [IMPLEMENTATION_QUICK_START.md](IMPLEMENTATION_QUICK_START.md)
-- **Code Questions:** Ask in relevant PR or issue
-- **Architecture Questions:** Refer to [IMPROVEMENTS_PART_1.md](IMPROVEMENTS_PART_1.md)
+All code must pass:
 
----
-
-## Recognition
-
-Contributors are recognized in:
-- GitHub contributor graph
-- Release notes
-- Project documentation
+1. **Lint Checks**: `./gradlew lint`
+2. **Unit Tests**: `./gradlew testDebugUnitTest`
+3. **Integration Tests**: `./gradlew connectedAndroidTest`
+4. **Peer Review**: At least one approval
 
 ---
 
-**Thank you for contributing to NoghreSod! 🙏**
+## 📚 Useful Resources
+
+- [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)
+- [Android Architecture Guide](https://developer.android.com/guide/architecture)
+- [KDoc Format](https://kotlinlang.org/docs/kotlin-doc.html)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+
+---
+
+**Last Updated**: 2025-12-25  
+**Maintainer**: NoghreSod Development Team
