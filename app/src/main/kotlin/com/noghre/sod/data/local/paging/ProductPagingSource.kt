@@ -3,58 +3,145 @@ package com.noghre.sod.data.local.paging
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.noghre.sod.data.remote.api.NoghreSodApi
-import com.noghre.sod.domain.model.Product
+import com.noghre.sod.data.remote.util.NetworkResult
+import com.noghre.sod.domain.model.ProductSummary
+import com.noghre.sod.domain.model.Money
+import com.noghre.sod.domain.model.Currency
 import timber.log.Timber
+import java.math.BigDecimal
 
 /**
- * Paging source for product pagination using Paging 3.
+ * PagingSource for infinite scrolling pagination of products.
+ * Loads products page by page to optimize memory usage and performance.
+ * 
+ * @param api Retrofit API interface
+ * @param category Optional category filter
+ * @param searchQuery Optional search query
+ * 
+ * @author Yaser
+ * @version 1.0.0
  */
 class ProductPagingSource(
     private val api: NoghreSodApi,
-    private val query: String? = null
-) : PagingSource<Int, Product>() {
-
-    override fun getRefreshKey(state: PagingState<Int, Product>): Int? {
-        // Return the page index to refresh from, or null to start from 0
+    private val category: String? = null,
+    private val searchQuery: String? = null
+) : PagingSource<Int, ProductSummary>() {
+    
+    companion object {
+        private const val STARTING_PAGE_INDEX = 1
+        private const val PAGE_SIZE = 20
+    }
+    
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, ProductSummary> {
+        return try {
+            val page = params.key ?: STARTING_PAGE_INDEX
+            
+            val response = when {
+                !searchQuery.isNullOrBlank() -> {
+                    // Search products
+                    api.searchProducts(
+                        query = searchQuery,
+                        page = page,
+                        limit = params.loadSize
+                    )
+                }
+                !category.isNullOrBlank() -> {
+                    // Get products by category
+                    api.getProducts(
+                        page = page,
+                        limit = params.loadSize,
+                        category = category
+                    )
+                }
+                else -> {
+                    // Get all products
+                    api.getProducts(
+                        page = page,
+                        limit = params.loadSize
+                    )
+                }
+            }
+            
+            // Handle response
+            if (!response.isSuccessful) {
+                Timber.e("API Error: ${response.code()} - ${response.message()}")
+                return LoadResult.Error(Exception("HTTP ${response.code()}"))
+            }
+            
+            val data = response.body()?.data ?: emptyList()
+            val products = data.map { dto ->
+                ProductSummary(
+                    id = dto.id,
+                    name = dto.name,
+                    price = Money(
+                        amount = BigDecimal(dto.price),
+                        currency = Currency.IRR
+                    ),
+                    mainImage = dto.images.firstOrNull()?.url ?: "",
+                    category = mapStringToProductCategory(dto.category),
+                    purity = mapToPurityType(dto.purity ?: 925),
+                    rating = dto.rating ?: 0f,
+                    reviewCount = dto.reviewCount ?: 0,
+                    inStock = dto.inStock ?: true,
+                    isNew = isProductNew(dto.createdAt),
+                    isFeatured = dto.isFeatured ?: false,
+                    discountPercentage = dto.discountPercentage
+                )
+            }
+            
+            // Calculate next page
+            val nextKey = if (products.isEmpty()) {
+                null
+            } else {
+                page + 1
+            }
+            
+            LoadResult.Page(
+                data = products,
+                prevKey = if (page == STARTING_PAGE_INDEX) null else page - 1,
+                nextKey = nextKey
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Error loading products")
+            LoadResult.Error(e)
+        }
+    }
+    
+    override fun getRefreshKey(state: PagingState<Int, ProductSummary>): Int? {
         return state.anchorPosition?.let { anchorPosition ->
             state.closestPageToPosition(anchorPosition)?.prevKey?.plus(1)
                 ?: state.closestPageToPosition(anchorPosition)?.nextKey?.minus(1)
         }
     }
-
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Product> {
-        val page = params.key ?: INITIAL_PAGE
-        val pageSize = params.loadSize
-
+    
+    private fun mapStringToProductCategory(category: String?): com.noghre.sod.domain.model.ProductCategory {
         return try {
-            Timber.d("Loading products page: $page, pageSize: $pageSize")
-
-            val response = if (query != null) {
-                // Search products if query is provided
-                api.searchProducts(query, page, pageSize)
-            } else {
-                // Fetch all products
-                api.getProducts(page, pageSize)
-            }
-
-            val products = response.data // Assuming response has a 'data' field
-            val nextKey = if (products.isEmpty()) null else page + 1
-            val prevKey = if (page == INITIAL_PAGE) null else page - 1
-
-            Timber.d("Loaded ${products.size} products for page $page")
-
-            LoadResult.Page(
-                data = products,
-                prevKey = prevKey,
-                nextKey = nextKey
-            )
+            com.noghre.sod.domain.model.ProductCategory.fromString(category ?: "OTHER")
         } catch (e: Exception) {
-            Timber.e(e, "Error loading products page $page")
-            LoadResult.Error(e)
+            com.noghre.sod.domain.model.ProductCategory.OTHER
         }
     }
-
-    companion object {
-        private const val INITIAL_PAGE = 1
+    
+    private fun mapToPurityType(purity: Double): com.noghre.sod.domain.model.PurityType {
+        return when {
+            purity >= 99.0 -> com.noghre.sod.domain.model.PurityType.SILVER999
+            purity >= 95.0 -> com.noghre.sod.domain.model.PurityType.SILVER950
+            purity >= 92.0 -> com.noghre.sod.domain.model.PurityType.STERLING925
+            else -> com.noghre.sod.domain.model.PurityType.SILVER800
+        }
+    }
+    
+    private fun isProductNew(createdAt: String?): Boolean {
+        return try {
+            if (createdAt.isNullOrBlank()) return false
+            val created = java.time.LocalDateTime.parse(createdAt)
+            val daysSinceCreated = java.time.temporal.ChronoUnit.DAYS.between(
+                created,
+                java.time.LocalDateTime.now()
+            )
+            daysSinceCreated <= 7
+        } catch (e: Exception) {
+            false
+        }
     }
 }
