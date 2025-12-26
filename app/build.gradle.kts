@@ -1,11 +1,13 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.kotlin.kapt)
-    alias(libs.plugins.detekt)
-    alias(libs.plugins.google.services)
-    alias(libs.plugins.firebase.crashlytics)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -20,283 +22,201 @@ android {
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables.useSupportLibrary = true
-        
-        // ✅ BUILD CONFIG FIELDS (ISSUE #17)
-        buildConfigField("String", "APP_VERSION", "\"${versionName}\"")
-        buildConfigField("int", "VERSION_CODE", "${versionCode}")
-    }
-    
-    // ✅ SECURE RELEASE SIGNING
-    signingConfigs {
-        // Debug signing (default)
-        getByName("debug") {
-            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        vectorDrawables {
+            useSupportLibrary = true
         }
-        
-        // ✅ Release signing from environment variables with fallback
+    }
+
+    // Load signing properties from local file (not committed to Git)
+    val signingPropertiesFile = rootProject.file("signing.properties")
+    val signingProperties = Properties()
+    if (signingPropertiesFile.exists()) {
+        signingProperties.load(FileInputStream(signingPropertiesFile))
+    }
+
+    signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("KEY_ALIAS")
-            val keyPassword = System.getenv("KEY_PASSWORD")
-            
-            if (keystorePath != null && File(keystorePath).exists()) {
-                // Production release - use provided keystore
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            } else {
-                // Development fallback - use debug keystore
-                logger.warn("⚠️ Release keystore not found. Using debug keystore for development builds.")
-                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-                storePassword = "android"
-                this.keyAlias = "androiddebugkey"
-                this.keyPassword = "android"
-            }
-            
-            // ✅ APK v2+ signing (more secure)
-            enableV1Signing = false
-            enableV2Signing = true
-            enableV3Signing = true
-            enableV4Signing = true
+            storeFile = file(signingProperties.getProperty("storeFile", "release.jks"))
+            storePassword = signingProperties.getProperty("storePassword", "")
+            keyAlias = signingProperties.getProperty("keyAlias", "")
+            keyPassword = signingProperties.getProperty("keyPassword", "")
         }
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-DEBUG"
+
+            buildConfigField("String", "API_BASE_URL", "\"https://api-dev.noghresod.ir/api/\"")
+            buildConfigField("boolean", "DEBUG_LOGGING", "true")
+            buildConfigField("boolean", "ENABLE_CRASHLYTICS", "false")
+
+            resValue("string", "app_name", "NoghreSod Debug")
+        }
+
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            isDebuggable = false
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
-            
-            // Production optimizations
-            isDebuggable = false
-            isJniDebuggable = false
-            
-            // Crash reporting
-            buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "true")
-            buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.ir/v1/\"")
+
+            buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.ir/api/\"")
             buildConfigField("boolean", "DEBUG_LOGGING", "false")
+            buildConfigField("boolean", "ENABLE_CRASHLYTICS", "true")
+
+            resValue("string", "app_name", "NoghreSod")
+
+            signingConfig = signingConfigs.getByName("release")
         }
-        
-        debug {
-            isMinifyEnabled = false
-            isDebuggable = true
-            isJniDebuggable = true
-            
-            buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "false")
-            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.noghresod.ir/v1/\"")
+
+        create("staging") {
+            initWith(getByName("debug"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-STAGING"
+
+            buildConfigField("String", "API_BASE_URL", "\"https://api-staging.noghresod.ir/api/\"")
             buildConfigField("boolean", "DEBUG_LOGGING", "true")
+            buildConfigField("boolean", "ENABLE_CRASHLYTICS", "true")
+
+            resValue("string", "app_name", "NoghreSod Staging")
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
-    // ✅ BUILD FLAVORS FOR ENVIRONMENT MANAGEMENT
-    flavorDimensions += listOf("environment")
-    
+    flavorDimensions += "market"
     productFlavors {
-        create("dev") {
-            dimension = "environment"
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
-            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.noghresod.ir/v1/\"")
-            buildConfigField("boolean", "CERTIFICATE_PINNING_ENABLED", "false")
+        create("googlePlay") {
+            dimension = "market"
+            buildConfigField("String", "STORE", "\"google_play\"")
         }
-        
-        create("staging") {
-            dimension = "environment"
-            applicationIdSuffix = ".staging"
-            versionNameSuffix = "-staging"
-            buildConfigField("String", "API_BASE_URL", "\"https://staging-api.noghresod.ir/v1/\"")
-            buildConfigField("boolean", "CERTIFICATE_PINNING_ENABLED", "true")
+        create("cafeBazaar") {
+            dimension = "market"
+            applicationIdSuffix = ".bazaar"
+            buildConfigField("String", "STORE", "\"cafe_bazaar\"")
         }
-        
-        create("prod") {
-            dimension = "environment"
-            buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.ir/v1/\"")
-            buildConfigField("boolean", "CERTIFICATE_PINNING_ENABLED", "true")
-        }
-    }
-    
-    // Filter variants (dev only for debug, prod for release)
-    variantFilter {
-        if (buildType.name == "release" && flavors.any { it.name == "dev" }) {
-            ignore = true
+        create("myket") {
+            dimension = "market"
+            applicationIdSuffix = ".myket"
+            buildConfigField("String", "STORE", "\"myket\"")
         }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // ✅ ENABLE CORE LIBRARY DESUGARING FOR JAVA TIME API (ISSUE #46)
-        isCoreLibraryDesugaringEnabled = true
     }
-    
+
     kotlinOptions {
         jvmTarget = "17"
     }
-    
+
     buildFeatures {
         compose = true
         buildConfig = true
-        aidl = false
-        renderScript = false
-        resValues = false
-        shaders = false
     }
-    
+
     composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
-    
-    packaging {
+
+    packagingOptions {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        }
-    }
-    
-    lint {
-        checkReleaseBuilds = true
-        abortOnError = false
-        disable += "MissingTranslation"
-    }
-}
-
-// ✅ DEPENDENCY RESOLUTION STRATEGY
-subprojects {
-    configurations.all {
-        resolutionStrategy {
-            // Force consistent Kotlin version across all modules
-            force("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
-            force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${libs.versions.kotlin.get()}")
-            
-            // Force consistent AndroidX versions
-            force("androidx.core:core-ktx:${libs.versions.androidxCore.get()}")
-            
-            // Prefer project modules
-            preferProjectModules()
         }
     }
 }
 
 dependencies {
-    // Android Core
+    // Core dependencies
+    implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
+
+    // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Jetpack Compose
+    // Activity & Navigation
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
+
+    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
 
-    // Navigation
-    implementation(libs.androidx.navigation.compose)
-
-    // Hilt - Dependency Injection
-    implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
-
-    // Networking
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
-    implementation(libs.okhttp3.logging.interceptor)
-    implementation(libs.okhttp)
-
-    // Database
+    // Room Database
     implementation(libs.androidx.room.runtime)
-    kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
+    ksp(libs.androidx.room.compiler)
 
-    // Paging
-    implementation(libs.androidx.paging.runtime.ktx)
-    implementation(libs.androidx.paging.compose)
-
-    // Image Loading
-    implementation(libs.coil.compose)
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
 
     // Security
     implementation(libs.androidx.security.crypto)
 
-    // Serialization
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
     implementation(libs.gson)
-    implementation(libs.kotlinx.serialization.json)
 
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    // Dependency Injection
+    implementation(libs.hilt.android)
+    implementation(libs.hilt.navigation.compose)
+    ksp(libs.hilt.compiler)
 
-    // ViewModel & LiveData
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.livedata.ktx)
-    
-    // WorkManager for background tasks
-    implementation(libs.androidx.work.runtime.ktx)
-    
-    // DataStore (modern SharedPreferences)
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.datastore.core)
-    
-    // ✅ TIMBER LOGGING (ISSUE #16)
+    // Image Loading
+    implementation(libs.coil.compose)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.messaging)
+
+    // Logging
     implementation(libs.timber)
 
-    // ✅ FIREBASE
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics.ktx)
-    implementation(libs.firebase.crashlytics.ktx)
-    implementation(libs.firebase.messaging.ktx)
-    implementation(libs.firebase.config.ktx)
-
-    // ✅ CORE LIBRARY DESUGARING FOR JAVA TIME API (ISSUE #46)
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
+    // Desugaring
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
-    
+    testImplementation(libs.turbine)
+    testImplementation(libs.truth)
+
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.compose.ui.test.manifest)
+    androidTestImplementation(libs.mockk.android)
 
-    // Debugging
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-}
-
-// ✅ BUILD CONFIGURATION
-configurations.all {
-    resolutionStrategy {
-        // Force specific versions to prevent conflicts
-        force("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
-        force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${libs.versions.kotlin.get()}")
-        
-        // Cache dynamic versions
-        cacheDynamicVersionsFor(10, "m")
-        cacheChangingModulesFor(0, "s")
-        
-        // Prefer project modules
-        preferProjectModules()
-    }
-}
-
-// ✅ DETEKT CONFIGURATION
-detekt {
-    config.setFrom(files("detekt.yml"))
-    buildUponDefaultConfig = true
-    allRules = false
 }
