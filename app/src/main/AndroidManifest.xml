@@ -111,9 +111,7 @@
         </activity>
 
         <!-- ============== SERVICES ============== -->
-        <!-- FCM Push Notifications Service (ISSUE #13) -->
-        <!-- TODO: Implement PushNotificationService when Firebase messaging is ready -->
-        <!--
+        <!-- FCM Push Notifications Service (ISSUE #13 - NOW IMPLEMENTED) -->
         <service
             android:name="com.noghre.sod.service.PushNotificationService"
             android:exported="false">
@@ -121,7 +119,6 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        -->
 
         <!-- ============== CONTENT PROVIDERS ============== -->
         <!-- For sharing files securely (ISSUE #14) -->
