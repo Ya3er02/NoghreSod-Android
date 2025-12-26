@@ -27,6 +27,13 @@ android {
         }
     }
 
+    // ✅ SECURITY FIX: Load API configuration from local.properties (not committed)
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localProperties.load(FileInputStream(localPropertiesFile))
+    }
+
     // Load signing properties from local file (not committed to Git)
     val signingPropertiesFile = rootProject.file("signing.properties")
     val signingProperties = Properties()
@@ -51,7 +58,18 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-DEBUG"
 
-            buildConfigField("String", "API_BASE_URL", "\"https://api-dev.noghresod.ir/api/\"")
+            // ✅ Use local.properties with fallback
+            val debugApiUrl = localProperties.getProperty(
+                "api.base.url.debug",
+                "https://api-dev.noghresod.ir/api/"
+            )
+            val debugApiKey = localProperties.getProperty(
+                "api.key.debug",
+                "dev-key-placeholder"
+            )
+            
+            buildConfigField("String", "API_BASE_URL", "\"$debugApiUrl\"")
+            buildConfigField("String", "API_KEY", "\"$debugApiKey\"")
             buildConfigField("boolean", "DEBUG_LOGGING", "true")
             buildConfigField("boolean", "ENABLE_CRASHLYTICS", "false")
 
@@ -68,7 +86,18 @@ android {
                 "proguard-rules.pro"
             )
 
-            buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.ir/api/\"")
+            // ✅ Use local.properties with fallback
+            val releaseApiUrl = localProperties.getProperty(
+                "api.base.url.release",
+                "https://api.noghresod.ir/api/"
+            )
+            val releaseApiKey = localProperties.getProperty(
+                "api.key.release",
+                "release-key-placeholder"
+            )
+            
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiUrl\"")
+            buildConfigField("String", "API_KEY", "\"$releaseApiKey\"")
             buildConfigField("boolean", "DEBUG_LOGGING", "false")
             buildConfigField("boolean", "ENABLE_CRASHLYTICS", "true")
 
@@ -85,7 +114,18 @@ android {
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-STAGING"
 
-            buildConfigField("String", "API_BASE_URL", "\"https://api-staging.noghresod.ir/api/\"")
+            // ✅ Use local.properties with fallback
+            val stagingApiUrl = localProperties.getProperty(
+                "api.base.url.staging",
+                "https://api-staging.noghresod.ir/api/"
+            )
+            val stagingApiKey = localProperties.getProperty(
+                "api.key.staging",
+                "staging-key-placeholder"
+            )
+            
+            buildConfigField("String", "API_BASE_URL", "\"$stagingApiUrl\"")
+            buildConfigField("String", "API_KEY", "\"$stagingApiKey\"")
             buildConfigField("boolean", "DEBUG_LOGGING", "true")
             buildConfigField("boolean", "ENABLE_CRASHLYTICS", "true")
 
