@@ -1,26 +1,24 @@
-# Copy this file to local.properties and fill in your values
+# This is an example file. Copy this to local.properties and add your actual values.
+# DO NOT commit local.properties to git!
+# local.properties contains sensitive information like API keys and URLs
 
-# Development API
-dev.api.url=https://dev-api.noghresod.com/api/v1/
-dev.api.timeout=30
+# API Configuration
+api.base.url.debug=https://api-dev.noghresod.ir/api/
+api.base.url.staging=https://api-staging.noghresod.ir/api/
+api.base.url.release=https://api.noghresod.ir/api/
 
-# Staging API
-staging.api.url=https://staging-api.noghresod.com/api/v1/
-staging.api.timeout=30
+# API Keys
+api.key.debug=dev-secret-key-here
+api.key.staging=staging-secret-key-here
+api.key.release=production-secret-key-here
 
-# Production API
-prod.api.url=https://api.noghresod.com/api/v1/
-prod.api.timeout=30
+# Timeouts (in seconds)
+api.timeout.connect=30
+api.timeout.read=30
+api.timeout.write=30
 
-# Keystore for signing
-keystore.file=./keystore/noghresod.jks
-keystore.password=YOUR_KEYSTORE_PASSWORD
-keystore.alias=noghresod
-keystore.key.password=YOUR_KEY_PASSWORD
+# Logging
+debug.logging=true
 
-# Firebase
-firebase.enabled=true
-firebase.project.id=YOUR_PROJECT_ID
-
-# Analytics
-analytics.enabled=true
+# Environment
+environment=development
