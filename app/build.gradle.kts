@@ -135,6 +135,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // ✅ ENABLE CORE LIBRARY DESUGARING FOR JAVA TIME API (ISSUE #46)
+        isCoreLibraryDesugaringEnabled = true
     }
     
     kotlinOptions {
@@ -256,6 +258,9 @@ dependencies {
     implementation(libs.firebase.crashlytics.ktx)
     implementation(libs.firebase.messaging.ktx)
     implementation(libs.firebase.config.ktx)
+
+    // ✅ CORE LIBRARY DESUGARING FOR JAVA TIME API (ISSUE #46)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 
     // Testing
     testImplementation(libs.junit)
