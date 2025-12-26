@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 
+    FileProvider paths for secure file sharing
+    
+    Usage: Used by FileProvider to generate URIs for sharing files with other apps.
+    
+    Reference: https://developer.android.com/reference/androidx/core/content/FileProvider
+    -->
+    
+    <!-- Internal cache directory -->
+    <cache-path
+        name="image_cache"
+        path="images/" />
+    
+    <!-- External files directory (if needed for photo uploads) -->
+    <external-files-path
+        name="app_external_files"
+        path="/Pictures/NoghreSod/" />
+    
+    <!-- App-specific external cache -->
+    <external-cache-path
+        name="app_external_cache"
+        path="/" />
+    
+    <!-- Internal files -->
+    <files-path
+        name="internal_files"
+        path="/" />
+</paths>
