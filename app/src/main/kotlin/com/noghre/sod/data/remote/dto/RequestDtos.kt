@@ -1,188 +1,167 @@
 package com.noghre.sod.data.remote.dto
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import com.google.gson.annotations.SerializedName
 
-// ==================== Authentication Request DTOs ====================
+// ==================== CART REQUESTS ====================
 
-@Serializable
-data class RegisterRequestDto(
-    @SerialName("email")
-    val email: String,
-    @SerialName("phone")
-    val phone: String,
-    @SerialName("password")
-    val password: String,
-    @SerialName("firstName")
-    val firstName: String,
-    @SerialName("lastName")
-    val lastName: String,
-)
-
-@Serializable
-data class LoginRequestDto(
-    @SerialName("email")
-    val email: String,
-    @SerialName("password")
-    val password: String,
-)
-
-@Serializable
-data class LoginPhoneRequestDto(
-    @SerialName("phone")
-    val phone: String,
-    @SerialName("code")
-    val code: String,
-)
-
-@Serializable
-data class PhoneRequestDto(
-    @SerialName("phone")
-    val phone: String,
-)
-
-@Serializable
-data class VerifyOTPRequestDto(
-    @SerialName("phone")
-    val phone: String,
-    @SerialName("code")
-    val code: String,
-)
-
-@Serializable
-data class RefreshTokenRequestDto(
-    @SerialName("refreshToken")
-    val refreshToken: String,
-)
-
-@Serializable
-data class AuthTokenDto(
-    @SerialName("accessToken")
-    val accessToken: String,
-    @SerialName("refreshToken")
-    val refreshToken: String,
-    @SerialName("expiresIn")
-    val expiresIn: Long,
-    @SerialName("user")
-    val user: UserDto,
-)
-
-// ==================== Product Request DTOs ====================
-
-@Serializable
-data class AddReviewRequestDto(
-    @SerialName("rating")
-    val rating: Float,
-    @SerialName("comment")
-    val comment: String?,
-)
-
-// ==================== Cart Request DTOs ====================
-
-@Serializable
-data class AddToCartRequestDto(
-    @SerialName("productId")
+/**
+ * Request model for adding item to cart.
+ * Type-safe alternative to Map<String, Any>
+ */
+data class AddToCartRequest(
+    @SerializedName("product_id")
     val productId: String,
-    @SerialName("quantity")
+    @SerializedName("quantity")
     val quantity: Int,
-)
+    @SerializedName("selected_color")
+    val selectedColor: String? = null,
+    @SerializedName("selected_size")
+    val selectedSize: String? = null
+) {
+    init {
+        require(productId.isNotBlank()) { "Product ID cannot be blank" }
+        require(quantity > 0) { "Quantity must be greater than 0" }
+    }
+}
 
-@Serializable
-data class UpdateCartItemRequestDto(
-    @SerialName("quantity")
+data class UpdateCartItemRequest(
+    @SerializedName("quantity")
     val quantity: Int,
-)
+    @SerializedName("selected_color")
+    val selectedColor: String? = null,
+    @SerializedName("selected_size")
+    val selectedSize: String? = null
+) {
+    init {
+        require(quantity > 0) { "Quantity must be greater than 0" }
+    }
+}
 
-@Serializable
-data class ApplyDiscountRequestDto(
-    @SerialName("code")
-    val code: String,
-)
+// ==================== ORDER REQUESTS ====================
 
-// ==================== Order Request DTOs ====================
-
-@Serializable
-data class CreateOrderRequestDto(
-    @SerialName("shippingAddressId")
+data class CreateOrderRequest(
+    @SerializedName("shipping_address_id")
     val shippingAddressId: String,
-    @SerialName("billingAddressId")
-    val billingAddressId: String? = null,
-    @SerialName("paymentMethod")
+    @SerializedName("payment_method")
     val paymentMethod: String,
-    @SerialName("notes")
-    val notes: String? = null,
-)
+    @SerializedName("discount_code")
+    val discountCode: String? = null,
+    @SerializedName("notes")
+    val notes: String? = null
+) {
+    init {
+        require(shippingAddressId.isNotBlank()) { "Shipping address ID cannot be blank" }
+        require(paymentMethod.isNotBlank()) { "Payment method cannot be blank" }
+    }
+}
 
-@Serializable
-data class CancelOrderRequestDto(
-    @SerialName("reason")
-    val reason: String?,
-)
+// ==================== PAYMENT REQUESTS ====================
 
-@Serializable
-data class RequestReturnDto(
-    @SerialName("items")
-    val items: List<String>, // Order item IDs
-    @SerialName("reason")
-    val reason: String,
-    @SerialName("description")
-    val description: String,
-)
+data class ProcessPaymentRequest(
+    @SerializedName("order_id")
+    val orderId: String,
+    @SerializedName("amount")
+    val amount: Double,
+    @SerializedName("method")
+    val method: String,
+    @SerializedName("return_url")
+    val returnUrl: String
+) {
+    init {
+        require(orderId.isNotBlank()) { "Order ID cannot be blank" }
+        require(amount > 0) { "Amount must be greater than 0" }
+        require(method.isNotBlank()) { "Payment method cannot be blank" }
+        require(returnUrl.isNotBlank()) { "Return URL cannot be blank" }
+    }
+}
 
-@Serializable
-data class VerifyPaymentRequestDto(
-    @SerialName("transactionId")
-    val transactionId: String,
-)
+// ==================== USER REQUESTS ====================
 
-@Serializable
-data class PaymentVerificationDto(
-    @SerialName("isValid")
-    val isValid: Boolean,
-    @SerialName("transactionId")
-    val transactionId: String,
-    @SerialName("amount")
-    val amount: Long,
-    @SerialName("message")
-    val message: String?,
-)
+data class UpdateProfileRequest(
+    @SerializedName("first_name")
+    val firstName: String,
+    @SerializedName("last_name")
+    val lastName: String,
+    @SerializedName("phone_number")
+    val phoneNumber: String? = null,
+    @SerializedName("email")
+    val email: String? = null
+) {
+    init {
+        require(firstName.isNotBlank()) { "First name cannot be blank" }
+        require(lastName.isNotBlank()) { "Last name cannot be blank" }
+    }
+}
 
-// ==================== User Request DTOs ====================
+data class AddAddressRequest(
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("full_address")
+    val fullAddress: String,
+    @SerializedName("province")
+    val province: String,
+    @SerializedName("city")
+    val city: String,
+    @SerializedName("postal_code")
+    val postalCode: String,
+    @SerializedName("recipient_name")
+    val recipientName: String,
+    @SerializedName("recipient_phone")
+    val recipientPhone: String,
+    @SerializedName("is_default")
+    val isDefault: Boolean = false
+) {
+    init {
+        require(title.isNotBlank()) { "Title cannot be blank" }
+        require(fullAddress.isNotBlank()) { "Address cannot be blank" }
+        require(province.isNotBlank()) { "Province cannot be blank" }
+        require(city.isNotBlank()) { "City cannot be blank" }
+        require(postalCode.isNotBlank()) { "Postal code cannot be blank" }
+    }
+}
 
-@Serializable
-data class UpdateProfileRequestDto(
-    @SerialName("firstName")
-    val firstName: String? = null,
-    @SerialName("lastName")
-    val lastName: String? = null,
-    @SerialName("profileImage")
-    val profileImage: String? = null,
-    @SerialName("bio")
-    val bio: String? = null,
-    @SerialName("birthDate")
-    val birthDate: String? = null,
-)
+// ==================== COUPON REQUESTS ====================
 
-@Serializable
-data class ChangePasswordRequestDto(
-    @SerialName("oldPassword")
-    val oldPassword: String,
-    @SerialName("newPassword")
-    val newPassword: String,
-)
+data class ApplyCouponRequest(
+    @SerializedName("coupon_code")
+    val couponCode: String
+) {
+    init {
+        require(couponCode.isNotBlank()) { "Coupon code cannot be blank" }
+    }
+}
 
-@Serializable
-data class PasswordResetRequestDto(
-    @SerialName("email")
-    val email: String,
-)
+// ==================== REVIEW REQUESTS ====================
 
-@Serializable
-data class ResetPasswordRequestDto(
-    @SerialName("email")
-    val email: String,
-    @SerialName("code")
-    val code: String,
-    @SerialName("newPassword")
-    val newPassword: String,
-)
+data class SubmitReviewRequest(
+    @SerializedName("rating")
+    val rating: Float,
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("comment")
+    val comment: String,
+    @SerializedName("images")
+    val images: List<String>? = null
+) {
+    init {
+        require(rating in 1f..5f) { "Rating must be between 1 and 5" }
+        require(title.isNotBlank()) { "Title cannot be blank" }
+        require(comment.isNotBlank()) { "Comment cannot be blank" }
+    }
+}
+
+// ==================== PUSH NOTIFICATION REQUESTS ====================
+
+data class RegisterFcmTokenRequest(
+    @SerializedName("token")
+    val token: String,
+    @SerializedName("device_id")
+    val deviceId: String,
+    @SerializedName("platform")
+    val platform: String = "android"
+) {
+    init {
+        require(token.isNotBlank()) { "FCM token cannot be blank" }
+        require(deviceId.isNotBlank()) { "Device ID cannot be blank" }
+    }
+}
