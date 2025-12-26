@@ -9,6 +9,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.CertificatePinner
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -39,6 +40,7 @@ annotation class ErrorInterceptorQualifier
  * Provides Retrofit, OkHttp, and custom interceptors.
  *
  * Configuration includes:
+ * - Certificate Pinning for HTTPS security
  * - Gson with lenient parsing and date formatting
  * - HttpLoggingInterceptor for request/response logging (debug only)
  * - Custom AuthInterceptor for adding auth tokens
@@ -47,7 +49,7 @@ annotation class ErrorInterceptorQualifier
  * - Retrofit with Gson converter factory
  *
  * @author Yaser
- * @version 1.0.0
+ * @version 1.1.0
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -56,6 +58,36 @@ object NetworkModule {
     private const val CONNECT_TIMEOUT = 30L
     private const val READ_TIMEOUT = 30L
     private const val WRITE_TIMEOUT = 30L
+    
+    // ✅ CERTIFICATE PINS (Issue #2)
+    // These are public key hashes from SSL certificates
+    // Get them from: https://tools.keycdn.com/certificate-key-validator
+    private const val PIN_ISRG_ROOT_X1 = "r/mIkG3eEpVdm+u/8IAcLvkTw7ohWL+5s/stw7OTZHM="
+    private const val PIN_LETS_ENCRYPT_R3 = "MK8KPuCvosKaQB0GY6xvh8cOFw1ltBmD89ZwIaJLcKk="
+    private const val PIN_DST_ROOT_CA_X3 = "iQMGa1Z59FIEf86ystaWIcNqposECNq1UetQ2kvkMKI="
+    
+    /**
+     * Provide CertificatePinner for SSL certificate validation.
+     * Prevents man-in-the-middle attacks by pinning expected certificates.
+     *
+     * @return CertificatePinner instance
+     */
+    @Provides
+    @Singleton
+    fun provideCertificatePinner(): CertificatePinner {
+        return CertificatePinner.Builder()
+            // Production API
+            .add("api.noghresod.ir", "sha256/$PIN_ISRG_ROOT_X1")
+            .add("api.noghresod.ir", "sha256/$PIN_LETS_ENCRYPT_R3")
+            .add("api.noghresod.ir", "sha256/$PIN_DST_ROOT_CA_X3")  // Backup
+            
+            // Staging API
+            .add("api-staging.noghresod.ir", "sha256/$PIN_ISRG_ROOT_X1")
+            .add("api-staging.noghresod.ir", "sha256/$PIN_LETS_ENCRYPT_R3")
+            .add("api-staging.noghresod.ir", "sha256/$PIN_DST_ROOT_CA_X3")  // Backup
+            
+            .build()
+    }
     
     /**
      * Provide Gson instance for JSON serialization/deserialization.
@@ -120,11 +152,12 @@ object NetworkModule {
     
     /**
      * Provide OkHttpClient with custom configuration.
-     * Includes interceptors, timeouts, and retry logic.
+     * Includes interceptors, timeouts, certificate pinning, and retry logic.
      *
      * @param httpLoggingInterceptor For request/response logging
      * @param authInterceptor For adding auth tokens
      * @param errorInterceptor For handling errors
+     * @param certificatePinner For SSL certificate validation
      * @return Configured OkHttpClient
      */
     @Provides
@@ -132,9 +165,13 @@ object NetworkModule {
     fun provideOkHttpClient(
         httpLoggingInterceptor: HttpLoggingInterceptor,
         @AuthInterceptorQualifier authInterceptor: Interceptor,
-        @ErrorInterceptorQualifier errorInterceptor: Interceptor
+        @ErrorInterceptorQualifier errorInterceptor: Interceptor,
+        certificatePinner: CertificatePinner
     ): OkHttpClient {
         return OkHttpClient.Builder()
+            // ✅ Add certificate pinning (Issue #2)
+            .certificatePinner(certificatePinner)
+            
             // Add custom interceptors
             .addInterceptor(authInterceptor)
             .addInterceptor(errorInterceptor)
@@ -146,7 +183,7 @@ object NetworkModule {
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json")
                     .addHeader("Accept-Language", "fa-IR")
-                    .addHeader("User-Agent", "NoghreSod-Android/${BuildConfig.APP_VERSION}")
+                    .addHeader("User-Agent", "NoghreSod-Android/${BuildConfig.VERSION_NAME}")
                     .build()
                 chain.proceed(request)
             }
