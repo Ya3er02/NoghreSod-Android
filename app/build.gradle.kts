@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -31,28 +33,27 @@ android {
             keyPassword = "android"
         }
         
-        // ✅ Release signing from environment variables (NEVER hardcoded)
+        // ✅ Release signing from environment variables with fallback (ISSUE #7)
         create("release") {
-            val releaseKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
             val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
             val keyAlias = System.getenv("KEY_ALIAS")
             val keyPassword = System.getenv("KEY_PASSWORD")
             
-            if (releaseKeystorePath == null || keystorePassword == null || keyAlias == null || keyPassword == null) {
-                throw GradleException(
-                    "Missing required environment variables for release signing:\n" +
-                    "  - RELEASE_KEYSTORE_PATH\n" +
-                    "  - KEYSTORE_PASSWORD\n" +
-                    "  - KEY_ALIAS\n" +
-                    "  - KEY_PASSWORD\n\n" +
-                    "For local builds, set these in your shell profile or CI/CD secrets."
-                )
+            if (keystorePath != null && File(keystorePath).exists()) {
+                // Production release - use provided keystore
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            } else {
+                // Development fallback - use debug keystore
+                logger.warn("⚠️ Release keystore not found. Using debug keystore for development builds.")
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                this.keyAlias = "androiddebugkey"
+                this.keyPassword = "android"
             }
-            
-            storeFile = file(releaseKeystorePath)
-            storePassword = keystorePassword
-            this.keyAlias = keyAlias
-            this.keyPassword = keyPassword
             
             // ✅ APK v2+ signing (more secure)
             enableV1Signing = false
@@ -146,7 +147,7 @@ android {
     }
     
     composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
     
     packaging {
@@ -159,6 +160,23 @@ android {
         checkReleaseBuilds = true
         abortOnError = false
         disable += "MissingTranslation"
+    }
+}
+
+// ✅ DEPENDENCY RESOLUTION STRATEGY (ISSUE #10)
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            // Force consistent Kotlin version across all modules
+            force("org.jetbrains.kotlin:kotlin-stdlib:${libs.versions.kotlin.get()}")
+            force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${libs.versions.kotlin.get()}")
+            
+            // Force consistent AndroidX versions
+            force("androidx.core:core-ktx:${libs.versions.androidxCore.get()}")
+            
+            // Prefer project modules
+            preferProjectModules()
+        }
     }
 }
 
@@ -224,6 +242,13 @@ dependencies {
     // DataStore (modern SharedPreferences)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.core)
+
+    // ✅ FIREBASE (ISSUE #6)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics.ktx)
+    implementation(libs.firebase.crashlytics.ktx)
+    implementation(libs.firebase.messaging.ktx)
+    implementation(libs.firebase.config.ktx)
 
     // Testing
     testImplementation(libs.junit)
