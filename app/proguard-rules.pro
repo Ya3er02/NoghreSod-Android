@@ -1,137 +1,201 @@
-# ============================================
-# 🛡️ ProGuard Configuration for NoghreSod
-# ============================================
+# =================================
+# NOGHRESOD PROGUARD RULES
+# ===================================
+# ProGuard rules for release optimization
+# Handles: obfuscation, optimization, and shrinking
 
-# Keep main application classes
--keep class com.noghre.sod.MainActivity { *; }
--keep class com.noghre.sod.** { *; }
+# ========== GENERAL ==========
+# Keep source file names for better crash reports
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# ============================================
-# 📡 Retrofit Configuration
-# ============================================
--keepattributes Signature, InnerClasses, EnclosingMethod
--keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+# Keep annotations
+-keepattributes *Annotation*
+-keepattributes Signature
+-keepattributes Exceptions
+-keepattributes InnerClasses,EnclosingMethod
+-keepattributes MethodParameters
 
-# Retrofit interfaces
--keepclassmembers,allowshrinking,allowobfuscation interface * {
+# ========== KOTLIN ==========
+-keep class kotlin.** { *; }
+-keep class kotlin.Metadata { *; }
+-dontwarn kotlin.**
+
+-keepclassmembers class **$WhenMappings {
+    <fields>;
+}
+
+-keepclassmembers class kotlin.Metadata {
+    public <methods>;
+}
+
+# Remove Kotlin intrinsics checks (only for debug)
+-assumenosideeffects class kotlin.jvm.internal.Intrinsics {
+    static void checkParameterIsNotNull(java.lang.Object, java.lang.String);
+    static void checkExpressionValueIsNotNull(java.lang.Object, java.lang.String);
+    static void checkNotNullParameter(java.lang.Object, java.lang.String);
+    static void checkNotNullExpressionValue(java.lang.Object, java.lang.String);
+    static void checkReturnedValueIsNotNull(java.lang.Object, java.lang.String);
+}
+
+# ========== COROUTINES ==========
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembernames class kotlinx.** {
+    volatile <fields>;
+}
+-dontwarn kotlinx.coroutines.**
+
+# ========== RETROFIT & OKHTTP ==========
+-keepattributes Signature
+-keepattributes RuntimeVisibleAnnotations
+-keepattributes RuntimeInvisibleAnnotations
+-keepattributes RuntimeVisibleParameterAnnotations
+-keepattributes RuntimeInvisibleParameterAnnotations
+
+-keepclasseswithmembers class * {
     @retrofit2.http.* <methods>;
 }
 
-# Retrofit classes
 -keep class retrofit2.** { *; }
--keep class okhttp3.** { *; }
--dontwarn okhttp3.**
+-keep interface retrofit2.** { *; }
 -dontwarn retrofit2.**
--dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
 
-# ============================================
-# 📦 OkHttp Configuration
-# ============================================
--keep class okhttp3.internal.** { *; }
--dontwarn okhttp3.internal.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
 
-# ============================================
-# 📚 Gson Configuration
-# ============================================
--keepattributes Signature
--keepattributes *Annotation*
--keep class com.google.gson.stream.** { *; }
+# ========== GSON (JSON Serialization) ==========
 -keep class com.google.gson.** { *; }
 -keep class * implements com.google.gson.TypeAdapterFactory
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
 
-# DTO classes - keep all fields for Gson
--keep class com.noghre.sod.data.remote.dto.** { *; }
--keep class com.noghre.sod.data.local.entity.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn sun.misc.**
 
-# ============================================
-# 🗄️ Room Database Configuration
-# ============================================
+# Keep all DTO/Model classes with Gson annotations
+-keep class com.noghre.sod.data.remote.dto.** { *; }
+-keep class com.noghre.sod.domain.model.** { *; }
+
+# Generic types
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# ========== ROOM DATABASE ==========
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *
--keep @androidx.room.Dao interface *
+-keep @androidx.room.Dao class *
+
+-keep class com.noghre.sod.data.local.database.** { *; }
+-keep class com.noghre.sod.data.local.dao.** { *; }
+-keep class com.noghre.sod.data.local.entity.** { *; }
 -dontwarn androidx.room.paging.**
 
-# ============================================
-# 💉 Hilt Dependency Injection
-# ============================================
--keep class dagger.hilt.** { *; }
+# ========== HILT / DAGGER ==========
+-keep class dagger.** { *; }
 -keep class javax.inject.** { *; }
--keep @dagger.hilt.android.HiltAndroidApp class *
 
-# ============================================
-# 🏗️ Android Lifecycle
-# ============================================
--keepclassmembers class * implements android.os.Parcelable {
-    public static final android.os.Parcelable$Creator CREATOR;
-}
+-keep class * extends dagger.hilt.android.internal.managers.ApplicationComponentManager
+-keep class **_HiltComponents$* { *; }
+-keep class **Hilt** { *; }
+-keep class **_Factory { *; }
+-keep class **_MembersInjector { *; }
+-keep class **_Impl { *; }
 
-# Keep all activities, services, broadcast receivers, etc
--keep public class * extends android.app.Activity
--keep public class * extends android.app.Service
--keep public class * extends android.content.BroadcastReceiver
--keep public class * extends android.content.ContentProvider
+-keep @dagger.hilt.android.lifecycle.HiltViewModel class * extends androidx.lifecycle.ViewModel
 
-# Keep view constructors for inflation
--keepclasseswithmembers class * {
-    public <init>(android.content.Context, android.util.AttributeSet);
-}
-
-# ============================================
-# 🔐 Kotlin Coroutines
-# ============================================
--keepclassmembernames class kotlinx.coroutines.internal.MainDispatcherFactory {
-    *** create(...);
-}
--keepclassmembernames class kotlinx.coroutines.CoroutineExceptionHandler {
-    *** handleException(...);
-}
--keep class kotlin.coroutines.jvm.internal.** { *; }
-
-# ============================================
-# 📊 Jetpack Compose
-# ============================================
+# ========== COMPOSE ==========
 -keep class androidx.compose.** { *; }
--keep interface androidx.compose.** { *; }
+-dontwarn androidx.compose.**
 
-# ============================================
-# 🎨 Material 3
-# ============================================
--keep class com.google.android.material.** { *; }
--keep interface com.google.android.material.** { *; }
+-keep @androidx.compose.runtime.Composable class ** { *; }
+-keep @androidx.compose.runtime.Composable interface ** { *; }
 
-# ============================================
-# 📸 Coil Image Loading
-# ============================================
+# ========== COIL IMAGE LOADING ==========
 -keep class coil.** { *; }
 -keep interface coil.** { *; }
+-dontwarn coil.**
 
-# ============================================
-# 🔒 Encryption Libraries
-# ============================================
--keepclassmembers class * {
-    *** encode(...);
-    *** decode(...);
+# ========== DATASTORE ==========
+-keep class androidx.datastore.*.** { *; }
+
+# ========== PAGING ==========
+-keep class androidx.paging.** { *; }
+-dontwarn androidx.paging.**
+
+# ========== FIREBASE ==========
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
+
+-keep class com.google.firebase.analytics.** { *; }
+-keep class com.google.firebase.crashlytics.** { *; }
+-keep class com.google.firebase.messaging.** { *; }
+
+# ========== APP SPECIFIC CLASSES ==========
+# Keep all ViewModels
+-keep class com.noghre.sod.presentation.viewmodel.** { *; }
+
+# Keep Application class
+-keep class com.noghre.sod.NoghreSodApp { *; }
+
+# Keep MainActivity and Activities
+-keep class com.noghre.sod.MainActivity { *; }
+-keep class com.noghre.sod.presentation.ui.** { *; }
+
+# Keep Services
+-keep class com.noghre.sod.service.** { *; }
+
+# Keep Parcelable implementations
+-keep class * implements android.os.Parcelable {
+    public static final android.os.Parcelable$Creator *;
 }
 
-# ============================================
-# 🚫 Warnings to Ignore
-# ============================================
--dontwarn java.lang.invoke.StringConcatFactory
--dontwarn com.google.android.material.**
--dontwarn androidx.**
--dontwarn org.jetbrains.kotlin.**
+# Keep Serializable classes
+-keepnames class * implements java.io.Serializable
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    !static !transient <fields>;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
 
-# ============================================
-# 🎯 Optimization
-# ============================================
+# ========== R CLASS ==========
+# Keep R classes (resources)
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}
+
+# ========== LOGGING REMOVAL ==========
+# Remove Log.d, Log.v, Log.i calls in release
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** println(...);
+}
+
+# ========== OPTIMIZATION ==========
 -optimizationpasses 5
--allowaccessmodification
--mergeinterfacesaggressively
+-dontusemixedcaseclassnames
+-dontskipnonpubliclibraryclasses
+-dontskipnonpubliclibraryclassmembers
+-verbose
 
-# ============================================
-# 📝 Line Numbers for Crash Reports
-# ============================================
--keepattributes SourceFile, LineNumberTable
--renamesourcefileattribute SourceFile
+# Preserve line numbers for debugging
+-keepparameternames
+
+# ========== DEBUGGING ==========
+# Uncomment during troubleshooting:
+# -printconfiguration build/proguard-config.txt
+# -printusage build/proguard-unused.txt
+# -printmapping build/proguard-mapping.txt
