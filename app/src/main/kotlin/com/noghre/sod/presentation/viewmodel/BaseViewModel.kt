@@ -2,264 +2,96 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.domain.model.error.AppError
-import com.noghre.sod.presentation.event.EventHandler
-import com.noghre.sod.presentation.event.UiEvent
-import com.noghre.sod.presentation.uistate.UiState
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
-* 📺 Base ViewModel
+ * Base ViewModel for all screens.
+ * Provides common functionality: error handling, loading state, lifecycle management.
  * 
- * Provides common functionality for all ViewModels:
- * - State management
- * - Event handling
- * - Error handling
- * - Coroutine management
- * - Analytics tracking
+ * Features:
+ * - Centralized error handling
+ * - Automatic job cancellation
+ * - Shared error events
+ * - Loading state management
+ * - Memory leak prevention
  * 
- * @since 1.0.0
+ * @author Yaser
+ * @version 1.0.0
  */
-abstract class BaseViewModel<T : Any>(
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main
-) : ViewModel() {
+abstract class BaseViewModel : ViewModel() {
     
-    // ==================== State Management ====================
+    // Error event stream for UI to consume
+    private val _errorEvents = MutableSharedFlow<ErrorEvent>()
+    val errorEvents: SharedFlow<ErrorEvent> = _errorEvents
     
-    protected val _uiState = MutableStateFlow<UiState<T>>(UiState.Idle)
-    val uiState: StateFlow<UiState<T>> = _uiState.asStateFlow()
+    // Job tracker for lifecycle management
+    private var currentJob: Job? = null
     
-    // ==================== Event Handling ====================
-    
-    protected val eventHandler = EventHandler<UiEvent>()
-    val events: Flow<UiEvent> = eventHandler.events
-    
-    // ==================== Job Tracking ====================
-    
-    private val jobs = mutableListOf<Job>()
-    
-    // ==================== Exception Handler ====================
-    
-    protected val exceptionHandler = CoroutineExceptionHandler { _, exception ->
-        Timber.e(exception, "Uncaught exception in ${this::class.simpleName}")
-        handleException(exception)
-    }
-    
-    // ==================== State Methods ====================
-    
-    /**
-     * Update UI state
-     */
-    protected fun setState(state: UiState<T>) {
-        _uiState.value = state
+    // Exception handler with logging
+    protected val exceptionHandler = CoroutineExceptionHandler { coroutineContext, exception ->
+        Timber.e(exception, "Coroutine exception in ${this::class.simpleName}")
+        emitError(exception)
     }
     
     /**
-     * Set loading state
+     * Launch a coroutine with built-in error handling.
      */
-    protected fun setLoading(hasData: Boolean = false) {
-        _uiState.value = if (hasData) {
-            val currentData = _uiState.value.getData()
-            if (currentData != null) {
-                UiState.LoadingWithData(currentData)
-            } else {
-                UiState.Loading
-            }
-        } else {
-            UiState.Loading
+    protected fun launchSafe(block: suspend () -> Unit) {
+        currentJob?.cancel() // Cancel previous job if still running
+        currentJob = viewModelScope.launch(exceptionHandler) {
+            block()
         }
     }
     
     /**
-     * Set success state
+     * Emit error event to UI.
      */
-    protected fun setSuccess(data: T) {
-        _uiState.value = UiState.Success(data)
-    }
-    
-    /**
-     * Set error state
-     */
-    protected fun setError(error: AppError, canRetry: Boolean = true) {
-        val currentData = _uiState.value.getData()
-        _uiState.value = if (currentData != null) {
-            UiState.ErrorWithData(currentData, error, canRetry)
-        } else {
-            UiState.Error(error, null, null)
-        }
-    }
-    
-    /**
-     * Set empty state
-     */
-    protected fun setEmpty(message: String? = null) {
-        _uiState.value = UiState.Empty(message)
-    }
-    
-    // ==================== Event Methods ====================
-    
-    /**
-     * Send UI event
-     */
-    protected fun sendEvent(event: UiEvent) {
+    protected fun emitError(exception: Throwable) {
         viewModelScope.launch {
-            eventHandler.send(event)
+            val message = when (exception) {
+                is TimeoutException -> "درخواست به مهلت زمانی رسید"
+                is NetworkException -> "خطای شبکه"
+                is ValidationException -> exception.message ?: "خطای اعتبار‌سنجی"
+                else -> exception.localizedMessage ?: "خطای نامشخص"
+            }
+            _errorEvents.emit(ErrorEvent(message, exception))
         }
     }
     
     /**
-     * Send navigation event
+     * Emit error with custom message.
      */
-    protected fun navigate(destination: UiEvent.Navigation) {
-        sendEvent(destination)
-    }
-    
-    /**
-     * Send feedback event (snackbar, toast, dialog)
-     */
-    protected fun sendFeedback(feedback: UiEvent.Feedback) {
-        sendEvent(feedback)
-    }
-    
-    /**
-     * Send error event
-     */
-    protected fun sendError(error: UiEvent.Error) {
-        sendEvent(error)
-    }
-    
-    // ==================== Coroutine Helpers ====================
-    
-    /**
-     * Launch coroutine with error handling
-     */
-    protected fun launchIO(
-        onStart: (() -> Unit)? = null,
-        block: suspend () -> Unit
-    ): Job {
-        val job = viewModelScope.launch(ioDispatcher + exceptionHandler) {
-            onStart?.invoke()
-            block()
+    protected fun emitError(message: String, exception: Exception? = null) {
+        viewModelScope.launch {
+            _errorEvents.emit(ErrorEvent(message, exception))
         }
-        jobs.add(job)
-        return job
     }
     
     /**
-     * Launch coroutine on main dispatcher
+     * Called when ViewModel is no longer used.
+     * Automatically cancels all jobs.
      */
-    protected fun launchMain(
-        onStart: (() -> Unit)? = null,
-        block: suspend () -> Unit
-    ): Job {
-        val job = viewModelScope.launch(mainDispatcher + exceptionHandler) {
-            onStart?.invoke()
-            block()
-        }
-        jobs.add(job)
-        return job
-    }
-    
-    // ==================== Error Handling ====================
-    
-    /**
-     * Handle exception
-     */
-    protected open fun handleException(exception: Throwable) {
-        val appError = when (exception) {
-            is AppError -> exception
-            else -> AppError.UnknownError(exception)
-        }
-        
-        setError(appError)
-        sendError(UiEvent.Error.ServerError(
-            error = AppError.ServerError(
-                statusCode = 500,
-                serverMessage = exception.message,
-                code = "UNKNOWN_ERROR",
-                userMessage = "خطایی رخ داد"
-            )
-        ))
-    }
-    
-    /**
-     * Handle network error
-     */
-    protected fun handleNetworkError(error: AppError.NetworkError) {
-        setError(error)
-        sendError(UiEvent.Error.NetworkError(error))
-    }
-    
-    /**
-     * Handle server error
-     */
-    protected fun handleServerError(error: AppError.ServerError) {
-        setError(error, canRetry = error.canRetry)
-        sendError(UiEvent.Error.ServerError(error))
-    }
-    
-    /**
-     * Handle auth error
-     */
-    protected fun handleAuthError(error: AppError.AuthError) {
-        setError(error)
-        if (error.requiresLogin) {
-            navigate(UiEvent.Navigation.ToUrl("login"))
-        }
-        sendError(UiEvent.Error.AuthError(error))
-    }
-    
-    // ==================== Analytics ====================
-    
-    /**
-     * Track screen view
-     */
-    protected fun trackScreenView(screenName: String, screenClass: String? = null) {
-        sendEvent(UiEvent.Analytics.TrackScreenView(
-            screenName = screenName,
-            screenClass = screenClass ?: this::class.simpleName
-        ))
-    }
-    
-    /**
-     * Track event
-     */
-    protected fun trackEvent(eventName: String, parameters: Map<String, Any> = emptyMap()) {
-        sendEvent(UiEvent.Analytics.TrackEvent(
-            eventName = eventName,
-            parameters = parameters
-        ))
-    }
-    
-    /**
-     * Track exception
-     */
-    protected fun trackException(exception: Throwable, fatal: Boolean = false) {
-        sendEvent(UiEvent.Analytics.TrackException(
-            exception = exception,
-            fatal = fatal
-        ))
-    }
-    
-    // ==================== Lifecycle ====================
-    
     override fun onCleared() {
         super.onCleared()
-        
-        // Cancel all jobs
-        jobs.forEach { it.cancel() }
-        jobs.clear()
-        
+        currentJob?.cancel()
         Timber.d("${this::class.simpleName} cleared")
     }
+    
+    /**
+     * Error event data class.
+     */
+    data class ErrorEvent(
+        val message: String,
+        val exception: Throwable? = null
+    )
 }
+
+// Custom exception types
+class TimeoutException(message: String = "Request timeout") : Exception(message)
+class NetworkException(message: String = "Network error") : Exception(message)
+class ValidationException(message: String = "Validation error") : Exception(message)
