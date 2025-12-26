@@ -14,15 +14,17 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <!-- ============== CAMERA PERMISSIONS (for future features) ============== -->
-    <!-- For product image capture -->
+    <!-- REMOVED: Not needed for initial phase of silver jewelry store -->
+    <!-- These should be added when photo upload feature is implemented -->
+    <!-- For Android 13+ use READ_MEDIA_IMAGES instead -->
+    <!--
     <uses-permission android:name="android.permission.CAMERA" />
-    
-    <!-- For file access from camera -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    -->
 
     <!-- ============== LOCATION PERMISSIONS (optional) ============== -->
-    <!-- For delivery location tracking -->
+    <!-- For delivery location tracking (if needed later) -->
     <uses-permission
         android:name="android.permission.ACCESS_FINE_LOCATION"
         tools:node="remove" />
@@ -56,7 +58,6 @@
         android:name="com.noghre.sod.NoghreSodApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:debuggable="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -79,22 +80,40 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             
-            <!-- Deep linking support -->
+            <!-- Deep linking support (ISSUE #12 - CORRECTED DOMAIN) -->
             <intent-filter
                 android:autoVerify="true"
                 android:label="@string/app_name">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                
+                <!-- Primary domain (noghresod.ir - not .com) -->
                 <data
-                    android:host="noghresod.com"
+                    android:host="noghresod.ir"
+                    android:pathPrefix="/product"
+                    android:scheme="https" />
+            </intent-filter>
+            
+            <!-- Also support www variant -->
+            <intent-filter
+                android:autoVerify="true"
+                android:label="@string/app_name">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                
+                <data
+                    android:host="www.noghresod.ir"
                     android:pathPrefix="/product"
                     android:scheme="https" />
             </intent-filter>
         </activity>
 
         <!-- ============== SERVICES ============== -->
-        <!-- FCM Push Notifications (if using Firebase) -->
+        <!-- FCM Push Notifications Service (ISSUE #13) -->
+        <!-- TODO: Implement PushNotificationService when Firebase messaging is ready -->
+        <!--
         <service
             android:name="com.noghre.sod.service.PushNotificationService"
             android:exported="false">
@@ -102,9 +121,10 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+        -->
 
         <!-- ============== CONTENT PROVIDERS ============== -->
-        <!-- For sharing files securely -->
+        <!-- For sharing files securely (ISSUE #14) -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
