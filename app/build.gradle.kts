@@ -21,6 +21,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+        
+        // ✅ BUILD CONFIG FIELDS (ISSUE #17)
+        buildConfigField("String", "APP_VERSION", "\"${versionName}\"")
+        buildConfigField("int", "VERSION_CODE", "${versionCode}")
     }
     
     // ✅ SECURE RELEASE SIGNING
@@ -33,7 +37,7 @@ android {
             keyPassword = "android"
         }
         
-        // ✅ Release signing from environment variables with fallback (ISSUE #7)
+        // ✅ Release signing from environment variables with fallback
         create("release") {
             val keystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
             val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -163,7 +167,7 @@ android {
     }
 }
 
-// ✅ DEPENDENCY RESOLUTION STRATEGY (ISSUE #10)
+// ✅ DEPENDENCY RESOLUTION STRATEGY
 subprojects {
     configurations.all {
         resolutionStrategy {
@@ -242,8 +246,11 @@ dependencies {
     // DataStore (modern SharedPreferences)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.core)
+    
+    // ✅ TIMBER LOGGING (ISSUE #16)
+    implementation(libs.timber)
 
-    // ✅ FIREBASE (ISSUE #6)
+    // ✅ FIREBASE
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics.ktx)
     implementation(libs.firebase.crashlytics.ktx)
