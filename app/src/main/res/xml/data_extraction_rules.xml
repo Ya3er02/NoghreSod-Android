@@ -1,17 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
-    <!-- Include all files by default -->
+    <!-- 
+    Data extraction rules determine what data the OS automatically backs up
+    to Google Cloud (Android 12+)
+    
+    Reference: https://developer.android.com/guide/topics/data/autobackup
+    -->
+    
     <cloud-backup>
-        <include domain="sharedpref" path="." />
-        <include domain="database" path="." />
-        <include domain="file" path="." />
-        <!-- Exclude sensitive data -->
-        <exclude domain="sharedpref" path="user_auth" />
-        <exclude domain="database" path="tokens" />
+        <!-- EXCLUDE: Sensitive data that should NOT be backed up -->
+        <exclude domain="sharedpref" path="encrypted_prefs.xml"/>
+        <exclude domain="sharedpref" path="user_credentials.xml"/>
+        <exclude domain="database" path="noghresod.db"/>
+        <exclude domain="file" path="sensitive_files/"/>
     </cloud-backup>
+    
     <device-transfer>
-        <include domain="sharedpref" path="." />
-        <include domain="database" path="." />
-        <exclude domain="sharedpref" path="user_auth" />
+        <!-- ALLOW: Data that can be transferred between devices -->
+        <include domain="sharedpref" path="app_preferences.xml"/>
+        <include domain="sharedpref" path="ui_settings.xml"/>
     </device-transfer>
 </data-extraction-rules>
