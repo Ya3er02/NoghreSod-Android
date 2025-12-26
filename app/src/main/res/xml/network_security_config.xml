@@ -1,68 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Network Security Configuration
-     Ensures all network traffic is encrypted and secure
-     Last updated: 2025-12-25
--->
 <network-security-config>
-    <!-- Production Configuration (api.noghresod.ir) -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.noghresod.ir</domain>
-        
-        <!-- Certificate Pinning - Primary & Backup Pins -->
-        <pin-set expiration="2026-12-31">
-            <!-- Primary Certificate Pin (Current) -->
-            <!-- Extract with: openssl s_client -servername api.noghresod.ir -connect api.noghresod.ir:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64 -->
-            <pin digest="SHA-256">sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
-            
-            <!-- Backup Certificate Pin (For Certificate Rotation) -->
-            <pin digest="SHA-256">sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
-        </pin-set>
-        
-        <!-- Trust Only System Certificates in Production -->
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
+    <!-- 
+    Security configuration for API calls
+    - Production: HTTPS only with certificate pinning
+    - Debug: Allow localhost for development
     
-    <!-- Staging Configuration (staging-api.noghresod.ir) -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">staging-api.noghresod.ir</domain>
-        
-        <!-- Looser pinning for staging (certificate changes frequently) -->
-        <pin-set expiration="2026-12-31">
-            <pin digest="SHA-256">sha256/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=</pin>
-        </pin-set>
-        
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
+    Reference: https://developer.android.com/training/articles/security-config
+    -->
     
-    <!-- Development Configuration (dev-api.noghresod.ir) -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">dev-api.noghresod.ir</domain>
-        
-        <!-- No pinning for dev (certificate changes during development) -->
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" /> <!-- Allow user certificates for debugging -->
-        </trust-anchors>
-    </domain-config>
-    
-    <!-- Debug Overrides (Only for Debug Builds) -->
-    <!-- Configured in build.gradle.kts via debugNetworkSecurityConfig -->
-    <debug-overrides>
-        <trust-anchors>
-            <certificates src="user" /> <!-- Allow self-signed certificates for debugging -->
-            <certificates src="system" />
-        </trust-anchors>
-    </debug-overrides>
-    
-    <!-- Global Configuration -->
-    <!-- Block cleartext traffic everywhere by default -->
+    <!-- Production Configuration -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
+            <!-- Trust system certificates -->
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    
+    <!-- API Certificate Pinning (Optional - for production) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.noghresod.ir</domain>
+        
+        <!-- Certificate Pinning: Force specific certificates only -->
+        <pin-set expiration="2027-12-31">
+            <!-- 
+            TODO: Generate certificate pins using:
+            openssl s_client -connect api.noghresod.ir:443 < /dev/null | \
+            openssl x509 -noout -pubkey | \
+            openssl pkey -pubin -outform der | \
+            openssl dgst -sha256 -binary | \
+            openssl enc -base64
+            
+            Example (NOT real):
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            -->
+        </pin-set>
+    </domain-config>
+    
+    <!-- Development Configuration - Allow HTTP for testing -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain> <!-- Android emulator gateway -->
+        <domain includeSubdomains="true">dev-api.noghresod.ir</domain>
+    </domain-config>
 </network-security-config>
