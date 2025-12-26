@@ -54,6 +54,9 @@ firebaseBom = "33.7.0"
 googleServices = "4.4.2"
 firebaseCrashlyticsPlugin = "3.0.2"
 
+# Logging - Timber
+timber = "5.0.1"
+
 # Testing
 junit = "4.13.2"
 mockk = "1.13.10"
@@ -136,6 +139,9 @@ firebase-analytics-ktx = { module = "com.google.firebase:firebase-analytics-ktx"
 firebase-crashlytics-ktx = { module = "com.google.firebase:firebase-crashlytics-ktx" }
 firebase-messaging-ktx = { module = "com.google.firebase:firebase-messaging-ktx" }
 firebase-config-ktx = { module = "com.google.firebase:firebase-config-ktx" }
+
+# Logging - Timber
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 
 # Testing
 junit = { module = "junit:junit", version.ref = "junit" }
