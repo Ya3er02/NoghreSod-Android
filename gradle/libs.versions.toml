@@ -1,13 +1,13 @@
 [versions]
-# Kotlin - Latest stable version
-kotlin = "1.9.22"
+# Kotlin - Latest stable version (December 2025)
+kotlin = "2.1.0"
 
 # Android Gradle Plugin - Latest stable
-androidGradlePlugin = "8.7.3"
+androidGradlePlugin = "8.8.0"
 
 # Compose - Latest stable
-composeCompiler = "1.5.8"
-composeBom = "2024.12.00"
+composeCompiler = "1.5.14"
+composeBom = "2025.01.00"
 
 # AndroidX - Core libraries
 androidxCore = "1.13.1"
@@ -37,7 +37,7 @@ retrofit = "2.11.0"
 okhttp = "4.12.0"
 
 # Dependency Injection - Hilt
-hilt = "2.51"
+hilt = "2.52"
 
 # Image Loading - Coil
 coil = "2.6.0"
@@ -48,6 +48,11 @@ kotlinxSerialization = "1.6.2"
 
 # Coroutines
 kotlinxCoroutines = "1.8.1"
+
+# Firebase (December 2025)
+firebaseBom = "33.7.0"
+googleServices = "4.4.2"
+firebaseCrashlyticsPlugin = "3.0.2"
 
 # Testing
 junit = "4.13.2"
@@ -125,6 +130,13 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 
+# Firebase
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics-ktx = { module = "com.google.firebase:firebase-analytics-ktx" }
+firebase-crashlytics-ktx = { module = "com.google.firebase:firebase-crashlytics-ktx" }
+firebase-messaging-ktx = { module = "com.google.firebase:firebase-messaging-ktx" }
+firebase-config-ktx = { module = "com.google.firebase:firebase-config-ktx" }
+
 # Testing
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }
@@ -140,3 +152,5 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
