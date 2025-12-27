@@ -1,317 +1,332 @@
 package com.noghre.sod.data.repository
 
-import com.google.common.truth.Truth.assertThat
-import com.noghre.sod.data.local.dao.ProductDao
-import com.noghre.sod.data.local.entity.ProductEntity
+import com.noghre.sod.core.error.AppError
+import com.noghre.sod.core.error.GlobalExceptionHandler
+import com.noghre.sod.core.util.Result
 import com.noghre.sod.data.remote.api.ApiService
 import com.noghre.sod.data.remote.dto.ProductDto
-import com.noghre.sod.domain.model.NetworkResult
-import com.noghre.sod.domain.util.NetworkMonitor
-import io.mockk.MockKAnnotations
-import io.mockk.coEvery
-import io.mockk.coJustRun
-import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.impl.annotations.MockK
-import kotlinx.coroutines.flow.flowOf
+import com.noghre.sod.data.remote.dto.ApiResponse
+import com.noghre.sod.domain.model.Product
+import io.mockk.*
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import retrofit2.Response
-import java.io.IOException
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
- * Unit Tests for ProductRepository
+ * 🪨 Product Repository Unit Tests
  * 
- * هدف:
- * ✅ Offline-First pattern تست
- * ✅ Room database تست
- * ✅ Network error handling
- * ✅ Cache strategy validation
+ * Tests error handling, data transformation, and business logic.
  */
 class ProductRepositoryTest {
-
-    @MockK
+    
     private lateinit var apiService: ApiService
-
-    @MockK
-    private lateinit var productDao: ProductDao
-
-    @MockK
-    private lateinit var networkMonitor: NetworkMonitor
-
+    private lateinit var exceptionHandler: GlobalExceptionHandler
     private lateinit var repository: ProductRepositoryImpl
-
+    
     @Before
     fun setup() {
-        MockKAnnotations.init(this, relaxed = true)
-        repository = ProductRepositoryImpl(apiService, productDao, networkMonitor)
+        apiService = mockk()
+        exceptionHandler = GlobalExceptionHandler()
+        repository = ProductRepositoryImpl(apiService, exceptionHandler)
     }
-
-    // ========== Offline-First ==========
-
+    
+    @After
+    fun tearDown() {
+        clearAllMocks()
+    }
+    
+    // ============================================
+    // SUCCESS CASES
+    // ============================================
+    
     @Test
-    fun `بررسی محصول - ابتدا کاش سپس نببرق`() = runTest {
-        // Given - انبار دار پیشین
-        val cachedProducts = listOf(
-            ProductEntity(
+    fun `getProducts returns Success when API call succeeds`() = runTest {
+        // Arrange
+        val mockProducts = listOf(
+            ProductDto(
                 id = "1",
-                name = "انگشتر نقره",
-                price = 1500000.0,
-                imageUrl = "https://example.com/ring.jpg",
-                description = "انگشتر اسلیمی",
-                categoryId = "rings",
-                stock = 10,
-                isFavorite = false,
-                lastUpdated = System.currentTimeMillis()
+                name = "نقره خالص",
+                price = 100000.0,
+                description = "نقره خالص 925",
+                images = listOf("image1.jpg"),
+                rating = 4.5,
+                categoryId = "cat1"
             )
         )
-
-        every { productDao.getAllProducts() } returns flowOf(cachedProducts)
-        every { networkMonitor.isOnline() } returns false  // آفلاین
-
-        // When
-        val result = repository.getProducts(categoryId = null, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
         
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then - باید کاش برگردانه
-        assertThat(results).isNotEmpty()
-        assertThat(results.last()).isInstanceOf(NetworkResult.Success::class.java)
-    }
-
-    @Test
-    fun `بررسی محصول - شبکه سپس کاش`() = runTest {
-        // Given
-        val cachedProducts = listOf(
-            ProductEntity("1", "محصول 1", 1000.0, "", "", "cat", 10, false, System.currentTimeMillis())
+        val mockResponse = ApiResponse(
+            success = true,
+            data = mockProducts,
+            message = "Success"
         )
-        val apiProducts = listOf(
-            ProductDto("2", "محصول 2", 2000.0, "", "", "cat", 5)
+        
+        coEvery { apiService.getProducts() } returns mockResponse
+        
+        // Act
+        val result = repository.getProducts()
+        
+        // Assert
+        assertIs<Result.Success<List<Product>>>(result)
+        assertEquals(1, result.data.size)
+        assertEquals("نقره خالص", result.data[0].name)
+        
+        coVerify(exactly = 1) { apiService.getProducts() }
+    }
+    
+    @Test
+    fun `searchProducts filters results correctly`() = runTest {
+        // Arrange
+        val query = "قلادی"
+        val mockResponse = ApiResponse(
+            success = true,
+            data = listOf(
+                ProductDto(
+                    id = "1",
+                    name = "براسلت قلادی",
+                    price = 50000.0,
+                    description = "براسلت",
+                    images = emptyList(),
+                    rating = 4.0,
+                    categoryId = "cat2"
+                )
+            ),
+            message = "Success"
         )
-
-        every { productDao.getAllProducts() } returns flowOf(cachedProducts)
-        coEvery { apiService.getProducts(page = 1, perPage = 20) } returns 
-            Response.success(apiProducts)
-        every { networkMonitor.isOnline() } returns true
-        coJustRun { productDao.insertProducts(any()) }
-        coJustRun { productDao.clearProducts() }
-
-        // When
-        val result = repository.getProducts(categoryId = null, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
         
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then
-        // اول: loading
-        assertThat(results[0]).isInstanceOf(NetworkResult.Loading::class.java)
+        coEvery { apiService.searchProducts(query) } returns mockResponse
         
-        // دوم: cached data
-        if (results.size > 1) {
-            assertThat(results[1]).isInstanceOf(NetworkResult.Success::class.java)
-        }
-    }
-
-    @Test
-    fun `بررسی محصول - آفلاین بدون کاش`() = runTest {
-        // Given - آفلاین و بدون کاش
-        every { productDao.getAllProducts() } returns flowOf(emptyList())
-        every { networkMonitor.isOnline() } returns false
-
-        // When
-        val result = repository.getProducts(categoryId = null, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
+        // Act
+        val result = repository.searchProducts(query)
         
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then - باید خطا
-        assertThat(results.last()).isInstanceOf(NetworkResult.Error::class.java)
+        // Assert
+        assertIs<Result.Success<List<Product>>>(result)
+        assertEquals(1, result.data.size)
+        assertTrue(result.data[0].name.contains("قلادی"))
     }
-
-    // ========== Filtering ==========
-
+    
     @Test
-    fun `بررسی محصول - براساس دسته‌بندی`() = runTest {
-        // Given
-        val categoryId = "rings"
-        val filteredProducts = listOf(
-            ProductEntity(
-                id = "1",
-                name = "انگشتر",
-                price = 1500000.0,
-                imageUrl = "",
-                description = "",
-                categoryId = categoryId,
-                stock = 10,
-                isFavorite = false,
-                lastUpdated = System.currentTimeMillis()
-            )
-        )
-
-        every { productDao.getProductsByCategory(categoryId) } returns flowOf(filteredProducts)
-        every { networkMonitor.isOnline() } returns false
-
-        // When
-        val result = repository.getProducts(categoryId = categoryId, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
-        
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then
-        assertThat(results).isNotEmpty()
-    }
-
-    // ========== Network Error Handling ==========
-
-    @Test
-    fun `بررسی محصول - خطای تایم‌آوت`() = runTest {
-        // Given
-        every { productDao.getAllProducts() } returns flowOf(emptyList())
-        coEvery { apiService.getProducts(any(), any()) } throws IOException("Request timed out")
-        every { networkMonitor.isOnline() } returns true
-
-        // When
-        val result = repository.getProducts(categoryId = null, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
-        
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then - باید error برگردانه
-        assertThat(results.last()).isInstanceOf(NetworkResult.Error::class.java)
-    }
-
-    @Test
-    fun `بررسی محصول - خطای سرور (500)`() = runTest {
-        // Given
-        every { productDao.getAllProducts() } returns flowOf(emptyList())
-        coEvery { apiService.getProducts(any(), any()) } returns 
-            Response.error(500, mockk { every { string() } returns "{\"error\":\"Server error\"}" })
-        every { networkMonitor.isOnline() } returns true
-
-        // When
-        val result = repository.getProducts(categoryId = null, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
-        
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then
-        assertThat(results.last()).isInstanceOf(NetworkResult.Error::class.java)
-    }
-
-    @Test
-    fun `بررسی محصول - خطای 404 Not Found`() = runTest {
-        // Given
-        every { productDao.getAllProducts() } returns flowOf(emptyList())
-        coEvery { apiService.getProducts(any(), any()) } returns 
-            Response.error(404, mockk { every { string() } returns "{\"error\":\"Not found\"}" })
-        every { networkMonitor.isOnline() } returns true
-
-        // When
-        val result = repository.getProducts(categoryId = null, page = 1)
-        val results = mutableListOf<NetworkResult<*>>()
-        
-        result.collect { networkResult ->
-            results.add(networkResult)
-        }
-
-        // Then
-        assertThat(results.last()).isInstanceOf(NetworkResult.Error::class.java)
-    }
-
-    // ========== Pagination ==========
-
-    @Test
-    fun `بررسی محصول - صفحه‌بندی درست`() = runTest {
-        // Given
-        val page1Products = listOf(
-            ProductEntity("1", "محصول 1", 1000.0, "", "", "cat", 10, false, System.currentTimeMillis())
-        )
-
-        coEvery { apiService.getProducts(page = 1, perPage = 20) } returns 
-            Response.success(listOf(ProductDto("1", "محصول 1", 1000.0, "", "", "cat", 10)))
-        coEvery { apiService.getProducts(page = 2, perPage = 20) } returns 
-            Response.success(listOf(ProductDto("2", "محصول 2", 2000.0, "", "", "cat", 10)))
-        
-        every { productDao.getAllProducts() } returns flowOf(page1Products)
-        every { networkMonitor.isOnline() } returns true
-        coJustRun { productDao.insertProducts(any()) }
-        coJustRun { productDao.clearProducts() }
-
-        // When
-        val result1 = repository.getProducts(categoryId = null, page = 1)
-        val result2 = repository.getProducts(categoryId = null, page = 2)
-
-        // Then - page parameters درستار شه
-        coVerify { apiService.getProducts(page = 1, perPage = 20) }
-        coVerify { apiService.getProducts(page = 2, perPage = 20) }
-    }
-
-    // ========== Database Operations ==========
-
-    @Test
-    fun `ذخیره محصول - داخل دیتابیس`() = runTest {
-        // Given
-        val products = listOf(
-            ProductEntity("1", "محصول", 1000.0, "", "", "cat", 10, false, System.currentTimeMillis())
-        )
-        coJustRun { productDao.insertProducts(products) }
-
-        // When
-        productDao.insertProducts(products)
-
-        // Then
-        coVerify { productDao.insertProducts(products) }
-    }
-
-    @Test
-    fun `حذف محصول قدیمی - بعد از 7 روز`() = runTest {
-        // Given
-        coJustRun { productDao.cleanOldProducts(olderThanDays = 7) }
-
-        // When
-        productDao.cleanOldProducts(olderThanDays = 7)
-
-        // Then
-        coVerify { productDao.cleanOldProducts(olderThanDays = 7) }
-    }
-
-    @Test
-    fun `محصول واحد - دریافت از ID`() = runTest {
-        // Given
-        val productId = "1"
-        val product = ProductEntity(
+    fun `getProductById returns single product`() = runTest {
+        // Arrange
+        val productId = "123"
+        val mockProduct = ProductDto(
             id = productId,
-            name = "محصول",
-            price = 1000.0,
-            imageUrl = "",
-            description = "",
-            categoryId = "cat",
-            stock = 10,
-            isFavorite = false,
-            lastUpdated = System.currentTimeMillis()
+            name = "نقره",
+            price = 150000.0,
+            description = "نقره ւ کارات",
+            images = listOf("img.jpg"),
+            rating = 5.0,
+            categoryId = "cat1"
         )
-
-        coEvery { productDao.getProductById(productId) } returns product
-
-        // When
-        val result = productDao.getProductById(productId)
-
-        // Then
-        assertThat(result).isNotNull()
-        assertThat(result?.id).isEqualTo(productId)
+        
+        val mockResponse = ApiResponse(
+            success = true,
+            data = mockProduct,
+            message = "Success"
+        )
+        
+        coEvery { apiService.getProductById(productId) } returns mockResponse
+        
+        // Act
+        val result = repository.getProductById(productId)
+        
+        // Assert
+        assertIs<Result.Success<Product>>(result)
+        assertEquals(productId, result.data.id)
+        assertEquals("نقره", result.data.name)
+    }
+    
+    // ============================================
+    // ERROR CASES
+    // ============================================
+    
+    @Test
+    fun `searchProducts returns Error for empty query`() = runTest {
+        // Arrange
+        val emptyQuery = ""
+        
+        // Act
+        val result = repository.searchProducts(emptyQuery)
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Validation>(result.error)
+        assertEquals("query", (result.error as AppError.Validation).field)
+        
+        coVerify(exactly = 0) { apiService.searchProducts(any()) }
+    }
+    
+    @Test
+    fun `getProductById returns Error for invalid ID`() = runTest {
+        // Arrange
+        val invalidId = ""
+        
+        // Act
+        val result = repository.getProductById(invalidId)
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Validation>(result.error)
+    }
+    
+    @Test
+    fun `getProducts returns Error on network failure`() = runTest {
+        // Arrange
+        coEvery { apiService.getProducts() } throws java.net.UnknownHostException()
+        
+        // Act
+        val result = repository.getProducts()
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Network>(result.error)
+    }
+    
+    @Test
+    fun `getProducts returns Error on timeout`() = runTest {
+        // Arrange
+        coEvery { apiService.getProducts() } throws java.net.SocketTimeoutException()
+        
+        // Act
+        val result = repository.getProducts()
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Network>(result.error)
+    }
+    
+    @Test
+    fun `getProducts returns Error when API fails`() = runTest {
+        // Arrange
+        val mockResponse = ApiResponse<List<ProductDto>>(
+            success = false,
+            data = null,
+            message = "Server error",
+            code = 500
+        )
+        
+        coEvery { apiService.getProducts() } returns mockResponse
+        
+        // Act
+        val result = repository.getProducts()
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Network>(result.error)
+        assertEquals(500, (result.error as AppError.Network).statusCode)
+    }
+    
+    @Test
+    fun `getProductById returns 404 error when not found`() = runTest {
+        // Arrange
+        val productId = "nonexistent"
+        val mockResponse = ApiResponse<ProductDto>(
+            success = false,
+            data = null,
+            message = "Not found",
+            code = 404
+        )
+        
+        coEvery { apiService.getProductById(productId) } returns mockResponse
+        
+        // Act
+        val result = repository.getProductById(productId)
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Network>(result.error)
+        assertEquals(404, (result.error as AppError.Network).statusCode)
+    }
+    
+    // ============================================
+    // CATEGORY FILTER TESTS
+    // ============================================
+    
+    @Test
+    fun `getProductsByCategory returns filtered products`() = runTest {
+        // Arrange
+        val categoryId = "jewelry"
+        val mockResponse = ApiResponse(
+            success = true,
+            data = listOf(
+                ProductDto(
+                    id = "1",
+                    name = "کوبالت",
+                    price = 200000.0,
+                    description = "کوبالت",
+                    images = emptyList(),
+                    rating = 4.2,
+                    categoryId = categoryId
+                )
+            ),
+            message = "Success"
+        )
+        
+        coEvery { apiService.getProductsByCategory(categoryId) } returns mockResponse
+        
+        // Act
+        val result = repository.getProductsByCategory(categoryId)
+        
+        // Assert
+        assertIs<Result.Success<List<Product>>>(result)
+        assertEquals(1, result.data.size)
+        assertEquals(categoryId, result.data[0].categoryId)
+    }
+    
+    @Test
+    fun `getProductsByCategory returns Error for invalid category`() = runTest {
+        // Arrange
+        val invalidCategory = ""
+        
+        // Act
+        val result = repository.getProductsByCategory(invalidCategory)
+        
+        // Assert
+        assertIs<Result.Error>(result)
+        assertIs<AppError.Validation>(result.error)
+    }
+    
+    // ============================================
+    // INTEGRATION TESTS
+    // ============================================
+    
+    @Test
+    fun `getAllOperations work correctly in sequence`() = runTest {
+        // Arrange
+        val mockResponse = ApiResponse(
+            success = true,
+            data = listOf(
+                ProductDto(
+                    id = "1",
+                    name = "نقره",
+                    price = 100000.0,
+                    description = "نقره خالص",
+                    images = emptyList(),
+                    rating = 4.5,
+                    categoryId = "cat1"
+                )
+            ),
+            message = "Success"
+        )
+        
+        coEvery { apiService.getProducts() } returns mockResponse
+        coEvery { apiService.searchProducts("test") } returns mockResponse
+        
+        // Act - Execute multiple operations
+        val result1 = repository.getProducts()
+        val result2 = repository.searchProducts("test")
+        
+        // Assert - Both succeed
+        assertIs<Result.Success<List<Product>>>(result1)
+        assertIs<Result.Success<List<Product>>>(result2)
+        assertEquals(1, result1.data.size)
+        assertEquals(1, result2.data.size)
+        
+        // Verify calls
+        coVerify(exactly = 1) { apiService.getProducts() }
+        coVerify(exactly = 1) { apiService.searchProducts("test") }
     }
 }
