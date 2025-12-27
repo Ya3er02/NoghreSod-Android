@@ -2,260 +2,127 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.domain.model.Cart
+import com.noghre.sod.core.error.GlobalExceptionHandler
+import com.noghre.sod.core.util.onError
+import com.noghre.sod.core.util.onSuccess
 import com.noghre.sod.domain.model.CartItem
-import com.noghre.sod.domain.model.Product
 import com.noghre.sod.domain.repository.CartRepository
-import com.noghre.sod.domain.repository.ProductRepository
+import com.noghre.sod.presentation.common.UiEvent
+import com.noghre.sod.presentation.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
-/**
- * CartViewModel - مدیریت سبد خرید با Optimistic Updates
- * Features:
- * - Optimistic UI Updates
- * - Stock Availability Check
- * - Offline Support & Sync
- * - Quantity Management
- * - Backend Synchronization
- */
 @HiltViewModel
 class CartViewModel @Inject constructor(
     private val cartRepository: CartRepository,
-    private val productRepository: ProductRepository
+    private val exceptionHandler: GlobalExceptionHandler
 ) : ViewModel() {
-
-    // Cart State
-    private val _cartState = MutableStateFlow<CartState>(CartState.Loading)
-    val cartState: StateFlow<CartState> = _cartState.asStateFlow()
-
-    // Offline Queue for pending actions
-    private val pendingActions = mutableListOf<CartAction>()
-
-    // Connectivity observer
-    private var connectivityObserver: Flow<Boolean>? = null
-
+    
+    private val _uiState = MutableStateFlow<UiState<List<CartItem>>>(UiState.Idle)
+    val uiState: StateFlow<UiState<List<CartItem>>> = _uiState.asStateFlow()
+    
+    private val _events = Channel<UiEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
+    
+    private val _totalPrice = MutableStateFlow(0.0)
+    val totalPrice: StateFlow<Double> = _totalPrice.asStateFlow()
+    
     init {
-        loadCart()
-        observeConnectivity()
+        loadCartItems()
     }
-
-    /**
-     * Load cart from repository
-     */
-    private fun loadCart() {
-        viewModelScope.launch {
-            _cartState.value = CartState.Loading
-
-            cartRepository.getCart()
-                .onSuccess { cart ->
-                    _cartState.value = CartState.Success(cart)
-                }
-                .onFailure { error ->
-                    _cartState.value = CartState.Error(
-                        message = error.message ?: "Failed to load cart"
-                    )
-                }
-        }
-    }
-
-    /**
-     * Add item to cart with optimistic update
-     */
-    fun addToCart(product: Product, quantity: Int) {
-        viewModelScope.launch {
-            val currentState = _cartState.value as? CartState.Success ?: return@launch
-
-            // Optimistic UI update
-            val optimisticCart = currentState.cart.copy(
-                items = currentState.cart.items + CartItem(
-                    id = "${product.id}_${System.currentTimeMillis()}",
-                    product = product,
-                    quantity = quantity,
-                    isOptimistic = true
-                )
-            )
-            _cartState.value = CartState.Success(optimisticCart)
-
-            // Backend call
-            cartRepository.addItem(product.id, quantity)
-                .onSuccess { updatedCart ->
-                    _cartState.value = CartState.Success(updatedCart)
-                }
-                .onFailure { error ->
-                    // Rollback on failure
-                    _cartState.value = currentState
-                    handleError(error)
-                    // Queue for retry if offline
-                    pendingActions.add(CartAction.Add(product.id, quantity))
-                }
-        }
-    }
-
-    /**
-     * Update item quantity with stock check
-     */
-    fun updateQuantity(itemId: String, newQuantity: Int) {
-        viewModelScope.launch {
-            val currentState = _cartState.value as? CartState.Success ?: return@launch
-            val currentItem = currentState.cart.items.find { it.id == itemId } ?: return@launch
-
-            // Check stock availability
-            productRepository.checkStock(currentItem.product.id, newQuantity)
-                .onSuccess { available ->
-                    if (available) {
-                        performOptimisticUpdate(itemId, newQuantity, currentState)
+    
+    fun loadCartItems() {
+        viewModelScope.launch(exceptionHandler.handler) {
+            _uiState.value = UiState.Loading
+            Timber.d("Loading cart items")
+            
+            cartRepository.getCartItems()
+                .onSuccess { items ->
+                    Timber.d("Cart items loaded: ${items.size}")
+                    _uiState.value = if (items.isEmpty()) {
+                        _totalPrice.value = 0.0
+                        UiState.Empty
                     } else {
-                        _cartState.value = CartState.Error(
-                            message = "Insufficient stock available"
-                        )
+                        _totalPrice.value = items.sumOf { it.product.price * it.quantity }
+                        UiState.Success(items)
                     }
                 }
-                .onFailure { error ->
-                    handleError(error)
+                .onError { error ->
+                    Timber.e("Failed to load cart: ${error.message}")
+                    _uiState.value = UiState.Error(error)
+                    _events.send(UiEvent.ShowError(error))
                 }
         }
     }
-
-    /**
-     * Perform optimistic update for quantity change
-     */
-    private suspend fun performOptimisticUpdate(
-        itemId: String,
-        newQuantity: Int,
-        currentState: CartState.Success
-    ) {
-        val optimisticCart = currentState.cart.copy(
-            items = currentState.cart.items.map { item ->
-                if (item.id == itemId) {
-                    item.copy(quantity = newQuantity, isOptimistic = true)
-                } else {
-                    item
+    
+    fun onUpdateQuantity(itemId: String, newQuantity: Int) {
+        if (newQuantity < 1) return
+        
+        viewModelScope.launch(exceptionHandler.handler) {
+            Timber.d("Updating cart item quantity: $itemId -> $newQuantity")
+            
+            cartRepository.updateCartItem(itemId, newQuantity)
+                .onSuccess {
+                    Timber.d("Quantity updated successfully")
+                    loadCartItems() // Refresh
                 }
-            }
-        )
-        _cartState.value = CartState.Success(optimisticCart)
-
-        // Backend call
-        cartRepository.updateQuantity(itemId, newQuantity)
-            .onSuccess { updatedCart ->
-                _cartState.value = CartState.Success(updatedCart)
-            }
-            .onFailure { error ->
-                // Rollback on failure
-                _cartState.value = currentState
-                handleError(error)
-                pendingActions.add(CartAction.Update(itemId, newQuantity))
-            }
-    }
-
-    /**
-     * Remove item from cart
-     */
-    fun removeItem(itemId: String) {
-        viewModelScope.launch {
-            val currentState = _cartState.value as? CartState.Success ?: return@launch
-
-            // Optimistic removal
-            val optimisticCart = currentState.cart.copy(
-                items = currentState.cart.items.filter { it.id != itemId }
-            )
-            _cartState.value = CartState.Success(optimisticCart)
-
-            // Backend call
-            cartRepository.removeItem(itemId)
-                .onSuccess { updatedCart ->
-                    _cartState.value = CartState.Success(updatedCart)
-                }
-                .onFailure { error ->
-                    // Rollback on failure
-                    _cartState.value = currentState
-                    handleError(error)
-                    pendingActions.add(CartAction.Remove(itemId))
+                .onError { error ->
+                    Timber.e("Failed to update quantity: ${error.message}")
+                    _events.send(UiEvent.ShowError(error))
                 }
         }
     }
-
-    /**
-     * Clear entire cart
-     */
-    fun clearCart() {
-        viewModelScope.launch {
-            _cartState.value = CartState.Loading
+    
+    fun onRemoveItem(itemId: String) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            Timber.d("Removing cart item: $itemId")
+            
+            cartRepository.removeFromCart(itemId)
+                .onSuccess {
+                    Timber.d("Item removed successfully")
+                    _events.send(UiEvent.ShowToast("از سبد خرید حذف شد"))
+                    loadCartItems() // Refresh
+                }
+                .onError { error ->
+                    Timber.e("Failed to remove item: ${error.message}")
+                    _events.send(UiEvent.ShowError(error))
+                }
+        }
+    }
+    
+    fun onClearCart() {
+        viewModelScope.launch(exceptionHandler.handler) {
+            Timber.d("Clearing entire cart")
+            
             cartRepository.clearCart()
                 .onSuccess {
-                    _cartState.value = CartState.Success(Cart(items = emptyList()))
-                    pendingActions.clear()
+                    Timber.d("Cart cleared successfully")
+                    _events.send(UiEvent.ShowToast("سبد خرید خالی شد"))
+                    loadCartItems() // Refresh
                 }
-                .onFailure { error ->
-                    _cartState.value = CartState.Error(
-                        message = error.message ?: "Failed to clear cart"
-                    )
+                .onError { error ->
+                    Timber.e("Failed to clear cart: ${error.message}")
+                    _events.send(UiEvent.ShowError(error))
                 }
         }
     }
-
-    /**
-     * Observe connectivity and sync pending actions
-     */
-    private fun observeConnectivity() {
-        // This would observe ConnectivityManager in real implementation
-        // For now, we'll sync manually when needed
-    }
-
-    /**
-     * Sync pending offline operations
-     */
-    fun syncPendingOperations() {
-        if (pendingActions.isEmpty()) return
-
+    
+    fun onCheckoutClick() {
         viewModelScope.launch {
-            pendingActions.forEach { action ->
-                when (action) {
-                    is CartAction.Add -> {
-                        cartRepository.addItem(action.productId, action.quantity)
-                    }
-                    is CartAction.Remove -> {
-                        cartRepository.removeItem(action.itemId)
-                    }
-                    is CartAction.Update -> {
-                        cartRepository.updateQuantity(action.itemId, action.quantity)
-                    }
-                }
-            }
-            pendingActions.clear()
-            loadCart() // Refresh cart after sync
+            Timber.d("Navigating to checkout")
+            _events.send(UiEvent.Navigate("checkout"))
         }
     }
-
-    /**
-     * Handle errors
-     */
-    private fun handleError(error: Exception) {
-        _cartState.value = CartState.Error(
-            message = error.message ?: "Unknown error occurred"
-        )
+    
+    fun onRetryClick() {
+        Timber.d("Retry clicked")
+        loadCartItems()
     }
-}
-
-// Cart State
-sealed interface CartState {
-    data object Loading : CartState
-    data class Success(val cart: Cart) : CartState
-    data class Error(val message: String) : CartState
-}
-
-// Cart Actions for offline queue
-sealed interface CartAction {
-    data class Add(val productId: String, val quantity: Int) : CartAction
-    data class Remove(val itemId: String) : CartAction
-    data class Update(val itemId: String, val quantity: Int) : CartAction
 }
