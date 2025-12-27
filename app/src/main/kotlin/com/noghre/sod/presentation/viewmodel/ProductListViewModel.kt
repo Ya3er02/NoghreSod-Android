@@ -2,79 +2,98 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.domain.model.ProductSummary
-import com.noghre.sod.domain.usecase.GetProductsUseCase
+import com.noghre.sod.core.error.GlobalExceptionHandler
+import com.noghre.sod.core.util.onError
+import com.noghre.sod.core.util.onSuccess
+import com.noghre.sod.domain.model.Product
+import com.noghre.sod.domain.repository.ProductRepository
+import com.noghre.sod.presentation.common.UiEvent
+import com.noghre.sod.presentation.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
-
-data class ProductListUiState(
-    val products: List<ProductSummary> = emptyList(),
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val searchQuery: String = "",
-    val selectedCategory: String? = null,
-    val hasMore: Boolean = true,
-    val page: Int = 1
-)
 
 @HiltViewModel
 class ProductListViewModel @Inject constructor(
-    private val getProductsUseCase: GetProductsUseCase
+    private val productRepository: ProductRepository,
+    private val exceptionHandler: GlobalExceptionHandler
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(ProductListUiState())
-    val uiState: StateFlow<ProductListUiState> = _uiState.asStateFlow()
-
+    
+    private val _uiState = MutableStateFlow<UiState<List<Product>>>(UiState.Idle)
+    val uiState: StateFlow<UiState<List<Product>>> = _uiState.asStateFlow()
+    
+    private val _events = Channel<UiEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
+    
     init {
         loadProducts()
     }
-
-    private fun loadProducts(page: Int = 1) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            val result = getProductsUseCase(
-                page = page,
-                limit = 20,
-                category = _uiState.value.selectedCategory
-            )
-            result.onSuccess { products ->
-                _uiState.value = _uiState.value.copy(
-                    products = if (page == 1) products else _uiState.value.products + products,
-                    isLoading = false,
-                    hasMore = products.size >= 20,
-                    page = page
-                )
+    
+    fun loadProducts(categoryId: String? = null) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            _uiState.value = UiState.Loading
+            Timber.d("Loading products for category: $categoryId")
+            
+            val result = if (categoryId != null) {
+                productRepository.getProductsByCategory(categoryId)
+            } else {
+                productRepository.getProducts()
             }
-            result.onFailure { exception ->
-                _uiState.value = _uiState.value.copy(
-                    error = exception.message,
-                    isLoading = false
-                )
-            }
+            
+            result
+                .onSuccess { products ->
+                    Timber.d("Products loaded successfully: ${products.size}")
+                    _uiState.value = if (products.isEmpty()) {
+                        UiState.Empty
+                    } else {
+                        UiState.Success(products)
+                    }
+                }
+                .onError { error ->
+                    Timber.e("Failed to load products: ${error.message}")
+                    _uiState.value = UiState.Error(error)
+                    _events.send(UiEvent.ShowError(error))
+                }
         }
     }
-
-    fun search(query: String) {
+    
+    fun onProductClick(productId: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(searchQuery = query)
-            loadProducts(page = 1)
+            Timber.d("Product clicked: $productId")
+            _events.send(UiEvent.Navigate("product_detail/$productId"))
         }
     }
-
-    fun filterByCategory(category: String?) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(selectedCategory = category)
-            loadProducts(page = 1)
+    
+    fun onFavoriteClick(productId: String) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            Timber.d("Toggling favorite for product: $productId")
+            
+            productRepository.toggleFavorite(productId)
+                .onSuccess {
+                    Timber.d("Favorite toggled successfully")
+                    _events.send(UiEvent.ShowToast("به علاقه‌مندی‌ها اضافه شد"))
+                    loadProducts() // Refresh to update UI
+                }
+                .onError { error ->
+                    Timber.e("Failed to toggle favorite: ${error.message}")
+                    _events.send(UiEvent.ShowError(error))
+                }
         }
     }
-
-    fun loadMore() {
-        if (_uiState.value.hasMore && !_uiState.value.isLoading) {
-            loadProducts(page = _uiState.value.page + 1)
-        }
+    
+    fun onRetryClick() {
+        Timber.d("Retry clicked")
+        loadProducts()
+    }
+    
+    fun onRefresh() {
+        Timber.d("Pull to refresh triggered")
+        loadProducts()
     }
 }
