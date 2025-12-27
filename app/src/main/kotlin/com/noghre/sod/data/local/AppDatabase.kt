@@ -1,12 +1,14 @@
 package com.noghre.sod.data.local
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.noghre.sod.BuildConfig
 import com.noghre.sod.data.local.entity.AddressEntity
 import com.noghre.sod.data.local.entity.CartItemEntity
 import com.noghre.sod.data.local.entity.OrderEntity
@@ -202,6 +204,7 @@ abstract class AppDatabase : RoomDatabase() {
     
     companion object {
         const val DATABASE_NAME = "noghresod_database"
+        private const val TAG = "AppDatabase"
     }
 }
 
@@ -215,27 +218,57 @@ object DatabaseModule {
     
     /**
      * Provide singleton AppDatabase instance
+     * 
+     * ⚠️ PRODUCTION-SAFE: No destructive migration in release builds
+     * Debug builds only have fallback for rapid development
      */
     @Provides
     @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context
     ): AppDatabase {
-        return Room.databaseBuilder(
+        val builder = Room.databaseBuilder(
             context,
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
         )
-        // Add migrations
-        .addMigrations(
+        
+        // Add all required migrations
+        builder.addMigrations(
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
             MIGRATION_4_5
         )
-        // Only for development - use migrations in production
-        .fallbackToDestructiveMigration() // Remove in production!
-        .build()
+        
+        // Configure based on build type
+        if (BuildConfig.DEBUG) {
+            // Development: Allow fallback with logging
+            builder.fallbackToDestructiveMigration()
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                        super.onDestructiveMigration(db)
+                        Log.w("AppDatabase", "⚠️ DESTRUCTIVE MIGRATION OCCURRED - This should not happen in production!")
+                    }
+                })
+        } else {
+            // Production: Crash if migration is missing (better than silent data loss)
+            builder.addCallback(object : RoomDatabase.Callback() {
+                override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                    super.onDestructiveMigration(db)
+                    Log.e("AppDatabase", "❌ CRITICAL: Destructive migration in production!")
+                    // This will crash the app - which is better than losing user data
+                    throw IllegalStateException(
+                        "Database migration failed. Please update the app or clear app data."
+                    )
+                }
+            })
+        }
+        
+        // Enable Write-Ahead Logging for better concurrent access
+        builder.setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+        
+        return builder.build()
     }
     
     /**
