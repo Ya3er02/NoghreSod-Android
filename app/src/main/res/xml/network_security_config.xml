@@ -1,60 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Network Security Configuration for Certificate Pinning -->
-<!-- Protects against man-in-the-middle attacks by pinning SSL certificates -->
-<!-- Reference: https://developer.android.com/training/articles/security-config -->
 <network-security-config>
-    <!-- Trust anchors: Certificate authorities trusted by the app -->
+    <!-- Default configuration for all domains -->
     <domain-config cleartextTrafficPermitted="false">
-        <!-- NoghreSod Production API -->
-        <domain includeSubdomains="true">api.noghresod.ir</domain>
+        <domain includeSubdomains="true">api.noghresod.com</domain>
+        <domain includeSubdomains="true">noghresod.com</domain>
         
-        <!-- Pin production SSL certificate -->
-        <!-- Get certificate: openssl s_client -connect api.noghresod.ir:443 -->
-        <!-- Or use: openssl x509 -in cert.crt -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64 -->
-        <pin-set expiration="2026-12-26">
-            <!-- Production API certificate pin -->
-            <!-- TODO: Replace with actual certificate pins from your SSL provider -->
-            <!-- Example pins from Let's Encrypt: -->
-            <pin digest="SHA-256">r/mIkG3eEpVdm+u/8IAcLvkTw7ohWL+5s/stw7OTZHM=</pin>  <!-- ISRG Root X1 -->
-            <pin digest="SHA-256">MK8KPuCvosKaQB0GY6xvh8cOFw1ltBmD89ZwIaJLcKk=</pin>  <!-- Let's Encrypt R3 -->
-            <!-- Backup pin: Use an older, trusted root certificate -->
-            <pin digest="SHA-256">iQMGa1Z59FIEf86ystaWIcNqposECNq1UetQ2kvkMKI=</pin>  <!-- DST Root CA X3 -->
+        <!-- Certificate pinning for API endpoint -->
+        <pin-set expiration="2026-12-31">
+            <!-- Pin your certificate here -->
+            <!-- Get certificate SHA-256: openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64 -->
+            <!-- Example: <pin digest="SHA-256">BASE64_ENCODED_SHA256</pin> -->
         </pin-set>
         
-        <!-- Trust system certificates -->
+        <!-- Enforce TLS 1.2+ -->
         <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
+            <certificates src="system"/>
         </trust-anchors>
     </domain-config>
-
-    <!-- Staging API Configuration -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api-staging.noghresod.ir</domain>
-        <pin-set expiration="2026-12-26">
-            <!-- Staging API certificate pins -->
-            <pin digest="SHA-256">r/mIkG3eEpVdm+u/8IAcLvkTw7ohWL+5s/stw7OTZHM=</pin>
-            <pin digest="SHA-256">MK8KPuCvosKaQB0GY6xvh8cOFw1ltBmD89ZwIaJLcKk=</pin>
-        </pin-set>
+    
+    <!-- Debug configuration (only for DEBUG builds) -->
+    <debug-overrides>
         <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
+            <certificates src="system"/>
+            <certificates src="@raw/debug_cert"/>
         </trust-anchors>
-    </domain-config>
-
-    <!-- Development API Configuration (localhost/debug) -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">api-dev.noghresod.ir</domain>
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-        </trust-anchors>
-    </domain-config>
-
-    <!-- Default policy for other domains -->
-    <default-config cleartextTrafficPermitted="false">
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </default-config>
+    </debug-overrides>
 </network-security-config>
