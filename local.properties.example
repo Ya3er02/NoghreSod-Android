@@ -1,24 +1,26 @@
-# This is an example file. Copy this to local.properties and add your actual values.
-# DO NOT commit local.properties to git!
-# local.properties contains sensitive information like API keys and URLs
+# Local Configuration Template
+# Copy this to local.properties and fill in your values
+# NEVER commit local.properties to Git (it's in .gitignore)
+
+# SDK Configuration
+sdk.dir=/path/to/android/sdk
 
 # API Configuration
-api.base.url.debug=https://api-dev.noghresod.ir/api/
-api.base.url.staging=https://api-staging.noghresod.ir/api/
-api.base.url.release=https://api.noghresod.ir/api/
+api.key=your_secret_api_key_here
+api.base_url=https://api.noghresod.com/api/
 
-# API Keys
-api.key.debug=dev-secret-key-here
-api.key.staging=staging-secret-key-here
-api.key.release=production-secret-key-here
+# Payment Gateway Keys
+payment.gateway.key=your_payment_key
+payment.gateway.secret=your_payment_secret
 
-# Timeouts (in seconds)
-api.timeout.connect=30
-api.timeout.read=30
-api.timeout.write=30
+# Firebase Configuration
+firebase.database_url=https://your-project.firebaseio.com
 
-# Logging
-debug.logging=true
+# Feature Flags
+enable.debug.logging=false
+enable.crash.reporting=true
+enable.analytics=true
 
-# Environment
-environment=development
+# Security
+enableProguard=true
+enableNativeDebugging=false
