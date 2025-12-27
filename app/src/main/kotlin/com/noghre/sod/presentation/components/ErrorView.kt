@@ -1,5 +1,6 @@
 package com.noghre.sod.presentation.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
@@ -13,57 +14,94 @@ import androidx.compose.ui.unit.dp
 import com.noghre.sod.core.error.AppError
 
 /**
- * 🗣️ Reusable error display component
+ * 🔴 Error View Component
  * 
- * Displays error message and optional retry button.
- * Automatically converts AppError to user-friendly Persian message.
+ * Reusable Composable for displaying errors with retry option.
+ * Automatically formats AppError to user-friendly Persian messages.
  * 
  * Usage:
- * ```kotlin
- * when(uiState) {
- *     is UiState.Error -> ErrorView(
- *         error = uiState.error,
- *         onRetry = { viewModel.loadData() }
- *     )
- *     else -> { }
- * }
+ * ```
+ * ErrorView(
+ *     error = AppError.Network("Network unavailable", 500),
+ *     onRetry = { viewModel.retry() },
+ *     modifier = Modifier.fillMaxSize()
+ * )
  * ```
  */
 @Composable
 fun ErrorView(
     error: AppError,
     onRetry: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Error Icon
         Icon(
             imageVector = Icons.Default.Error,
-            contentDescription = null,
+            contentDescription = "Error",
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.error
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
+        // Error Message
         Text(
             text = error.toUserMessage(),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
-        
+
+        // Error Details (if available)
+        when (error) {
+            is AppError.Network -> {
+                if (error.statusCode != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "HTTP ${error.statusCode}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            is AppError.Validation -> {
+                if (error.field != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "فیلد: ${error.field}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            else -> {}
+        }
+
+        // Retry Button
         if (onRetry != null) {
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             Button(
                 onClick = onRetry,
-                modifier = Modifier.fillMaxWidth(0.6f)
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(48.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -71,71 +109,203 @@ fun ErrorView(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("تلاش مجدد")
+                Text(
+                    text = "تلاش مجدد",
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
         }
     }
 }
 
 /**
- * 📌 Loading state indicator (skeleton/shimmer)
+ * 🔴 Compact Error View
+ * 
+ * Smaller version for use in rows or lists.
+ * 
+ * Usage:
+ * ```
+ * CompactErrorView(
+ *     error = error,
+ *     onRetry = { viewModel.retry() }
+ * )
+ * ```
  */
 @Composable
-fun LoadingView(
-    modifier: Modifier = Modifier
+fun CompactErrorView(
+    error: AppError,
+    onRetry: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
-    Box(
+    Row(
         modifier = modifier
-            .fillMaxSize(),
-        contentAlignment = Alignment.Center
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = MaterialTheme.shapes.medium
+            )
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = "Error",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Text(
+                text = error.toUserMessage(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (onRetry != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = onRetry,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Retry",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 🔴 Loading View
+ * 
+ * Shows loading indicator while data is being fetched.
+ */
+@Composable
+fun LoadingView(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(48.dp),
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "در حال بارگیری...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
 
 /**
- * 🖪 Empty state indicator
+ * 🗑️ Empty View
+ * 
+ * Shows when no data is available.
  */
 @Composable
 fun EmptyView(
-    message: String = "هیچ نتیجهای یافت نشد",
-    onRetry: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+    message: String = "هیچ آیتمی یافت نشد",
+    icon: @Composable () -> Unit = {
         Icon(
             imageVector = Icons.Default.Error,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.outlineVariant
+            tint = MaterialTheme.colorScheme.outline
         )
-        
+    },
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        icon()
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Text(
             text = message,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
-        
-        if (onRetry != null) {
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Button(
-                onClick = onRetry,
-                modifier = Modifier.fillMaxWidth(0.6f)
-            ) {
-                Text("تازه پرت")
-            }
+    }
+}
+
+/**
+ * 🌟 Loading List Item
+ * 
+ * Skeleton loader for lists.
+ */
+@Composable
+fun LoadingListItem(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Image placeholder
+        Surface(
+            modifier = Modifier
+                .size(80.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small
+                )
+        ) {}
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Title skeleton
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .height(16.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small
+                    )
+            ) {}
+
+            // Price skeleton
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.4f)
+                    .height(14.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small
+                    )
+            ) {}
         }
     }
 }
