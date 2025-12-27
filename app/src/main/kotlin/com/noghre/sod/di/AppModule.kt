@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.room.Room
 import com.noghre.sod.BuildConfig
 import com.noghre.sod.data.local.database.NoghreSodDatabase
+import com.noghre.sod.data.local.Migrations
 import com.noghre.sod.data.remote.api.NoghreSodApi
 import dagger.Module
 import dagger.Provides
@@ -36,7 +37,7 @@ private val Context.preferencesDataStore: DataStore<Preferences> by preferencesD
  * Provides database, API, and network configurations.
  *
  * @author Yaser
- * @version 1.0.0
+ * @version 1.1.0 - Fixed database migration strategy for production safety
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -72,6 +73,8 @@ object AppModule {
 
     /**
      * Provides HTTP logging interceptor.
+     * - DEBUG: Full body logging
+     * - RELEASE: No logging (security)
      */
     @Provides
     @Singleton
@@ -108,7 +111,18 @@ object AppModule {
     }
 
     /**
-     * Provides Room database instance.
+     * Provides Room database instance with safe migration strategy.
+     *
+     * Migration Strategy:
+     * - DEBUG: fallbackToDestructiveMigration() allowed (dev convenience)
+     * - RELEASE: NO fallback - database schema error will crash app
+     *            (preferred over silent data loss)
+     *
+     * All migrations MUST be defined in Migrations.kt and added here.
+     * New schema changes require proper migration functions.
+     *
+     * @param context Application context
+     * @return Configured NoghreSodDatabase instance
      */
     @Provides
     @Singleton
@@ -120,7 +134,22 @@ object AppModule {
             NoghreSodDatabase::class.java,
             "noghresod.db"
         )
-            .fallbackToDestructiveMigration()
+            .addMigrations(
+                Migrations.MIGRATION_1_2,
+                Migrations.MIGRATION_2_3,
+                Migrations.MIGRATION_3_4,
+                Migrations.MIGRATION_4_5
+            )
+            .apply {
+                if (BuildConfig.DEBUG) {
+                    // ⚠️ DEBUG ONLY: Allow destructive migration
+                    // This should NEVER be in production builds
+                    fallbackToDestructiveMigration()
+                }
+                // PRODUCTION: If migration fails, app crashes
+                // This is SAFER than silent data loss
+            }
+            .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
             .build()
     }
 
