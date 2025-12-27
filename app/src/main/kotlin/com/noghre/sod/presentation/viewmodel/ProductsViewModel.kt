@@ -1,281 +1,278 @@
 package com.noghre.sod.presentation.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.domain.model.Category
 import com.noghre.sod.domain.model.Product
-import com.noghre.sod.domain.usecase.GetCategoriesUseCase
-import com.noghre.sod.domain.usecase.GetProductsUseCase
-import com.noghre.sod.domain.usecase.SearchProductsUseCase
-import com.noghre.sod.domain.usecase.AddToFavoritesUseCase
-import com.noghre.sod.domain.usecase.RemoveFromFavoritesUseCase
-import com.noghre.sod.presentation.common.UiEvent
-import com.noghre.sod.presentation.common.UiConstants
-import com.noghre.sod.presentation.products.AvailabilityFilter
-import com.noghre.sod.presentation.products.ProductFilterOptions
-import com.noghre.sod.presentation.products.ProductSortType
-import com.noghre.sod.presentation.products.ProductsUiState
+import com.noghre.sod.domain.model.ProductFilters
+import com.noghre.sod.domain.repository.ProductRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * ViewModel for products listing screen.
- * Manages state for browsing, searching, filtering, and managing favorites.
- *
- * @property getProductsUseCase Use case for fetching products
- * @property getCategoriesUseCase Use case for fetching categories
- * @property searchProductsUseCase Use case for searching products
- * @property addToFavoritesUseCase Use case for adding to favorites
- * @property removeFromFavoritesUseCase Use case for removing from favorites
+ * ProductsViewModel - مدیریت لیست محصولات با Pagination و Search
+ * Features:
+ * - State Management با StateFlow
+ * - Pagination Support
+ * - Search with Debouncing
+ * - Filter/Sort Management
+ * - Retry Mechanism
+ * - Process Death Recovery
  */
 @HiltViewModel
 class ProductsViewModel @Inject constructor(
-    private val getProductsUseCase: GetProductsUseCase,
-    private val getCategoriesUseCase: GetCategoriesUseCase,
-    private val searchProductsUseCase: SearchProductsUseCase,
-    private val addToFavoritesUseCase: AddToFavoritesUseCase,
-    private val removeFromFavoritesUseCase: RemoveFromFavoritesUseCase
+    private val productsRepository: ProductRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ProductsUiState())
+    // State Management
+    private val _uiState = MutableStateFlow<ProductsUiState>(ProductsUiState.Initial)
     val uiState: StateFlow<ProductsUiState> = _uiState.asStateFlow()
 
-    private val _events = Channel<UiEvent>()
-    val events = _events.receiveAsFlow()
+    // Pagination State
+    private val _paginationState = MutableStateFlow(PaginationState())
+    val paginationState: StateFlow<PaginationState> = _paginationState.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
+    // Search Query with Debouncing
+    private val searchQuery = MutableStateFlow("")
+
+    // Loading State
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
-        loadProducts(forceRefresh = true)
-        loadCategories()
-        setupSearchDebounce()
+        observeSearchQuery()
+        restoreStateIfNeeded()
+        loadProducts()
     }
 
     /**
-     * Load products with optional category filter and refresh
-     *
-     * @param categoryId Category ID to filter by (optional)
-     * @param forceRefresh Force refresh from API
+     * Observe search query with debouncing (300ms)
+     * Prevents excessive API calls while typing
      */
-    fun loadProducts(categoryId: String? = null, forceRefresh: Boolean = false) {
-        viewModelScope.launch {
-            try {
-                updateState {
-                    copy(
-                        isLoading = !forceRefresh && products.isEmpty(),
-                        isRefreshing = forceRefresh,
-                        error = null
-                    )
+    @OptIn(FlowPreview::class)
+    private fun observeSearchQuery() {
+        searchQuery
+            .debounce(300)
+            .distinctUntilChanged()
+            .onEach { query ->
+                if (query.isNotEmpty()) {
+                    searchProducts(query)
+                } else {
+                    resetAndLoadProducts()
                 }
-
-                val result = getProductsUseCase(
-                    page = 1,
-                    categoryId = categoryId,
-                    sortBy = uiState.value.sortBy.name.lowercase()
-                )
-
-                updateState {
-                    copy(
-                        products = result,
-                        isLoading = false,
-                        isRefreshing = false,
-                        hasMorePages = result.size >= UiConstants.DEFAULT_PAGE_SIZE,
-                        currentPage = 1
-                    )
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Error loading products")
-                updateState {
-                    copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        error = e.message ?: "Failed to load products"
-                    )
-                }
-                _events.send(UiEvent.ShowSnackbar("Failed to load products"))
             }
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * Load products with optional filters
+     */
+    fun loadProducts(filters: ProductFilters = ProductFilters()) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _uiState.value = ProductsUiState.Loading
+            _paginationState.value = PaginationState()
+
+            productsRepository.getProducts(
+                page = 1,
+                filters = filters
+            )
+                .onSuccess { response ->
+                    _paginationState.update {
+                        it.copy(
+                            currentPage = 1,
+                            hasMorePages = response.hasNextPage,
+                            isLoadingMore = false
+                        )
+                    }
+                    _uiState.value = ProductsUiState.Success(
+                        products = response.products,
+                        filters = filters
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = ProductsUiState.Error(
+                        message = error.message ?: "Failed to load products",
+                        type = ErrorType.NETWORK_ERROR
+                    )
+                }
+                .also {
+                    _isLoading.value = false
+                }
         }
     }
 
     /**
-     * Load all available categories
+     * Load next page with pagination and error handling
      */
-    fun loadCategories() {
+    fun loadNextPage() {
+        val paginationState = _paginationState.value
+        if (paginationState.isLoadingMore || !paginationState.hasMorePages) {
+            return
+        }
+
         viewModelScope.launch {
-            try {
-                val result = getCategoriesUseCase()
-                updateState { copy(categories = result) }
-            } catch (e: Exception) {
-                Timber.e(e, "Error loading categories")
-            }
+            _paginationState.update { it.copy(isLoadingMore = true) }
+
+            val currentState = _uiState.value as? ProductsUiState.Success ?: return@launch
+            val nextPage = paginationState.currentPage + 1
+
+            productsRepository.getProducts(
+                page = nextPage,
+                filters = currentState.filters
+            )
+                .onSuccess { response ->
+                    _paginationState.update {
+                        it.copy(
+                            currentPage = nextPage,
+                            hasMorePages = response.hasNextPage,
+                            isLoadingMore = false
+                        )
+                    }
+                    appendProducts(response.products)
+                }
+                .onFailure { error ->
+                    _paginationState.update { it.copy(isLoadingMore = false) }
+                    handleError(error)
+                }
         }
     }
 
     /**
-     * Search products with debounce
-     *
-     * @param query Search query
+     * Append new products to existing list
      */
-    fun searchProducts(query: String) {
-        _searchQuery.value = query
+    private fun appendProducts(newProducts: List<Product>) {
+        val currentState = _uiState.value as? ProductsUiState.Success ?: return
+        _uiState.value = currentState.copy(
+            products = currentState.products + newProducts
+        )
     }
 
     /**
-     * Select a category to filter products
-     *
-     * @param category Selected category
+     * Search products with debounced query
      */
-    fun onCategorySelected(category: Category) {
-        updateState { copy(selectedCategory = category) }
-        loadProducts(categoryId = category.id, forceRefresh = true)
+    fun setSearchQuery(query: String) {
+        searchQuery.value = query
     }
 
     /**
-     * Change product sorting
-     *
-     * @param sortType Sort type
+     * Perform actual search
      */
-    fun onSortChanged(sortType: ProductSortType) {
-        updateState { copy(sortBy = sortType) }
-        loadProducts(forceRefresh = false)
+    private fun searchProducts(query: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _paginationState.value = PaginationState()
+
+            productsRepository.searchProducts(query)
+                .onSuccess { products ->
+                    _uiState.value = ProductsUiState.Success(
+                        products = products,
+                        filters = ProductFilters()
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = ProductsUiState.Error(
+                        message = "Search failed: ${error.message}",
+                        type = ErrorType.NETWORK_ERROR
+                    )
+                }
+                .also { _isLoading.value = false }
+        }
+    }
+
+    /**
+     * Reset search and reload products
+     */
+    private fun resetAndLoadProducts() {
+        loadProducts()
     }
 
     /**
      * Apply filters to products
-     *
-     * @param filters Filter options
      */
-    fun onFilterApplied(filters: ProductFilterOptions) {
-        updateState { copy(filterOptions = filters) }
-        loadProducts(forceRefresh = false)
+    fun applyFilters(filters: ProductFilters) {
+        savedStateHandle[KEY_FILTERS] = filters
+        loadProducts(filters)
     }
 
     /**
-     * Toggle favorite status of a product
-     *
-     * @param productId Product ID
+     * Retry mechanism for failed operations
      */
-    fun toggleFavorite(productId: String) {
-        viewModelScope.launch {
-            try {
-                val product = uiState.value.products.find { it.id == productId }
-                if (product != null) {
-                    if (product.isFavorite) {
-                        removeFromFavoritesUseCase(productId)
-                    } else {
-                        addToFavoritesUseCase(productId)
-                    }
-
-                    updateState {
-                        copy(
-                            products = products.map {
-                                if (it.id == productId) it.copy(isFavorite = !it.isFavorite) else it
-                            }
-                        )
-                    }
+    fun retry() {
+        when (val state = _uiState.value) {
+            is ProductsUiState.Error -> loadProducts()
+            is ProductsUiState.Success -> {
+                if (_paginationState.value.hasMorePages) {
+                    loadNextPage()
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "Error toggling favorite")
-                _events.send(UiEvent.ShowSnackbar("Error updating favorite"))
+            }
+            else -> Unit
+        }
+    }
+
+    /**
+     * Restore state after process death
+     */
+    private fun restoreStateIfNeeded() {
+        savedStateHandle.get<ProductFilters>(KEY_FILTERS)?.let { filters ->
+            val currentState = _uiState.value
+            if (currentState is ProductsUiState.Initial) {
+                loadProducts(filters)
             }
         }
     }
 
     /**
-     * Load more products (pagination)
+     * Handle errors from repository
      */
-    fun loadMoreProducts() {
-        if (!uiState.value.hasMorePages || uiState.value.isLoading) return
-
-        viewModelScope.launch {
-            try {
-                val nextPage = uiState.value.currentPage + 1
-                updateState { copy(isLoading = true) }
-
-                val result = getProductsUseCase(
-                    page = nextPage,
-                    categoryId = uiState.value.selectedCategory?.id
-                )
-
-                updateState {
-                    copy(
-                        products = products + result,
-                        isLoading = false,
-                        currentPage = nextPage,
-                        hasMorePages = result.size >= UiConstants.DEFAULT_PAGE_SIZE
-                    )
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Error loading more products")
-                updateState { copy(isLoading = false, error = e.message) }
-            }
-        }
+    private fun handleError(error: Exception) {
+        _uiState.value = ProductsUiState.Error(
+            message = error.message ?: "Unknown error occurred",
+            type = ErrorType.NETWORK_ERROR
+        )
     }
 
-    /**
-     * Refresh products (pull-to-refresh)
-     */
-    fun refresh() {
-        loadProducts(categoryId = uiState.value.selectedCategory?.id, forceRefresh = true)
+    companion object {
+        private const val KEY_FILTERS = "product_filters"
     }
+}
 
-    /**
-     * Clear error message
-     */
-    fun clearError() {
-        updateState { copy(error = null) }
-    }
+// UI State
+sealed interface ProductsUiState {
+    data object Initial : ProductsUiState
+    data object Loading : ProductsUiState
 
-    /**
-     * Setup debounced search
-     */
-    private fun setupSearchDebounce() {
-        viewModelScope.launch {
-            _searchQuery
-                .debounce(UiConstants.DEBOUNCE_DELAY_MS)
-                .collect { query ->
-                    if (query.isNotEmpty()) {
-                        performSearch(query)
-                    } else {
-                        loadProducts()
-                    }
-                }
-        }
-    }
+    data class Success(
+        val products: List<Product>,
+        val filters: ProductFilters,
+        val retryableError: String? = null
+    ) : ProductsUiState
 
-    /**
-     * Perform search
-     */
-    private suspend fun performSearch(query: String) {
-        try {
-            updateState { copy(isLoading = true, searchQuery = query) }
-            val results = searchProductsUseCase(query)
-            updateState {
-                copy(
-                    products = results,
-                    isLoading = false,
-                    currentPage = 1
-                )
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Error searching products")
-            updateState { copy(isLoading = false, error = e.message) }
-        }
-    }
+    data class Error(
+        val message: String,
+        val type: ErrorType
+    ) : ProductsUiState
+}
 
-    /**
-     * Update state immutably
-     */
-    private fun updateState(block: ProductsUiState.() -> ProductsUiState) {
-        _uiState.update(block)
-    }
+// Pagination State
+data class PaginationState(
+    val currentPage: Int = 0,
+    val hasMorePages: Boolean = true,
+    val isLoadingMore: Boolean = false
+)
+
+// Error Types
+enum class ErrorType {
+    NETWORK_ERROR, TIMEOUT, SERVER_ERROR, VALIDATION_ERROR
 }

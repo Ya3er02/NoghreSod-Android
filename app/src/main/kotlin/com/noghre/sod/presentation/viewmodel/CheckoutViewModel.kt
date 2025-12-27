@@ -3,189 +3,222 @@ package com.noghre.sod.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.noghre.sod.domain.model.Address
-import com.noghre.sod.domain.usecase.GetAddressesUseCase
-import com.noghre.sod.domain.usecase.CreateOrderUseCase
-import com.noghre.sod.domain.usecase.ProcessPaymentUseCase
-import com.noghre.sod.presentation.checkout.CheckoutStep
-import com.noghre.sod.presentation.checkout.CheckoutUiState
-import com.noghre.sod.presentation.checkout.PaymentMethod
-import com.noghre.sod.presentation.common.UiEvent
+import com.noghre.sod.domain.model.Order
+import com.noghre.sod.domain.model.PaymentMethod
+import com.noghre.sod.domain.repository.AddressRepository
+import com.noghre.sod.domain.repository.CartRepository
+import com.noghre.sod.domain.repository.OrderRepository
+import com.noghre.sod.domain.repository.PaymentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * ViewModel for multi-step checkout flow.
+ * CheckoutViewModel - مدیریت فرآیند checkout چند مرحله‌ای
+ * Features:
+ * - Multi-step Checkout Flow
+ * - Address Management
+ * - Payment Method Selection
+ * - Order Processing
+ * - Step Navigation
  */
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
-    private val getAddressesUseCase: GetAddressesUseCase,
-    private val createOrderUseCase: CreateOrderUseCase,
-    private val processPaymentUseCase: ProcessPaymentUseCase
+    private val cartRepository: CartRepository,
+    private val paymentRepository: PaymentRepository,
+    private val addressRepository: AddressRepository,
+    private val orderRepository: OrderRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CheckoutUiState())
-    val uiState: StateFlow<CheckoutUiState> = _uiState.asStateFlow()
+    // Checkout State
+    private val _checkoutState = MutableStateFlow<CheckoutState>(
+        CheckoutState.AddressSelection(emptyList(), null)
+    )
+    val checkoutState: StateFlow<CheckoutState> = _checkoutState.asStateFlow()
 
-    private val _events = Channel<UiEvent>()
-    val events = _events.receiveAsFlow()
+    // Current Step
+    private val _currentStep = MutableStateFlow(CheckoutStep.ADDRESS)
+    val currentStep: StateFlow<CheckoutStep> = _currentStep.asStateFlow()
+
+    // Selected Address
+    private val _selectedAddress = MutableStateFlow<Address?>(null)
+    val selectedAddress: StateFlow<Address?> = _selectedAddress.asStateFlow()
+
+    // Selected Payment Method
+    private val _selectedPaymentMethod = MutableStateFlow<PaymentMethod?>(null)
+    val selectedPaymentMethod: StateFlow<PaymentMethod?> = _selectedPaymentMethod.asStateFlow()
 
     init {
         loadAddresses()
+        loadPaymentMethods()
     }
 
     /**
      * Load user addresses
      */
-    fun loadAddresses() {
+    private fun loadAddresses() {
         viewModelScope.launch {
-            try {
-                val addresses = getAddressesUseCase()
-                updateState { copy(addresses = addresses) }
-            } catch (e: Exception) {
-                Timber.e(e, "Error loading addresses")
-            }
+            addressRepository.getUserAddresses()
+                .onSuccess { addresses ->
+                    _checkoutState.value = CheckoutState.AddressSelection(
+                        addresses = addresses,
+                        selectedAddress = addresses.firstOrNull()
+                    )
+                }
+                .onFailure { error ->
+                    _checkoutState.value = CheckoutState.Error(
+                        message = error.message ?: "Failed to load addresses"
+                    )
+                }
         }
     }
 
     /**
-     * Select delivery address
-     *
-     * @param address Selected address
+     * Load available payment methods
+     */
+    private fun loadPaymentMethods() {
+        viewModelScope.launch {
+            paymentRepository.getPaymentMethods()
+                .onSuccess { methods ->
+                    // Store for later use
+                }
+        }
+    }
+
+    /**
+     * Select shipping address
      */
     fun selectAddress(address: Address) {
-        updateState { copy(selectedAddress = address) }
+        _selectedAddress.value = address
+        val currentState = _checkoutState.value as? CheckoutState.AddressSelection
+        if (currentState != null) {
+            _checkoutState.value = currentState.copy(selectedAddress = address)
+        }
     }
 
     /**
      * Select payment method
-     *
-     * @param method Payment method
      */
     fun selectPaymentMethod(method: PaymentMethod) {
-        updateState { copy(paymentMethod = method) }
+        _selectedPaymentMethod.value = method
     }
 
     /**
-     * Accept/reject terms
-     *
-     * @param accepted Terms accepted
+     * Proceed to next checkout step
      */
-    fun setTermsAccepted(accepted: Boolean) {
-        updateState { copy(termsAccepted = accepted) }
-    }
-
-    /**
-     * Move to next step with validation
-     */
-    fun nextStep() {
-        val currentStep = uiState.value.currentStep
-        if (validateStep(currentStep)) {
-            val nextStep = when (currentStep) {
-                CheckoutStep.ADDRESS -> CheckoutStep.PAYMENT
-                CheckoutStep.PAYMENT -> CheckoutStep.REVIEW
-                CheckoutStep.REVIEW -> CheckoutStep.CONFIRMATION
-                CheckoutStep.CONFIRMATION -> CheckoutStep.CONFIRMATION
+    fun proceedToNextStep() {
+        val nextStep = when (_currentStep.value) {
+            CheckoutStep.ADDRESS -> {
+                if (_selectedAddress.value == null) {
+                    _checkoutState.value = CheckoutState.Error(
+                        message = "Please select an address"
+                    )
+                    return
+                }
+                CheckoutStep.PAYMENT
             }
-            updateState { copy(currentStep = nextStep) }
-        } else {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowSnackbar("Please complete this step"))
+            CheckoutStep.PAYMENT -> {
+                if (_selectedPaymentMethod.value == null) {
+                    _checkoutState.value = CheckoutState.Error(
+                        message = "Please select a payment method"
+                    )
+                    return
+                }
+                CheckoutStep.REVIEW
+            }
+            CheckoutStep.REVIEW -> {
+                placeOrder()
+                return
             }
         }
+        _currentStep.value = nextStep
     }
 
     /**
-     * Move to previous step
+     * Go back to previous step
      */
-    fun previousStep() {
-        val currentStep = uiState.value.currentStep
-        val previousStep = when (currentStep) {
-            CheckoutStep.ADDRESS -> CheckoutStep.ADDRESS
+    fun goBack() {
+        val prevStep = when (_currentStep.value) {
+            CheckoutStep.ADDRESS -> return // Already at first step
             CheckoutStep.PAYMENT -> CheckoutStep.ADDRESS
             CheckoutStep.REVIEW -> CheckoutStep.PAYMENT
-            CheckoutStep.CONFIRMATION -> CheckoutStep.REVIEW
         }
-        updateState { copy(currentStep = previousStep) }
+        _currentStep.value = prevStep
     }
 
     /**
-     * Place order
+     * Place order and complete checkout
      */
-    fun placeOrder() {
-        val state = uiState.value
-
-        if (!validateStep(CheckoutStep.REVIEW)) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowSnackbar("Invalid order"))
-            }
-            return
-        }
-
+    private fun placeOrder() {
         viewModelScope.launch {
-            try {
-                updateState { copy(isProcessing = true) }
+            _checkoutState.value = CheckoutState.Processing
 
-                // Process payment if online
-                if (state.paymentMethod == PaymentMethod.ONLINE) {
-                    processPaymentUseCase(
-                        amount = state.cartItems.sumOf { it.subtotal },
-                        method = state.paymentMethod.name
-                    )
-                }
+            val selectedAddress = _selectedAddress.value
+            val selectedPayment = _selectedPaymentMethod.value
 
-                // Create order
-                createOrderUseCase(
-                    items = state.cartItems,
-                    address = state.selectedAddress ?: return@launch,
-                    paymentMethod = state.paymentMethod.name
+            if (selectedAddress == null || selectedPayment == null) {
+                _checkoutState.value = CheckoutState.Error(
+                    message = "Missing required information"
                 )
-
-                updateState {
-                    copy(
-                        isProcessing = false,
-                        currentStep = CheckoutStep.CONFIRMATION
-                    )
-                }
-                _events.send(UiEvent.ShowSnackbar("Order placed successfully"))
-                _events.send(UiEvent.Navigate("order_confirmation"))
-            } catch (e: Exception) {
-                Timber.e(e, "Error placing order")
-                updateState {
-                    copy(
-                        isProcessing = false,
-                        error = e.message ?: "Failed to place order"
-                    )
-                }
-                _events.send(UiEvent.ShowSnackbar("Failed to place order"))
+                return@launch
             }
+
+            val cartId = cartRepository.getCurrentCartId()
+
+            orderRepository.createOrder(
+                cartId = cartId,
+                shippingAddressId = selectedAddress.id,
+                paymentMethod = selectedPayment
+            )
+                .onSuccess { order ->
+                    _checkoutState.value = CheckoutState.Success(order)
+                    cartRepository.clearCart()
+                }
+                .onFailure { error ->
+                    _checkoutState.value = CheckoutState.Error(
+                        message = error.message ?: "Failed to place order"
+                    )
+                }
         }
     }
 
     /**
-     * Validate current step
-     *
-     * @param step Step to validate
-     * @return True if valid
+     * Cancel checkout and return to cart
      */
-    private fun validateStep(step: CheckoutStep): Boolean {
-        val state = uiState.value
-        return when (step) {
-            CheckoutStep.ADDRESS -> state.selectedAddress != null
-            CheckoutStep.PAYMENT -> state.paymentMethod != null
-            CheckoutStep.REVIEW -> state.termsAccepted
-            CheckoutStep.CONFIRMATION -> true
-        }
+    fun cancelCheckout() {
+        _currentStep.value = CheckoutStep.ADDRESS
+        _selectedAddress.value = null
+        _selectedPaymentMethod.value = null
     }
+}
 
-    private fun updateState(block: CheckoutUiState.() -> CheckoutUiState) {
-        _uiState.update(block)
-    }
+// Checkout State
+sealed interface CheckoutState {
+    data class AddressSelection(
+        val addresses: List<Address>,
+        val selectedAddress: Address?
+    ) : CheckoutState
+
+    data class PaymentSelection(
+        val methods: List<PaymentMethod>,
+        val selectedMethod: PaymentMethod?
+    ) : CheckoutState
+
+    data class Review(
+        val address: Address,
+        val paymentMethod: PaymentMethod
+    ) : CheckoutState
+
+    data object Processing : CheckoutState
+    data class Success(val order: Order) : CheckoutState
+    data class Error(val message: String) : CheckoutState
+}
+
+// Checkout Steps
+enum class CheckoutStep {
+    ADDRESS, PAYMENT, REVIEW
 }
