@@ -8,10 +8,20 @@ plugins {
     id("kotlin-serialization")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
 android {
     namespace = "com.noghre.sod"
     compileSdk = 34
 
+    // Load secrets from local.properties
+    val secretsFile = rootProject.file("local.properties")
+    val secrets = Properties()
+    if (secretsFile.exists()) {
+        secrets.load(FileInputStream(secretsFile))
+    }
+    
     defaultConfig {
         applicationId = "com.noghre.sod"
         minSdk = 24
@@ -24,9 +34,21 @@ android {
             useSupportLibrary = true
         }
 
-        // For BuildConfig values
+        // BuildConfig values from secrets
         buildConfigField("String", "API_BASE_URL", "\"https://api.noghresod.com/api/\"")
         buildConfigField("String", "APP_NAME", "\"نقره‌سود\"")
+        
+        // Zarinpal Payment Gateway - from local.properties
+        val zarinpalMerchantId = secrets.getProperty("zarinpal.merchant.id", "SANDBOX_MERCHANT_ID")
+        val zarinpalSandboxId = secrets.getProperty("zarinpal.sandbox.merchant.id", "SANDBOX_MERCHANT_ID")
+        buildConfigField("String", "ZARINPAL_MERCHANT_ID", "\"$zarinpalMerchantId\"")
+        buildConfigField("String", "ZARINPAL_SANDBOX_MERCHANT_ID", "\"$zarinpalSandboxId\"")
+        
+        // Firebase Configuration (if needed from properties)
+        val firebaseProjectId = secrets.getProperty("firebase.project.id", "")
+        if (firebaseProjectId.isNotEmpty()) {
+            buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$firebaseProjectId\"")
+        }
     }
 
     buildTypes {
@@ -38,10 +60,14 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("Boolean", "DEBUG_LOGGING", "false")
+            buildConfigField("Boolean", "ENABLE_CERTIFICATE_PINNING", "true")
+            buildConfigField("Boolean", "ENABLE_CRASHLYTICS", "true")
         }
         debug {
             isMinifyEnabled = false
             buildConfigField("Boolean", "DEBUG_LOGGING", "true")
+            buildConfigField("Boolean", "ENABLE_CERTIFICATE_PINNING", "false")
+            buildConfigField("Boolean", "ENABLE_CRASHLYTICS", "false")
         }
     }
 
@@ -143,6 +169,7 @@ dependencies {
     implementation("com.google.firebase:firebase-database")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-crashlytics")
 
     // ============================================
     // Google Play Services
