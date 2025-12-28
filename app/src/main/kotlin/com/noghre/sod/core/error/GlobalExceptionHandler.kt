@@ -116,6 +116,20 @@ sealed class AppError(open val message: String?) {
     ) : AppError(message)
     
     /**
+     * Payment-related errors (gateway unavailability, processing failures)
+     */
+    data class Payment(
+        override val message: String?
+    ) : AppError(message)
+    
+    /**
+     * Resource not found errors
+     */
+    data class NotFound(
+        override val message: String?
+    ) : AppError(message)
+    
+    /**
      * Unknown or unexpected errors
      */
     data class Unknown(
@@ -128,24 +142,26 @@ sealed class AppError(open val message: String?) {
      */
     fun toUserMessage(): String = when (this) {
         is Network -> when (statusCode) {
-            400 -> "درخواست نامعتبر. لطفاً اطلاعات را بررسی کنید."
-            401 -> "لطفاً دوباره وارد شوید."
+            400 -> "درخواست نامعتبر. لطفال اطلاعات را بررسی کنید."
+            401 -> "لطفال دوباره وارد شوید."
             403 -> "دسترسی به این بخش مجاز نیست."
             404 -> "اطلاعات درخواستی یافت نشد."
-            408 -> "زمان اتصال تمام شد. لطفاً دوباره تلاش کنید."
-            500, 502, 503 -> "خطا در سرور. لطفاً بعداً تلاش کنید."
-            in 500..599 -> "مشکل در سرور. لطفاً کمی صبر کنید."
+            408 -> "زمان اتصال تمام شد. لطفال دوباره تلاش کنید."
+            500, 502, 503 -> "خطا در سرور. لطفال بعدال تلاش کنید."
+            in 500..599 -> "مشکل در سرور. لطفال کمی صبر کنید."
             else -> message ?: "خطا در برقراری ارتباط. اتصال اینترنت خود را بررسی کنید."
         }
         is Database -> "خطا در ذخیره‌سازی اطلاعات. ${operation ?: ""}"
         is Authentication -> when (reason) {
             AuthFailureReason.INVALID_CREDENTIALS -> "نام کاربری یا رمز عبور اشتباه است."
-            AuthFailureReason.TOKEN_EXPIRED -> "نشست شما منقضی شده. لطفاً دوباره وارد شوید."
+            AuthFailureReason.TOKEN_EXPIRED -> "نشست شما منقضی شده. لطفال دوباره وارد شوید."
             AuthFailureReason.ACCOUNT_LOCKED -> "حساب کاربری شما قفل شده است."
             AuthFailureReason.UNKNOWN -> message ?: "خطا در احراز هویت."
         }
         is Validation -> message ?: "اطلاعات وارد شده معتبر نیست. ${field ?: ""}"
-        is Unknown -> "خطای غیرمنتظره رخ داد. لطفاً دوباره تلاش کنید."
+        is Payment -> message ?: "خطا در پرداخت. لطفال دوباره تلاش کنید."
+        is NotFound -> message ?: "مورد تلافی نت شد."
+        is Unknown -> "خطای غیرمنتظره رخ داد. لطفال دوباره تلاش کنید."
     }
     
     /**
