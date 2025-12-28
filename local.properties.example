@@ -1,26 +1,33 @@
-# Local Configuration Template
-# Copy this to local.properties and fill in your values
-# NEVER commit local.properties to Git (it's in .gitignore)
+# Local Properties - SECRET CREDENTIALS
+# DO NOT COMMIT THIS FILE WITH REAL VALUES
+# Copy to local.properties and fill with actual values
 
-# SDK Configuration
-sdk.dir=/path/to/android/sdk
+# ============================================
+# Zarinpal Payment Gateway Credentials
+# ============================================
+# Get your credentials from: https://panel.zarinpal.com
 
-# API Configuration
-api.key=your_secret_api_key_here
-api.base_url=https://api.noghresod.com/api/
+# Production Merchant ID
+zarinpal.merchant.id=YOUR_PRODUCTION_MERCHANT_ID
 
-# Payment Gateway Keys
-payment.gateway.key=your_payment_key
-payment.gateway.secret=your_payment_secret
+# Sandbox Merchant ID (for testing)
+zarinpal.sandbox.merchant.id=YOUR_SANDBOX_MERCHANT_ID
 
-# Firebase Configuration
-firebase.database_url=https://your-project.firebaseio.com
+# Optional: API Key for additional operations
+zarinpal.api.key=YOUR_API_KEY_IF_NEEDED
 
-# Feature Flags
-enable.debug.logging=false
-enable.crash.reporting=true
-enable.analytics=true
+# ============================================
+# Firebase Configuration (Optional)
+# ============================================
+# Leave empty if using google-services.json
+firebase.project.id=your-project-id
 
-# Security
-enableProguard=true
-enableNativeDebugging=false
+# ============================================
+# NextPay Gateway (Future Use)
+# ============================================
+# nextpay.api.key=YOUR_NEXTPAY_KEY
+
+# ============================================
+# Bazaar Pay (Future Use)
+# ============================================
+# bazaar.api.key=YOUR_BAZAAR_KEY
