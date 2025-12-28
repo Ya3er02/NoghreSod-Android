@@ -1,682 +1,593 @@
-# 🚀 NoghreSod Android - Deployment & Release Guide
+# 🚀 Deployment Guide - NoghreSod Android
 
-**Status:** Complete Deployment Documentation
-**Date:** December 26, 2025
-**Version:** v1.0 (Production Ready)
+**Complete guide for building, signing, and deploying to Google Play Store and user devices.**
 
 ---
 
-## 📄 Table of Contents
+## Table of Contents
 
-1. [Pre-Release Checklist](#pre-release-checklist)
-2. [Build Process](#build-process)
-3. [Testing Strategy](#testing-strategy)
-4. [Release Management](#release-management)
-5. [Google Play Submission](#google-play-submission)
-6. [Post-Release Monitoring](#post-release-monitoring)
-7. [Hotfix Procedure](#hotfix-procedure)
-8. [Rollback Strategy](#rollback-strategy)
+1. [Overview](#overview)
+2. [Build Types & Flavors](#build-types--flavors)
+3. [Signing Configuration](#signing-configuration)
+4. [Building](#building)
+5. [Testing Before Release](#testing-before-release)
+6. [Google Play Deployment](#google-play-deployment)
+7. [CI/CD Pipeline](#cicd-pipeline)
+8. [Version Management](#version-management)
+9. [Release Checklist](#release-checklist)
 
 ---
 
-## 📈 Pre-Release Checklist
+## Overview
 
-### Code Quality ✅
-
-```
-✅ All tests passing (./gradlew test)
-✅ Code coverage >= 87%
-✅ No critical/major lint warnings
-✅ ProGuard rules verified
-✅ All deprecations addressed
-✅ Thread safety verified
-✅ Memory leaks checked (LeakCanary)
-```
-
-### Security ✅
+### Build Pipeline
 
 ```
-✅ Certificate pinning configured
-✅ API keys in local.properties (not git)
-✅ No hardcoded secrets
-✅ HTTPS enforced
-✅ Keystore created and secured
-✅ ProGuard enabled for release
-✅ Crash reporting configured
+Source Code
+    ⬇︎
+./gradlew build
+    ⬇︎
+Compilation (Kotlin → Bytecode)
+    ⬇︎
+Resource Packaging
+    ⬇︎
+DEX Compilation (Java → Android)
+    ⬇︎
+APK Assembly
+    ⬇︎
+APK Signing
+    ⬇︎
+APK Optimization (R8/ProGuard)
+    ⬇︎
+Installation & Testing
 ```
 
-### Features ✅
+### Release Strategy
 
 ```
-✅ All planned features implemented
-✅ Analytics events configured
-✅ Offline-first tested
-✅ RTL layouts verified
-✅ Strings externalized
-✅ Images cached properly
-✅ Deep links working
-```
-
-### Documentation ✅
-
-```
-✅ README.md updated
-✅ Architecture documented
-✅ API integration guide complete
-✅ Troubleshooting guide written
-✅ Release notes prepared
-✅ Changelog updated
-```
-
-### Performance ✅
-
-```
-✅ APK size optimized (<100MB recommended)
-✅ Load time acceptable (<2s cold start)
-✅ Memory usage normal (<150MB typical)
-✅ Battery impact minimal
-✅ Network requests optimized
-✅ Database queries fast (<10ms)
+Internal Testing (Debug)
+         ⬇︎
+Staging Release (Sandbox Merchant)
+         ⬇︎
+Pre-release Testing
+         ⬇︎
+Production Release (Real Merchant)
+         ⬇︎
+Google Play Rollout
 ```
 
 ---
 
-## 🔦 Build Process
+## Build Types & Flavors
 
-### 1. Development Build
+### Build Types
+
+#### Debug
+- Development builds
+- Debuggable
+- No ProGuard/R8 obfuscation
+- Unoptimized
+- Faster build time
 
 ```bash
-# Clean previous builds
-./gradlew clean
-
-# Build debug APK
 ./gradlew assembleDebug
-
-# Install on device
-adb install app/build/outputs/apk/debug/*.apk
-
-# Or use Android Studio: Run > Run 'app'
 ```
 
-### 2. Stage/Beta Build
+#### Release
+- Production builds
+- Not debuggable
+- ProGuard/R8 optimization
+- Code obfuscation
+- Slower build time, smaller APK
 
 ```bash
-# Build staging APK (for internal testing)
-./gradlew assembleStaging
-
-# Create signed APK
-./gradlew assembleStaging \
-    -Pandroid.injected.signing.store.file=keystore.jks \
-    -Pandroid.injected.signing.store.password=password \
-    -Pandroid.injected.signing.key.alias=alias \
-    -Pandroid.injected.signing.key.password=password
+./gradlew assembleRelease
 ```
 
-### 3. Release Build
+### Product Flavors
+
+#### Dev
+- Uses Zarinpal Sandbox Merchant ID
+- Dev API server
+- For internal development
 
 ```bash
-# Build release APK (for production)
-./gradlew assembleRelease \
-    -Pandroid.injected.signing.store.file=keystore.jks \
-    -Pandroid.injected.signing.store.password=password \
-    -Pandroid.injected.signing.key.alias=release \
-    -Pandroid.injected.signing.key.password=password
-
-# Output: app/build/outputs/apk/release/app-release.apk
+./gradlew assembleDevDebug
+./gradlew assembleDevRelease
 ```
 
-### 4. Android App Bundle (Google Play)
+#### Staging
+- Uses Zarinpal Sandbox Merchant ID
+- Staging API server
+- For pre-release testing
+- Real-like environment
 
 ```bash
-# Build release bundle (for Play Store distribution)
-./gradlew bundleRelease \
-    -Pandroid.injected.signing.store.file=keystore.jks \
-    -Pandroid.injected.signing.store.password=password \
-    -Pandroid.injected.signing.key.alias=release \
-    -Pandroid.injected.signing.key.password=password
-
-# Output: app/build/outputs/bundle/release/app-release.aab
+./gradlew assembleStagingDebug
+./gradlew assembleStagingRelease
 ```
 
-### Build Configuration
+#### Production
+- Uses Zarinpal Production Merchant ID
+- Production API server
+- Real transactions
 
-**build.gradle.kts:**
+```bash
+./gradlew assembleProductionDebug
+./gradlew assembleProductionRelease
+```
+
+### Variant Combinations
+
+```
+Flavor × Build Type = Variant
+
+dev          × debug     = devDebug
+dev          × release   = devRelease
+staging      × debug     = stagingDebug
+staging      × release   = stagingRelease
+production   × debug     = productionDebug
+production   × release   = productionRelease
+```
+
+---
+
+## Signing Configuration
+
+### Generate Signing Key
+
+#### For Production
+
+```bash
+# Generate keystore (one-time)
+keytool -genkey -v -keystore noghre_sod_production.keystore \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias noghre_sod_prod
+
+# Output: noghre_sod_production.keystore
+# Store securely!
+```
+
+**Keystore Details to Remember:**
+- Keystore password (keep safe!)
+- Key alias: `noghre_sod_prod`
+- Key password (keep safe!)
+- Validity: 10000 days (~27 years)
+
+#### For Debug (Auto-generated)
+
+```bash
+# Android creates debug keystore automatically at:
+# ~/.android/debug.keystore
+# Password: android
+# Alias: androiddebugkey
+```
+
+### Configure Signing in Gradle
+
+**File: `app/build.gradle.kts`**
+
 ```kotlin
 android {
-    compileSdk = 34
-    
-    defaultConfig {
-        applicationId = "com.noghre.sod"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+    signingConfigs {
+        create("release") {
+            storeFile = file("${System.getProperty("user.home")}/.android/noghre_sod_production.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = "noghre_sod_prod"
+            keyPassword = System.getenv("KEY_PASSWORD")
+        }
     }
     
     buildTypes {
-        debug {
-            debuggable = true
-            minifyEnabled = false
-        }
-        
         release {
-            debuggable = false
-            minifyEnabled = true
-            shrinkResources = true
-            
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            
-            signingConfig = signingConfigs.release
         }
     }
 }
 ```
 
----
-
-## 🧪 Testing Strategy
-
-### 1. Unit Tests
+### Store Keystore Securely
 
 ```bash
-# Run all unit tests
-./gradlew test
+# Best practice: Don't commit keystore!
+# .gitignore should have:
+echo "*.keystore" >> .gitignore
 
-# Run specific test class
-./gradlew test --tests ProductsViewModelTest
-
-# Generate coverage report
-./gradlew testDebugUnitTest --coverage
-# View report: app/build/reports/coverage/debug/index.html
-```
-
-### 2. Instrumentation Tests (Android Device)
-
-```bash
-# Run Android tests
-./gradlew connectedAndroidTest
-
-# Run on specific device
-adb devices  # List devices
-./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=
-```
-
-### 3. Monkey Testing (Stress Test)
-
-```bash
-# Run random input test
-adb shell monkey -p com.noghre.sod -v 500
-
-# Monitor for crashes
-adb logcat | grep FATAL
-```
-
-### 4. Performance Testing
-
-```bash
-# Profile app
-./gradlew profileReleaseBuild
-
-# Measure startup time
-adb shell am start -W com.noghre.sod/.MainActivity
-
-# Memory profiling (Android Studio > Profiler)
-```
-
-### Test Coverage Target
-
-```
-✅ Unit Test Coverage: 87%
-✅ Critical Path Coverage: 95%
-✅ Screen Coverage: 100%
-✅ API Coverage: 90%
+# Store in:
+# 1. Secure password manager
+# 2. CI/CD secrets (GitHub Actions Secrets)
+# 3. Hardware security key (production)
 ```
 
 ---
 
-## 📋 Release Management
+## Building
 
-### Version Numbering: MAJOR.MINOR.PATCH
+### Build Commands
+
+```bash
+# Debug builds (unsigned, auto-signed with debug key)
+./gradlew assembleDebug
+./gradlew installDebug  # Build + install on device
+
+# Release builds (requires signing config)
+./gradlew assembleProductionRelease
+./gradlew bundleProductionRelease  # For Play Store
+
+# Specific flavor
+./gradlew assembleStagingRelease
+./gradlew installStagingRelease
+```
+
+### Build Options
+
+```bash
+# Parallel build (faster)
+./gradlew assembleProductionRelease --parallel
+
+# With build cache
+./gradlew assembleProductionRelease --build-cache
+
+# Clean first
+./gradlew clean assembleProductionRelease
+
+# Verbose output
+./gradlew assembleProductionRelease --info
+```
+
+### Output Location
 
 ```
-v1.0.0 - Initial release
-v1.1.0 - New features
-v1.0.1 - Bug fixes
-v1.1.5 - Multiple patches
-v2.0.0 - Major refactoring
+app/build/outputs/
+├── apk/             # APK files
+│   ├── devDebug/
+│   ├── stagingRelease/
+│   └── productionRelease/
+├── bundle/          # AAB files (for Play Store)
+│   └── productionRelease/
+├── mapping/         # R8 obfuscation mapping
+└── lint-results/    # Lint reports
 ```
 
-### Version Code (Internal)
+---
+
+## Testing Before Release
+
+### Pre-Release Testing Checklist
+
+```bash
+# 1. Run all tests
+./gradlew test --coverage
+
+# 2. Lint check
+./gradlew lint
+
+# 3. Build all variants
+./gradlew assembleDebug
+./gradlew assembleStagingRelease
+./gradlew assembleProductionDebug  # For manual testing
+
+# 4. Install on device
+./gradlew installStagingRelease
+
+# 5. Test payment flow (sandbox)
+# Use Zarinpal sandbox credentials
+
+# 6. Check app signing
+jarsigner -verify -verbose app/build/outputs/apk/productionRelease/app-production-release.apk
+```
+
+### Manual Testing on Staging
+
+1. **Install staging build:**
+   ```bash
+   ./gradlew installStagingRelease
+   ```
+
+2. **Test features:**
+   - Product browsing
+   - Filtering and search
+   - Add to cart
+   - Checkout flow
+   - **Payment (uses Zarinpal sandbox)**
+   - Offline functionality
+   - Network reconnection
+
+3. **Test payment with sandbox:**
+   - Use test card numbers
+   - Verify transaction logs
+   - Check database sync
+
+---
+
+## Google Play Deployment
+
+### Prerequisites
+
+- [Google Play Developer Account](https://play.google.com/console) (€25 one-time)
+- App signed with release keystore
+- App Store Listing prepared
+- Privacy Policy and Terms of Service
+- Screenshots and preview images
+- Rating content questionnaire completed
+
+### Prepare App Bundle
+
+```bash
+# Create AAB (App Bundle) for Play Store
+./gradlew bundleProductionRelease
+
+# Output: app/build/outputs/bundle/productionRelease/app-production-release.aab
+
+# This is ~5-10 MB (smaller than APK)
+# Play Store optimizes per device
+```
+
+### Upload to Play Console
+
+1. **Go to [Google Play Console](https://play.google.com/console)**
+2. **Select app (or create if new)**
+3. **Left sidebar → Release → Production**
+4. **Create new release:**
+   - Click "Create new release"
+   - Upload AAB file
+   - Add release notes
+   - Set rollout percentage (e.g., 10% → 25% → 100%)
+5. **Review and publish**
+
+### Play Store Rollout Strategy
+
+```
+Day 1: 10% rollout
+  Monitor crash reports and ratings
+  ⬇︎ (24 hours)
+
+Day 2: 25% rollout
+  Check metrics and user feedback
+  ⬇︎ (24 hours)
+  
+Day 3: 100% rollout
+  Full release to all users
+```
+
+---
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflow
+
+**File: `.github/workflows/build-and-deploy.yml`**
+
+```yaml
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Build
+        env:
+          ZARINPAL_MERCHANT_ID: ${{ secrets.PROD_MERCHANT_ID }}
+          ZARINPAL_SANDBOX_MERCHANT_ID: ${{ secrets.SANDBOX_MERCHANT_ID }}
+        run: |
+          echo "zarinpal.merchant.id=$ZARINPAL_MERCHANT_ID" >> local.properties
+          echo "zarinpal.sandbox.merchant.id=$ZARINPAL_SANDBOX_MERCHANT_ID" >> local.properties
+          ./gradlew bundleProductionRelease
+      
+      - name: Deploy to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_CONSOLE_JSON }}
+          packageName: com.noghre.sod
+          releaseFile: app/build/outputs/bundle/productionRelease/app-production-release.aab
+          track: internal
+          status: inProgress
+          rolloutPercentage: 10
+```
+
+### Setup GitHub Secrets
+
+```
+Repository Settings → Secrets and variables → Actions
+
+Add:
+- PROD_MERCHANT_ID: Your production Zarinpal ID
+- SANDBOX_MERCHANT_ID: Your sandbox Zarinpal ID
+- PLAY_CONSOLE_JSON: Google Play Console service account JSON
+- KEYSTORE_PASSWORD: Keystore password
+- KEY_PASSWORD: Key password
+```
+
+---
+
+## Version Management
+
+### Semantic Versioning
+
+**Format:** `MAJOR.MINOR.PATCH`
+
+Examples:
+- `1.0.0` - First release
+- `1.1.0` - New features (minor bump)
+- `1.1.1` - Bug fix (patch bump)
+- `2.0.0` - Breaking changes (major bump)
+
+### Update Version
+
+**File: `app/build.gradle.kts`**
 
 ```kotlin
-// Increment for every release
-versionCode = 1  // v1.0.0 (first release)
-versionCode = 2  // v1.0.1 (patch)
-versionCode = 3  // v1.1.0 (minor)
-versionCode = 4  // v1.1.1 (minor patch)
+android {
+    defaultConfig {
+        versionCode = 1        // Increment for each release
+        versionName = "1.0.0"  // Semantic version
+    }
+}
+
+// Version code calculation
+// versionCode = majorVersion * 10000 + minorVersion * 100 + patchVersion
+// Example: v1.2.3 = 10203
 ```
 
-### Release Branch
+### Version Timeline
+
+```
+v0.1.0 - Initial Alpha
+  ⬇︎ 1 month
+v0.5.0 - Beta with major features
+  ⬇︎ 2 weeks
+v1.0.0 - First Production Release
+  ⬇︎ 1 month
+v1.1.0 - New features, bug fixes
+  ⬇︎ 1 week
+v1.1.1 - Critical bug fix
+  ⬇︎ 2 weeks
+v2.0.0 - Major redesign/rewrite
+```
+
+---
+
+## Release Checklist
+
+### Before Deployment
+
+- [ ] All tests passing (`./gradlew test`)
+- [ ] Code review completed
+- [ ] Version updated in `build.gradle.kts`
+- [ ] CHANGELOG.md updated
+- [ ] Release notes prepared
+- [ ] Screenshots/preview updated (if UI changed)
+- [ ] Privacy Policy updated (if needed)
+- [ ] All branches merged to `main`
+- [ ] No TODO comments in code
+- [ ] No debug logging
+- [ ] ProGuard rules tested
+- [ ] Keystore password available
+
+### Build Staging Release
+
+- [ ] Run `./gradlew clean`
+- [ ] Run `./gradlew bundleStagingRelease`
+- [ ] Install staging APK on device
+- [ ] Test all critical flows
+- [ ] Test payment with sandbox
+- [ ] Check logs for crashes
+- [ ] Test offline functionality
+- [ ] Verify app signing
+
+### Build Production Release
+
+- [ ] Verify merchant ID in `local.properties`
+- [ ] Run `./gradlew clean`
+- [ ] Run `./gradlew bundleProductionRelease`
+- [ ] Verify signing configuration
+- [ ] Check APK size and performance
+- [ ] Verify manifest (target SDK, permissions)
+- [ ] Test with production payment credentials (if possible)
+
+### Upload to Play Store
+
+- [ ] Create release in Play Console
+- [ ] Upload AAB file
+- [ ] Add release notes
+- [ ] Set rollout percentage (10%)
+- [ ] Review all information
+- [ ] Submit for review
+- [ ] Monitor crash reports (next 24h)
+- [ ] Increase rollout to 25% (if stable)
+- [ ] Final rollout to 100%
+
+### Post-Release
+
+- [ ] Monitor crash reports
+- [ ] Monitor ratings and reviews
+- [ ] Check Play Console analytics
+- [ ] Monitor payment transactions
+- [ ] Tag release in Git
+- [ ] Archive release notes
+- [ ] Notify team of deployment
+
+---
+
+## Troubleshooting
+
+### Build Failures
+
+**Issue:** `Signing config is missing the required key fields`
 
 ```bash
-# Create release branch
-git checkout -b release/1.0.0
-
-# Update version in build.gradle
-versionName = "1.0.0"
-versionCode = 1
-
-# Create release commit
-git commit -am "chore: Release v1.0.0"
-
-# Create git tag
-git tag -a v1.0.0 -m "Version 1.0.0 Release"
-
-# Push to GitHub
-git push origin release/1.0.0
-git push origin v1.0.0
-
-# Merge back to main
-git checkout main
-git merge release/1.0.0
-git push origin main
+# Solution: Ensure signing config in build.gradle.kts
+# Or set environment variables:
+export KEYSTORE_PASSWORD="your_password"
+export KEY_PASSWORD="your_password"
+./gradlew assembleProductionRelease
 ```
 
----
-
-## 🐸 Google Play Submission
-
-### 1. Setup Google Play Console
-
-```
-1. Create developer account (if needed)
-2. Create app in Google Play Console
-3. Fill in app details
-4. Create signing key (if new)
-5. Set up pricing & distribution
-```
-
-### 2. Prepare Release
+**Issue:** `R8 rule violation`
 
 ```bash
-# Build signed release bundle
-./gradlew bundleRelease
-
-# Verify signature
-jarsigner -verify app/build/outputs/bundle/release/app-release.aab
-
-# Check bundle size
-ls -lh app/build/outputs/bundle/release/app-release.aab
+# Solution: Update proguard-rules.pro
+# Add -dontwarn for problematic classes
 ```
 
-### 3. Upload to Play Console
+### Play Store Issues
 
-```
-1. Open Google Play Console
-2. Select app
-3. Go to Release > Production
-4. Create new release
-5. Upload app-release.aab
-6. Set release notes:
-   - Features added
-   - Bugs fixed
-   - Performance improvements
-7. Review content rating questionnaire
-8. Review app permissions
-9. Submit for review
-```
+**Issue:** `App not compatible with any device`
 
-### 4. App Submission Checklist
+- Check `compileSdk` is 34+
+- Check `targetSdk` is 34+
+- Verify minSdk is reasonable (API 21+)
 
-```
-✅ App description complete
-✅ Screenshots (4-5 high quality)
-✅ App icon (512x512 PNG)
-✅ Feature graphic (1024x500 PNG)
-✅ Release notes written
-✅ Content rating completed
-✅ Privacy policy link provided
-✅ Contact information added
-✅ Target audience set
-✅ No prohibited content
-```
+**Issue:** `Certificate not valid for signing`
 
-### 5. Review Timeline
-
-```
-Submit for review
-    ↓ (Usually 1-3 hours)
-App under review (Google automated checks)
-    ↓ (Usually 24 hours)
-App approved or rejected
-    ↓
-If approved:
-  - Manually scheduled rollout (if desired)
-  - Or immediate release (100%)
-
-If rejected:
-  - Fix issues
-  - Resubmit
-```
-
-### 6. Rollout Strategy
-
-**Option 1: Immediate Release (100%)**
-- Fastest deployment
-- All users get update immediately
-- Risk: Any critical bug affects all users
-
-**Option 2: Staged Rollout (Recommended)**
-```
-Phase 1: 5% users (Monitor for 24 hours)
-Phase 2: 20% users (Monitor for 24 hours)
-Phase 3: 50% users (Monitor for 48 hours)
-Phase 4: 100% users (Full release)
-```
-
-**Option 3: Timed Rollout**
-```
-Submit today
-Monitor feedback
-Schedule release for specific date
-Automatic rollout at specified time
-```
+- Verify certificate path in signing config
+- Check certificate hasn't expired
+- Verify password is correct
 
 ---
 
-## 📉 Release Notes Template
-
-```markdown
-# v1.0.0 Release Notes
-
-## New Features
-- 🌟 Complete offline-first system
-  - Queue operations when offline
-  - Auto-sync when network restored
-  - Smart retry with exponential backoff
-  
-- 📊 Firebase Analytics integration
-  - Track user behavior
-  - Monitor error rates
-  - Analyze purchase funnel
-  
-- 💾 Smart image caching
-  - 2-layer cache (memory + disk)
-  - Progressive loading
-  - Automatic management
-
-## Bug Fixes
-- Fixed RTL layout issues on ProductCard
-- Fixed string externalization
-- Fixed image loading on slow networks
-
-## Improvements
-- Improved performance (87% test coverage)
-- Enhanced security (certificate pinning)
-- Better error messages (in Persian)
-
-## Known Issues
-- RTL not yet complete on 4 screens (coming in v1.1)
-- Analytics dashboard setup needed in Firebase Console
-
-## Installation
-- Update app from Play Store
-- Or download APK from GitHub releases
-
-## Feedback
-- Report bugs: GitHub issues
-- Feature requests: GitHub discussions
-```
-
----
-
-## 📉 Post-Release Monitoring
-
-### 1. Crash Reporting
+## Quick Commands Reference
 
 ```bash
-# Monitor crashes in Firebase Console
-# Path: Analytics > Crash Reporting
+# Development
+./gradlew installDebug              # Build & install dev debug
 
-# Check daily:
-- Crash rate
-- Affected users
-- Stack traces
-- Device/OS versions
-```
+# Staging
+./gradlew bundleStagingRelease      # Create staging AAB
+./gradlew installStagingRelease     # Install staging release
 
-### 2. Performance Monitoring
+# Production
+./gradlew bundleProductionRelease   # Create production AAB
+./gradlew assembleProductionRelease # Create production APK
 
-```bash
-# Firebase Performance Monitoring
-# Path: Analytics > Performance
+# Testing
+./gradlew test                      # Run unit tests
+./gradlew lint                      # Run lint checks
 
-# Monitor metrics:
-- App startup time
-- Screen loading time
-- HTTP request latency
-- User engagement
-```
-
-### 3. User Feedback
-
-```bash
-# Check:
-- Google Play reviews (daily)
-- In-app crash reports
-- Support emails
-- GitHub issues
-
-# Respond to users:
-- Thank for positive reviews
-- Address negative feedback
-- Provide support
-```
-
-### 4. Analytics Dashboard
-
-```bash
-# Firebase Analytics
-- Active users
-- User retention
-- Event tracking
-- Purchase funnel
-- Error tracking
-```
-
-### Key Metrics to Monitor
-
-```
-📉 Stability
-   ├─ Crash rate < 0.1%
-   ├─ ANR (App Not Responding) < 0.05%
-   └─ Error-free sessions > 99%
-
-⚡ Performance
-   ├─ Cold start time < 2s
-   ├─ Hot start time < 500ms
-   ├─ Average FPS > 55
-   └─ Memory usage < 150MB
-
-👁 Engagement
-   ├─ DAU (Daily Active Users)
-   ├─ Retention rate (Day 1, 7, 30)
-   ├─ Session length
-   └─ Event completion rate
-💵 Monetization
-   ├─ Conversion rate
-   ├─ Average order value
-   ├─ Repeat purchase rate
-   └─ User lifetime value
+# Cleanup
+./gradlew clean                     # Clean build files
 ```
 
 ---
 
-## 🚪 Hotfix Procedure
-
-### Critical Bug Found
-
-```bash
-# 1. Create hotfix branch
-git checkout -b hotfix/1.0.1 main
-
-# 2. Fix the issue
-# - Make code changes
-# - Update version to 1.0.1
-# - Run tests: ./gradlew test
-
-# 3. Commit hotfix
-git commit -am "fix: Critical bug in payment processing"
-
-# 4. Build and test
-./gradlew assembleRelease
-./gradlew test
-
-# 5. Create release commit
-git tag -a v1.0.1 -m "Hotfix: Payment issue"
-
-# 6. Merge back
-git checkout main
-git merge --no-ff hotfix/1.0.1
-git checkout develop
-git merge --no-ff hotfix/1.0.1
-
-# 7. Push and release
-git push origin main
-git push origin v1.0.1
-
-# 8. Deploy to Play Store
-# (Submit new release via Google Play Console)
-```
-
-### Hotfix Timeline
-
-```
-Bug reported
-    ↓ (0-30 min)
-Hotfix developed & tested
-    ↓ (30-60 min)
-Built & submitted to Play Store
-    ↓ (1-2 hours)
-Google Play review
-    ↓ (1-3 hours)
-Live to users
-
-Total time: 3-6 hours for critical fix
-```
-
----
-
-## 🔄 Rollback Strategy
-
-### If Critical Bug Post-Release
-
-```bash
-# 1. Pause staged rollout in Play Console
-#    Settings > Manage releases > Production
-#    Click pause on current release
-
-# 2. Analyze issue
-#    Check crashes in Firebase
-#    Gather user reports
-
-# 3. Option A: Fast rollback
-#    Create hotfix
-#    Resubmit to Play Console
-#    Previous version stays live
-
-# 4. Option B: Pull previous version
-#    In Play Console > Production
-#    Select previous release
-#    Push to users
-
-# 5. Communicate with users
-#    Update release notes
-#    Apologize for issue
-#    Explain fix timeline
-```
-
-### Communication Template
-
-```markdown
-## Important Update
-
-We've identified a critical issue in version 1.0.0 affecting [feature].
-
-**Impact:** [Description of user impact]
-
-**We're working on a fix:**
-- Issue identified
-- Fix in development
-- Testing in progress
-- Rollout ETA: [time]
-
-**For now:**
-- [Workaround if available]
-- [What to avoid]
-- [How to report issues]
-
-Thank you for your patience and feedback.
-```
-
----
-
-## 📃 Deployment Checklist
-
-### Before Release
-
-```
-✅ Version updated (build.gradle)
-✅ Release notes prepared
-✅ All tests passing
-✅ Code coverage checked
-✅ Security review completed
-✅ Performance tested
-✅ Screenshots prepared
-✅ App description updated
-```
-
-### During Release
-
-```
-✅ Build signed APK/AAB
-✅ Verify signature
-✅ Upload to Play Console
-✅ Set release notes
-✅ Choose rollout strategy
-✅ Submit for review
-✅ Monitor for approval
-```
-
-### After Release
-
-```
-✅ Monitor crash rate
-✅ Check Firebase Analytics
-✅ Read user reviews
-✅ Track engagement metrics
-✅ Respond to user feedback
-✅ Document release in GitHub
-```
-
----
-
-## 📚 References
-
-- [Google Play Publishing Documentation](https://developer.android.com/distribute/play)
-- [Firebase Console](https://console.firebase.google.com/)
-- [Android Security & Privacy Best Practices](https://developer.android.com/privacy-and-security)
-- [App Signing & Distribution](https://developer.android.com/studio/publish/app-signing)
-
----
-
-**Deployment Version:** 1.0
-**Last Updated:** December 26, 2025
-**Status:** Ready for Production Release
-
----
-
-**تیز رفتار رہو! (Keep going fast!) 💪**
+**Last Updated:** December 28, 2025  
+**Status:** ✅ Production-Ready
