@@ -13,6 +13,12 @@ import javax.inject.Singleton
 /**
  * Zarinpal Payment Service Implementation
  * Handles all communication with Zarinpal payment gateway
+ * 
+ * Secrets Management:
+ * - MERCHANT_ID is injected from BuildConfig at compile time
+ * - Set zarinpal.merchant.id in local.properties (production)
+ * - Set zarinpal.sandbox.merchant.id in local.properties (testing)
+ * - BuildConfig handles environment-based switching
  */
 @Singleton
 class ZarinpalPaymentService @Inject constructor(
@@ -20,10 +26,10 @@ class ZarinpalPaymentService @Inject constructor(
 ) {
     
     companion object {
-        // TODO: Move to BuildConfig or secure storage (like gradle.properties)
-        // Don't commit actual merchant ID to public repository!
-        private const val MERCHANT_ID = "YOUR_ZARINPAL_MERCHANT_ID"
-        private const val USE_SANDBOX = BuildConfig.DEBUG  // Use sandbox in debug builds
+        // Merchant ID is loaded from BuildConfig (from local.properties via gradle)
+        // This approach keeps secrets out of version control
+        private val MERCHANT_ID = BuildConfig.ZARINPAL_MERCHANT_ID
+        private val USE_SANDBOX = BuildConfig.DEBUG  // Use sandbox in debug builds
     }
     
     /**
@@ -37,6 +43,14 @@ class ZarinpalPaymentService @Inject constructor(
     ): Result<PaymentResponse> {
         return try {
             Timber.d("Requesting Zarinpal payment for order: ${request.orderId}")
+            
+            // Validate merchant ID is configured
+            if (MERCHANT_ID.isEmpty() || MERCHANT_ID == "YOUR_PRODUCTION_MERCHANT_ID") {
+                Timber.e("Zarinpal merchant ID is not configured")
+                return Result.Error(
+                    AppError.Payment("درگاه پرداخت به درستی تنظیم نشده است")
+                )
+            }
             
             // Prepare request DTO
             val dto = ZarinpalPaymentRequestDto(
@@ -108,6 +122,14 @@ class ZarinpalPaymentService @Inject constructor(
     ): Result<PaymentVerification> {
         return try {
             Timber.d("Verifying Zarinpal payment. Authority: $authority")
+            
+            // Validate merchant ID is configured
+            if (MERCHANT_ID.isEmpty() || MERCHANT_ID == "YOUR_PRODUCTION_MERCHANT_ID") {
+                Timber.e("Zarinpal merchant ID is not configured")
+                return Result.Error(
+                    AppError.Payment("درگاه پرداخت به درستی تنظیم نشده است")
+                )
+            }
             
             // Prepare verify request DTO
             val dto = ZarinpalVerifyRequestDto(
