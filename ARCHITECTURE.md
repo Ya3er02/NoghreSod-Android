@@ -1,675 +1,592 @@
-# 🏗️ NoghreSod Android - Architecture Guide
+# 🎯 Architecture Guide - NoghreSod Android
 
-**Status:** Complete Architecture Documentation
-**Date:** December 26, 2025
-**Project Version:** v1.0 (Week 4 Ready)
+**Comprehensive guide to application architecture, design patterns, and technology decisions.**
+
+- **Pattern:** Clean Architecture + MVVM + Offline-First
+- **Status:** Production-Ready
+- **Last Updated:** December 28, 2025
 
 ---
 
-## 📚 Table of Contents
+## Table of Contents
 
 1. [Overview](#overview)
-2. [Design Patterns](#design-patterns)
-3. [Layer Architecture](#layer-architecture)
-4. [Module Structure](#module-structure)
+2. [Clean Architecture Layers](#clean-architecture-layers)
+3. [Design Patterns](#design-patterns)
+4. [Dependency Injection](#dependency-injection)
 5. [Data Flow](#data-flow)
-6. [Dependency Injection](#dependency-injection)
-7. [Error Handling](#error-handling)
-8. [Offline-First Strategy](#offline-first-strategy)
-9. [Security Architecture](#security-architecture)
-10. [Testing Strategy](#testing-strategy)
+6. [Key Components](#key-components)
+7. [Offline-First Strategy](#offline-first-strategy)
+8. [Technology Stack](#technology-stack)
+9. [Architectural Decisions](#architectural-decisions)
 
 ---
 
-## 🎯 Overview
+## Overview
 
-### Architecture Pattern: MVVM + Repository
+### Architecture Philosophy
+
+NoghreSod follows **Clean Architecture** principles to achieve:
+- ✅ **Testability** - Easy to test each layer independently
+- ✅ **Maintainability** - Clear separation of concerns
+- ✅ **Scalability** - Easy to add new features
+- ✅ **Independence** - UI, Database, Network changes don't break business logic
+
+### Layered Structure
 
 ```
-┌─────────────────────────────────────┐
-│    Presentation Layer               │
-│  (Jetpack Compose UI)               │
-├─────────────────────────────────────┤
-│    ViewModel Layer                  │
-│  (State Management & Logic)         │
-├─────────────────────────────────────┤
-│    Repository Layer                 │
-│  (Data Aggregation & Business Logic)│
-├─────────────────────────────────────┤
-│    Data Layer                       │
-│  (Local & Remote Data Sources)      │
-├─────────────────────────────────────┤
-│    Framework Layer                  │
-│  (Android Framework, Hilt, Room)    │
-└─────────────────────────────────────┘
+┌───────────────────────────────────┐
+│  PRESENTATION LAYER                        │
+│  (User Interface, States, Events)          │
+├───────────────────────────────────┤
+│  DOMAIN LAYER                              │
+│  (Business Logic, UseCases, Entities)     │
+├───────────────────────────────────┤
+│  DATA LAYER                                │
+│  (Repository, Room, Network, Cache)       │
+└───────────────────────────────────┘
 ```
-
-### Key Principles
-
-✅ **Separation of Concerns** - Each layer has single responsibility
-✅ **Testability** - Easy to mock and test each component
-✅ **Reusability** - Business logic independent from UI
-✅ **Maintainability** - Clear structure, easy to navigate
-✅ **Scalability** - Easy to add new features
 
 ---
 
-## 🎨 Design Patterns
+## Clean Architecture Layers
+
+### 1. Presentation Layer
+
+**Responsibility:** UI rendering and user interactions
+
+**Components:**
+- **Composables** - Jetpack Compose UI components
+- **ViewModels** - State management and business logic coordination
+- **States** - UI state representation (sealed classes)
+- **Events** - User interactions (sealed classes)
+- **Screens** - Full page compositions
+
+**Technology:**
+- Jetpack Compose (Material 3)
+- Material Design System
+- Kotlin Coroutines
+
+**Example Structure:**
+```kotlin
+// Screen
+@Composable
+fun ProductsScreen(viewModel: ProductsViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    when (val state = uiState) {
+        is ProductsUiState.Loading -> LoadingShimmer()
+        is ProductsUiState.Success -> ProductList(state.products)
+        is ProductsUiState.Error -> ErrorDialog(state.message)
+    }
+}
+
+// ViewModel
+class ProductsViewModel : ViewModel() {
+    val uiState = getProductsUseCase()
+        .map { ProductsUiState.Success(it) }
+        .stateIn(scope, SharingStarted.WhileSubscribed())
+}
+```
+
+**Key Principles:**
+- No business logic in UI
+- State as immutable data classes
+- Events for user interactions
+- Observable state flows
+
+---
+
+### 2. Domain Layer
+
+**Responsibility:** Business logic and core application rules
+
+**Components:**
+- **UseCases** - Represent business operations
+- **Entities** - Core business objects (immutable)
+- **Repositories (Interfaces)** - Data source abstraction
+- **Exceptions** - Domain-specific errors
+
+**Technology:**
+- Pure Kotlin (no Android dependencies)
+- Sealed classes for type safety
+- Extension functions
+
+**Example Structure:**
+```kotlin
+// UseCase
+class GetProductsUseCase(
+    private val productsRepository: ProductsRepository,
+    private val filterRepository: FilterRepository
+) {
+    operator fun invoke(
+        filters: List<Filter> = emptyList()
+    ): Flow<List<ProductEntity>> = flow {
+        val products = productsRepository.getProducts()
+        emit(filterProducts(products, filters))
+    }
+}
+
+// Entity
+data class ProductEntity(
+    val id: String,
+    val name: String,
+    val price: Double,
+    val weight: Double,
+    val hallmark: String // 925 silver mark
+)
+
+// Repository Interface
+interface ProductsRepository {
+    suspend fun getProducts(): List<ProductEntity>
+    suspend fun getProduct(id: String): ProductEntity
+}
+```
+
+**Key Principles:**
+- Independent of UI framework
+- Independent of data source
+- Reusable across different platforms
+- No external dependencies (besides Kotlin stdlib)
+
+---
+
+### 3. Data Layer
+
+**Responsibility:** Data access and persistence
+
+**Components:**
+- **Repositories (Implementations)** - Coordinate data sources
+- **Local Data Source** - Room database (offline cache)
+- **Remote Data Source** - Retrofit API calls
+- **Data Models** - DTOs, Room entities
+- **Mappers** - Convert between models
+
+**Technology:**
+- Room Database (SQLite)
+- Retrofit + OkHttp
+- Moshi/Gson
+- DataStore
+
+**Example Structure:**
+```kotlin
+// Repository Implementation (Offline-First)
+class ProductsRepositoryImpl(
+    private val localDataSource: ProductsLocalDataSource,
+    private val remoteDataSource: ProductsRemoteDataSource
+) : ProductsRepository {
+    override suspend fun getProducts(): List<ProductEntity> {
+        // Try local first (offline)
+        val cachedProducts = localDataSource.getProducts()
+        if (cachedProducts.isNotEmpty()) {
+            return cachedProducts.toEntities()
+        }
+        
+        // Fetch from network if no cache
+        val remoteProducts = remoteDataSource.getProducts()
+        localDataSource.save(remoteProducts)
+        return remoteProducts.toEntities()
+    }
+}
+
+// Room Entity
+@Entity(tableName = "products")
+data class ProductDbEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val price: Double
+)
+
+// API DTO
+data class ProductDto(
+    val id: String,
+    val name: String,
+    val price: Double
+)
+```
+
+**Key Principles:**
+- Multiple data sources (local + remote)
+- Offline-first by default
+- Automatic sync when online
+- Type-safe database queries
+
+---
+
+## Design Patterns
 
 ### 1. MVVM (Model-View-ViewModel)
 
-**Components:**
-- **Model:** Data models, repositories
-- **View:** Composable functions, UI screens
-- **ViewModel:** State management, business logic
+**Purpose:** Separate UI logic from business logic
+
+```
+UI (View) ↔︎ ViewModel ↔︎ Repository ↔︎ Data Source
+  │            │              │                  │
+  │       observes state   coordinates data    fetches/saves
+  │            │              │                  │
+```
 
 **Benefits:**
-- Reactive UI updates (via Flow/StateFlow)
-- Testable business logic
+- ViewModel survives configuration changes
+- Easy to test (state is observable)
 - Clear separation between UI and logic
 
 ### 2. Repository Pattern
 
-**Purpose:** Abstract data sources
+**Purpose:** Abstract data sources behind a common interface
 
 ```kotlin
-interface ProductRepository {
-    suspend fun getProducts(): NetworkResult<List<Product>>
-    suspend fun getProductById(id: String): NetworkResult<Product>
-    suspend fun addToCart(product: Product): NetworkResult<Unit>
+// Abstraction
+interface ProductsRepository {
+    suspend fun getProducts(): List<ProductEntity>
 }
 
-@Singleton
-class ProductRepositoryImpl @Inject constructor(
-    private val apiService: ApiService,
-    private val localDatabase: ProductDao,
-    private val offlineFirstManager: OfflineFirstManager
-) : ProductRepository {
-    // Implementation delegates to appropriate data source
-}
-```
+// Multiple implementations
+class ProductsRepositoryImpl(
+    private val localDataSource: ProductsLocalDataSource,
+    private val remoteDataSource: ProductsRemoteDataSource
+) : ProductsRepository
 
-### 3. Dependency Injection (Hilt)
-
-**Centralized Configuration:**
-
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object NetworkModule {
-    @Provides
-    @Singleton
-    fun provideApiService(context: Context): ApiService {
-        return Retrofit.Builder()
-            .baseUrl(BuildConfig.API_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
-    }
-}
+// Can easily swap implementations for testing
+class FakeProductsRepository : ProductsRepository
 ```
 
 **Benefits:**
-- Loose coupling
-- Easy testing (mock dependencies)
-- Centralized configuration
-- Singleton management
+- Switch data sources without changing business logic
+- Easy to mock for testing
+- Follows Dependency Inversion Principle
 
-### 4. Observer Pattern (Flow/StateFlow)
+### 3. UseCase Pattern
 
-**Reactive Updates:**
+**Purpose:** Represent distinct business operations
 
 ```kotlin
-class ProductsViewModel @Inject constructor(
-    private val repository: ProductRepository
-) : ViewModel() {
-    private val _state = MutableStateFlow<UiState>(UiState.Loading)
-    val state: StateFlow<UiState> = _state.asStateFlow()
+// Each operation is a separate class
+class GetProductsUseCase(repository: ProductsRepository)
+class FilterProductsUseCase(repository: ProductsRepository)
+class AddToCartUseCase(cartRepository: CartRepository)
+
+// Composable
+class CheckoutUseCase(
+    private val getCartUseCase: GetCartUseCase,
+    private val calculateTotalUseCase: CalculateTotalUseCase,
+    private val processPaymentUseCase: ProcessPaymentUseCase
+)
+```
+
+**Benefits:**
+- Single Responsibility
+- Reusable across multiple ViewModels
+- Easy to test in isolation
+
+### 4. Sealed Classes for Type Safety
+
+**Purpose:** Represent restricted type hierarchies
+
+```kotlin
+// UI State
+sealed class ProductsUiState {
+    object Loading : ProductsUiState()
+    data class Success(val products: List<Product>) : ProductsUiState()
+    data class Error(val message: String) : ProductsUiState()
+}
+
+// When expression is exhaustive (compiler checks)
+when (uiState) {
+    is ProductsUiState.Loading -> { /* ... */ }
+    is ProductsUiState.Success -> { /* ... */ }
+    is ProductsUiState.Error -> { /* ... */ }
+}
+```
+
+---
+
+## Dependency Injection
+
+### Hilt Framework
+
+**Purpose:** Manage object creation and dependencies
+
+```kotlin
+// 1. Provide dependencies
+@Module
+@InstallIn(SingletonComponent::class)
+object DataModule {
+    @Singleton
+    @Provides
+    fun providesApiService(): ApiService {
+        return Retrofit.Builder()
+            .baseUrl("https://api.example.com")
+            .build()
+            .create(ApiService::class.java)
+    }
     
-    fun loadProducts() = viewModelScope.launch {
-        _state.value = UiState.Loading
-        when (val result = repository.getProducts()) {
-            is NetworkResult.Success -> _state.value = UiState.Success(result.data)
-            is NetworkResult.Error -> _state.value = UiState.Error(result.message)
-        }
+    @Singleton
+    @Provides
+    fun providesDatabase(@ApplicationContext context: Context): AppDatabase {
+        return Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "noghre_sod.db"
+        ).build()
     }
 }
+
+// 2. Inject where needed
+@HiltViewModel
+class ProductsViewModel @Inject constructor(
+    private val getProductsUseCase: GetProductsUseCase
+) : ViewModel()
+
+// 3. Mark activities
+@AndroidEntryPoint
+class MainActivity : ComponentActivity()
 ```
+
+**Benefits:**
+- Automatic dependency resolution
+- Easy to swap implementations (for testing)
+- Compile-time safety
+- Reduces boilerplate
 
 ---
 
-## 📦 Layer Architecture
+## Data Flow
 
-### Presentation Layer
+### Unidirectional Data Flow (MVI-like)
 
-**Responsibility:** UI rendering and user interaction
+```
+┌───────────────────────┐
+│      User Interaction                │
+│      (Click, Input, etc.)            │
+└───────────────────────┘
+         ⬇︎
+┌───────────────────────┐
+│   ViewModel Handles Event             │
+│   (Updates state, calls UseCase)      │
+└───────────────────────┘
+         ⬇︎
+┌───────────────────────┐
+│   UseCase Fetches Data                │
+│   (From Repository)                   │
+└───────────────────────┘
+         ⬇︎
+┌───────────────────────┐
+│   Repository Accesses Data            │
+│   (Local/Remote)                       │
+└───────────────────────┘
+         ⬇︎
+┌───────────────────────┐
+│   State Updated in ViewModel          │
+└───────────────────────┘
+         ⬇︎
+┌───────────────────────┐
+│   Compose Recomposes with New State   │
+│   (UI Updated)                        │
+└───────────────────────┘
+```
 
-**Components:**
-- Composable functions
-- ViewModels
-- UI state classes
-- Navigation
-
-**Technologies:**
-- Jetpack Compose
-- Navigation Compose
-- ViewModel
-
-### Domain Layer (Optional)
-
-**Responsibility:** Business logic and use cases
-
-**Components:**
-- Use case classes
-- Business rules
-- Data models
-
-### Repository/Data Layer
-
-**Responsibility:** Data aggregation and transformation
-
-**Components:**
-- Repository interfaces
-- Data sources (local/remote)
-- Offline-first manager
-- Network operations
-
-**Technologies:**
-- Retrofit (Remote)
-- Room (Local)
-- WorkManager (Background)
-
-### Framework Layer
-
-**Responsibility:** System integration
-
-**Components:**
-- Database
-- Network client
-- Dependency injection
-- Analytics
+**Benefits:**
+- Predictable state changes
+- Easy to debug
+- Time-travel debugging possible
+- Testable
 
 ---
 
-## 🗂️ Module Structure
+## Key Components
 
-```
-app/src/main/java/com/noghre/sod/
-│
-├── di/                           # Dependency Injection
-│   ├── NetworkModule.kt         # Network setup (Retrofit, SSL)
-│   ├── CoilModule.kt            # Image loading setup
-│   └── DatabaseModule.kt        # Room database setup
-│
-├── data/                         # Data Layer
-│   ├── local/
-│   │   ├── entity/              # Database entities
-│   │   │   ├── ProductEntity.kt
-│   │   │   ├── CartEntity.kt
-│   │   │   └── OfflineOperationEntity.kt
-│   │   ├── dao/                 # Database access objects
-│   │   │   ├── ProductDao.kt
-│   │   │   ├── CartDao.kt
-│   │   │   └── OfflineOperationDao.kt
-│   │   └── database/
-│   │       └── AppDatabase.kt
-│   │
-│   ├── remote/
-│   │   ├── api/
-│   │   │   └── ApiService.kt    # Retrofit service
-│   │   └── dto/                 # Data transfer objects
-│   │       ├── ProductDto.kt
-│   │       └── OrderDto.kt
-│   │
-│   ├── model/
-│   │   ├── NetworkResult.kt     # Type-safe API responses
-│   │   └── User.kt              # Domain models
-│   │
-│   ├── repository/              # Repository implementations
-│   │   ├── ProductRepository.kt
-│   │   └── CartRepository.kt
-│   │
-│   ├── network/
-│   │   ├── NetworkMonitor.kt    # Connectivity detection
-│   │   └── SafeApiCall.kt       # Retry logic
-│   │
-│   └── offline/                 # Offline-first system
-│       ├── OfflineFirstManager.kt
-│       ├── SyncWorker.kt
-│       └── OfflineOperationQueue.kt
-│
-├── presentation/                # Presentation Layer
-│   ├── screens/
-│   │   ├── products/
-│   │   │   ├── ProductsScreen.kt
-│   │   │   └── ProductsViewModel.kt
-│   │   ├── cart/
-│   │   │   ├── CartScreen.kt
-│   │   │   └── CartViewModel.kt
-│   │   └── ...
-│   │
-│   ├── components/              # Reusable UI components
-│   │   ├── ProductCard.kt       # RTL-compatible
-│   │   ├── CartItem.kt
-│   │   └── ...
-│   │
-│   └── theme/
-│       ├── Color.kt
-│       ├── Typography.kt
-│       └── Theme.kt
-│
-├── analytics/                   # Analytics Layer
-│   ├── FirebaseAnalyticsManager.kt
-│   └── AnalyticsEvents.kt
-│
-├── util/                        # Utilities
-│   ├── Extension.kt
-│   ├── Constant.kt
-│   └── Validator.kt
-│
-└── MainActivity.kt              # App entry point
-```
+### ViewModels
 
----
-
-## 🔄 Data Flow
-
-### 1. User Action Flow
-
-```
-UI Action (Button Click)
-    ↓
-ViewModel Function Called
-    ↓
-Repository Method
-    ↓
-Check Network Status (NetworkMonitor)
-    ↓
-┌─ ONLINE? → Execute via API (SafeApiCall with retry)
-└─ OFFLINE? → Queue operation (OfflineFirstManager)
-    ↓
-Update Local Cache (Room Database)
-    ↓
-Emit Result via Flow/StateFlow
-    ↓
-UI Updates Reactively
-```
-
-### 2. Offline Sync Flow
-
-```
-Network Restored (NetworkMonitor detects)
-    ↓
-SyncWorker triggered by WorkManager
-    ↓
-Fetch pending operations from OfflineOperationQueue
-    ↓
-Process each operation:
-  ├─ Add to Cart → Call API
-  ├─ Remove from Cart → Call API
-  └─ Create Order → Call API
-    ↓
-Exponential Backoff on Error:
-  ├─ Attempt 1: Wait 1s
-  ├─ Attempt 2: Wait 2s
-  └─ Attempt 3: Wait 4s
-    ↓
-Mark successful operations complete
-    ↓
-Notify UI of sync completion
-```
-
-### 3. Analytics Flow
-
-```
-Event Triggered (View product, Add to cart, etc)
-    ↓
-Call analyticsManager.trackEvent()
-    ↓
-Bundle event data
-    ↓
-Send to Firebase Analytics
-    ↓
-Appear in Firebase Console
-```
-
----
-
-## 💉 Dependency Injection
-
-### Hilt Setup
-
-**App Class:**
-```kotlin
-@HiltAndroidApp
-class NoghresodApp : Application() {
-    // Hilt will manage all dependencies
-}
-```
-
-**ViewModel Injection:**
 ```kotlin
 @HiltViewModel
 class ProductsViewModel @Inject constructor(
-    private val repository: ProductRepository,
-    private val analyticsManager: FirebaseAnalyticsManager
+    private val getProductsUseCase: GetProductsUseCase
 ) : ViewModel() {
-    // Dependencies injected automatically
-}
-```
-
-**Module Definitions:**
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object AppModule {
-    @Provides
-    @Singleton
-    fun provideProductRepository(
-        apiService: ApiService,
-        productDao: ProductDao,
-        offlineManager: OfflineFirstManager
-    ): ProductRepository {
-        return ProductRepositoryImpl(apiService, productDao, offlineManager)
+    
+    private val _uiState = MutableStateFlow<ProductsUiState>(
+        ProductsUiState.Loading
+    )
+    val uiState: StateFlow<ProductsUiState> = _uiState.asStateFlow()
+    
+    init {
+        loadProducts()
     }
-}
-```
-
----
-
-## ⚠️ Error Handling
-
-### Type-Safe Error Handling
-
-```kotlin
-sealed class NetworkResult<T> {
-    data class Success<T>(val data: T) : NetworkResult<T>()
-    data class Error<T>(
-        val code: Int,
-        val message: String
-    ) : NetworkResult<T>()
-    class Loading<T> : NetworkResult<T>()
-}
-```
-
-### Usage
-
-```kotlin
-when (val result = repository.getProducts()) {
-    is NetworkResult.Success -> {
-        // Handle success
-        _state.value = UiState.Success(result.data)
-    }
-    is NetworkResult.Error -> {
-        // Handle error
-        val errorMsg = context.getString(
-            R.string.error_http_code,
-            result.code
-        )
-        _state.value = UiState.Error(errorMsg)
-    }
-    is NetworkResult.Loading -> {
-        _state.value = UiState.Loading
-    }
-}
-```
-
-### Retry Logic
-
-```kotlin
-suspend fun <T> safeApiCall(
-    block: suspend () -> T
-): NetworkResult<T> {
-    return try {
-        NetworkResult.Success(block())
-    } catch (e: Exception) {
-        // Exponential backoff retry
-        var delay = 1000L
-        repeat(3) {
-            delay(delay)
-            try {
-                return NetworkResult.Success(block())
-            } catch (e: Exception) {
-                delay *= 2  // 1s, 2s, 4s
-            }
+    
+    private fun loadProducts() {
+        viewModelScope.launch {
+            getProductsUseCase()
+                .onStart { _uiState.value = ProductsUiState.Loading }
+                .catch { _uiState.value = ProductsUiState.Error(it.message) }
+                .collect { products -> 
+                    _uiState.value = ProductsUiState.Success(products)
+                }
         }
-        NetworkResult.Error(500, "Failed after retries")
     }
 }
 ```
 
----
+### StateFlow & Flow
 
-## 🔄 Offline-First Strategy
-
-### Architecture
-
-```
-OfflineFirstManager
-    ├── Queue Manager (Room Database)
-    │   └── OfflineOperationEntity
-    │       ├── id
-    │       ├── type (ADD_TO_CART, REMOVE_FROM_CART, etc)
-    │       ├── resourceId
-    │       ├── payload (JSON)
-    │       ├── status (PENDING, SYNCING, FAILED)
-    │       └── timestamp
-    │
-    ├── Network Monitor (Flow-based)
-    │   ├── Detects network changes
-    │   └── Triggers sync when online
-    │
-    └── Sync Worker (WorkManager)
-        ├── Background processing
-        ├── Periodic sync checks
-        └── Exponential backoff retry
-```
-
-### How It Works
-
-1. **User Action (Offline)**
-   ```kotlin
-   if (networkMonitor.isCurrentlyOnline()) {
-       repository.addToCart(product)  // Execute immediately
-   } else {
-       offlineFirstManager.queueOperation(  // Queue for later
-           type = "ADD_TO_CART",
-           resourceId = product.id,
-           payload = product.toJson()
-       )
-   }
-   ```
-
-2. **Network Restored**
-   - NetworkMonitor detects connectivity
-   - SyncWorker wakes up
-   - Processes queued operations
-   - Updates UI with results
-
-3. **Automatic Retry**
-   - Failed operation → Wait 1s → Retry
-   - Still failed → Wait 2s → Retry
-   - Still failed → Wait 4s → Retry
-   - After 3 attempts → Mark as failed
-
----
-
-## 🔐 Security Architecture
-
-### Certificate Pinning
-
-```xml
-<!-- network_security_config.xml -->
-<domain-config>
-    <domain includeSubdomains="true">api.example.com</domain>
-    <pin-set expiration="2026-01-01">
-        <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
-        <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
-        <pin digest="SHA-256">CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=</pin>
-    </pin-set>
-</domain-config>
-```
-
-### API Key Management
+- **StateFlow:** Hot flow, always has a value, emits to new collectors
+- **Flow:** Cold flow, only emits when collected
 
 ```kotlin
-// local.properties (not in git)
-api_url=https://api.example.com
-api_key=your-secret-key-here
-
-// BuildConfig
-buildConfigField "String", "API_URL", "\"${apiUrl}\""
-buildConfigField "String", "API_KEY", "\"${apiKey}\""
-
-// Usage
-val apiService = Retrofit.Builder()
-    .baseUrl(BuildConfig.API_URL)
-    .build()
-    .create(ApiService::class.java)
-```
-
-### Type Safety
-
-- All network responses wrapped in `NetworkResult<T>`
-- No nullable types for critical data
-- Sealed classes for exhaustive when statements
-- No raw types or unchecked casts
-
----
-
-## 🧪 Testing Strategy
-
-### Unit Testing
-
-**ViewModel Tests:**
-```kotlin
-@HiltAndroidTest
-class ProductsViewModelTest {
-    @get:Rule
-    val instantExecutorRule = InstantTaskExecutorRule()
-    
-    private lateinit var viewModel: ProductsViewModel
-    private val fakeRepository = FakeProductRepository()
-    
-    @Test
-    fun loadProducts_success() = runTest {
-        // Arrange
-        val products = listOf(createProduct())
-        fakeRepository.setSuccess(products)
-        
-        // Act
-        viewModel.loadProducts()
-        
-        // Assert
-        assertEquals(UiState.Success(products), viewModel.state.value)
-    }
+// Collect state
+val state by viewModel.uiState.collectAsState()
+when (state) {
+    is Loading -> {}
+    is Success -> {}
+    is Error -> {}
 }
 ```
-
-**Repository Tests:**
-```kotlin
-@HiltAndroidTest
-class ProductRepositoryTest {
-    @Test
-    fun getProducts_offline_queuesOperation() = runTest {
-        // Mock offline
-        networkMonitor.setOnline(false)
-        
-        // Call repository
-        repository.getProducts()
-        
-        // Verify queued
-        verify(offlineManager).queueOperation(any())
-    }
-}
-```
-
-### Test Coverage: 87%
-
-- **27 test methods**
-- MockK for mocking
-- Turbine for Flow testing
-- Coroutines Test Dispatcher
-- Real database in tests (H2 in-memory)
-
----
-
-## 📊 Analytics Architecture
-
-```
-UI Events
-    ↓
-ViewModel/Repository
-    ↓
-FirebaseAnalyticsManager
-    ├── Product Events (view, add, remove)
-    ├── Purchase Events (checkout, complete)
-    ├── User Events (login, signup)
-    ├── Error Events (app, network)
-    └── Offline Events (operation, sync)
-    ↓
-Firebase Console
-    ├── Real-time analytics
-    ├── User journey
-    ├── Purchase funnel
-    └── Error tracking
-```
-
----
-
-## 🚀 Performance Considerations
-
-### Image Caching
-
-```
-Coil Cache Hierarchy:
-1. Memory Cache (20% RAM, LRU eviction)
-2. Disk Cache (100MB, persistent)
-3. Network (with HTTP headers respect)
-```
-
-### Database Optimization
-
-- All queries indexed
-- Query execution: <10ms
-- Pagination for large lists
-- Room compiled queries (type-safe)
 
 ### Coroutines
 
-- ViewModelScope for lifecycle management
-- Custom dispatchers for different tasks
-- Proper exception handling
-- Memory leak prevention
+- **viewModelScope:** Lifecycle-aware, cancels on ViewModel destruction
+- **launch:** Fire-and-forget
+- **async:** Returns result (Deferred)
+
+```kotlin
+viewModelScope.launch {
+    val result = withContext(Dispatchers.Default) {
+        // CPU-intensive work
+    }
+}
+```
 
 ---
 
-## 📚 Best Practices Applied
+## Offline-First Strategy
 
-✅ Single Responsibility Principle
-✅ Dependency Injection
-✅ Type Safety
-✅ Null Safety (Kotlin)
-✅ Reactive Programming (Flow)
-✅ SOLID Principles
-✅ Clean Code
-✅ Comprehensive Testing
-✅ Security by Design
-✅ Performance Optimization
+**See [docs/OFFLINE_FIRST.md](docs/OFFLINE_FIRST.md) for complete details.**
+
+### Overview
+
+1. **Cache First** - Always try local database first
+2. **Sync When Online** - Background sync with WorkManager
+3. **Conflict Resolution** - Last-write-wins strategy
+4. **Queue Operations** - Store offline actions in queue
+
+### Implementation
+
+```kotlin
+// Offline-First Repository
+class OfflineFirstRepository(
+    private val localDataSource: LocalDataSource,
+    private val remoteDataSource: RemoteDataSource,
+    private val networkMonitor: NetworkMonitor
+) {
+    fun getData(): Flow<List<Entity>> = flow {
+        // 1. Emit cached data immediately
+        val cached = localDataSource.getAll()
+        emit(cached)
+        
+        // 2. If online, fetch fresh data
+        if (networkMonitor.isOnline.value) {
+            try {
+                val fresh = remoteDataSource.getAll()
+                localDataSource.update(fresh)
+                emit(fresh)
+            } catch (e: Exception) {
+                // Use cached data on error
+            }
+        }
+    }
+}
+```
 
 ---
 
-## 🔗 References
+## Technology Stack
 
-- [Android Architecture Guide](https://developer.android.com/jetpack/guide)
-- [MVVM Best Practices](https://developer.android.com/jetpack/guide/ui-layer)
-- [Room Database](https://developer.android.com/training/data-storage/room)
-- [Retrofit Documentation](https://square.github.io/retrofit/)
-- [Hilt Dependency Injection](https://developer.android.com/training/dependency-injection/hilt-android)
-- [Coroutines Guide](https://kotlinlang.org/docs/coroutines-overview.html)
+### Language
+- **Kotlin** 100% exclusive
+- **Coroutines** for async operations
+- **Collections** API
+- **Scope functions** (let, run, apply, also)
+
+### UI Framework
+- **Jetpack Compose** for declarative UI
+- **Material 3 Design System**
+- **Navigation Compose** for routing
+- **Hilt** for DI in Compose
+
+### Architecture
+- **Clean Architecture** - Clear layer separation
+- **MVVM Pattern** - State management
+- **Repository Pattern** - Data abstraction
+- **UseCase Pattern** - Business operations
+
+### Data Persistence
+- **Room Database** - Local SQLite storage
+- **DataStore** - Key-value preferences
+- **Moshi/Gson** - JSON serialization
+
+### Network
+- **Retrofit** - REST client
+- **OkHttp** - HTTP client with interceptors
+- **Moshi** - JSON parsing
+
+### Background & Async
+- **WorkManager** - Background tasks
+- **Coroutines** - Structured concurrency
+- **Flow** - Reactive streams
+
+### Testing
+- **JUnit 4/5** - Unit testing
+- **MockK** - Mocking library
+- **Turbine** - Flow testing
+- **Coroutines Test** - Coroutine testing
+- **Google Truth** - Assertions
+- **Espresso** - UI testing (pending)
+
+### Payment Integration
+- **Zarinpal API** - Payment gateway
+- **BuildConfig** - Secure secrets
+- **OkHttp Interceptors** - Request/response handling
+
+### Localization
+- **String resources** - Multi-language
+- **RTL Layout** - Right-to-left support
+- **Jalali Calendar** - Persian dates
 
 ---
 
-**Architecture Version:** 1.0
-**Last Updated:** December 26, 2025
-**Status:** Production Ready
+## Architectural Decisions
+
+See [docs/ADR/](docs/ADR/) for detailed Architecture Decision Records:
+
+- [ADR-001: MVVM Architecture](docs/ADR/ADR-001-MVVM-Architecture.md)
+- [ADR-002: Offline-First Strategy](docs/ADR/ADR-002-Offline-First.md)
+- [ADR-003: Payment Integration](docs/ADR/ADR-003-Payment-Integration.md)
+
+### Summary
+
+| Decision | Rationale | Trade-offs |
+|----------|-----------|------------|
+| **Clean Architecture** | Testability, Maintainability | More files/classes |
+| **MVVM Pattern** | Clear separation, ViewModel reuse | Learning curve |
+| **Offline-First** | Better UX, Works without internet | More complex sync |
+| **Jetpack Compose** | Modern, Declarative | Less ecosystem |
+| **Hilt DI** | Compile-time safety, Less boilerplate | Annotation processing |
+
+---
+
+## Conclusion
+
+NoghreSod's architecture is designed for:
+- ✅ **Reliability** - Comprehensive testing
+- ✅ **Maintainability** - Clear structure and patterns
+- ✅ **Scalability** - Easy to add features
+- ✅ **Performance** - Optimized queries and caching
+- ✅ **User Experience** - Works offline, smooth UI
+
+**For more details:**
+- Architecture patterns: See [DEVELOPMENT.md](DEVELOPMENT.md)
+- Implementation examples: Check source code in `app/src/main/kotlin/`
+- Testing strategy: Read [TESTING.md](TESTING.md)
+
+---
+
+**Last Updated:** December 28, 2025  
+**Status:** ✅ Production-Ready
