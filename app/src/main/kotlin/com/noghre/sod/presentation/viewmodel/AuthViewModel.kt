@@ -2,122 +2,222 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.core.error.GlobalExceptionHandler
-import com.noghre.sod.core.util.onError
-import com.noghre.sod.core.util.onSuccess
+import com.noghre.sod.R
+import com.noghre.sod.core.exception.GlobalExceptionHandler
+import com.noghre.sod.core.util.UiEvent
+import com.noghre.sod.domain.common.ResourceProvider
 import com.noghre.sod.domain.model.User
-import com.noghre.sod.domain.repository.AuthRepository
-import com.noghre.sod.presentation.common.UiEvent
-import com.noghre.sod.presentation.common.UiState
+import com.noghre.sod.domain.usecase.auth.GetCurrentUserUseCase
+import com.noghre.sod.domain.usecase.auth.IsAuthenticatedUseCase
+import com.noghre.sod.domain.usecase.auth.LoginUseCase
+import com.noghre.sod.domain.usecase.auth.LogoutUseCase
+import com.noghre.sod.domain.usecase.auth.RegisterUseCase
+import com.noghre.sod.domain.usecase.validation.ValidateEmailUseCase
+import com.noghre.sod.domain.usecase.validation.ValidatePasswordConfirmationUseCase
+import com.noghre.sod.domain.usecase.validation.ValidatePasswordUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+sealed class AuthUiState {
+    object Idle : AuthUiState()
+    object Loading : AuthUiState()
+    data class Success(val user: User) : AuthUiState()
+    data class Error(val message: String) : AuthUiState()
+}
+
+/**
+ * ✅ REFACTORED: Auth ViewModel with proper Clean Architecture
+ * 
+ * Key changes from old version:
+ * 1. ❌ NO direct AuthRepository injection
+ * 2. ✅ ALL UseCases injected (auth + validation)
+ * 3. ❌ NO validation logic in ViewModel
+ * 4. ✅ ALL validation delegated to UseCases
+ * 5. ✅ Proper error handling
+ * 6. ✅ Resource strings from ResourceProvider
+ */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository,
+    // ✅ Auth UseCases
+    private val loginUseCase: LoginUseCase,
+    private val registerUseCase: RegisterUseCase,
+    private val logoutUseCase: LogoutUseCase,
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val isAuthenticatedUseCase: IsAuthenticatedUseCase,
+    
+    // ✅ Validation UseCases
+    private val validateEmailUseCase: ValidateEmailUseCase,
+    private val validatePasswordUseCase: ValidatePasswordUseCase,
+    private val validatePasswordConfirmationUseCase: ValidatePasswordConfirmationUseCase,
+    
+    // Infrastructure
+    private val resourceProvider: ResourceProvider,
     private val exceptionHandler: GlobalExceptionHandler
 ) : ViewModel() {
     
-    private val _loginState = MutableStateFlow<UiState<User>>(UiState.Idle)
-    val loginState: StateFlow<UiState<User>> = _loginState.asStateFlow()
+    // ==================== UI State ====================
+    private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
+    val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
     
-    private val _registerState = MutableStateFlow<UiState<User>>(UiState.Idle)
-    val registerState: StateFlow<UiState<User>> = _registerState.asStateFlow()
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
     
-    private val _events = Channel<UiEvent>(Channel.BUFFERED)
-    val events = _events.receiveAsFlow()
+    private val _isAuthenticated = MutableStateFlow(false)
+    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
     
-    fun login(username: String, password: String) {
-        // Validation
-        if (username.isBlank() || password.isBlank()) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("لطفاً تمام فیلدها را پر کنید"))
-            }
-            return
-        }
-        
+    private val _uiEvent = MutableSharedFlow<UiEvent>()
+    val uiEvent = _uiEvent.asSharedFlow()
+    
+    // ==================== Initialization ====================
+    
+    init {
+        checkAuthentication()
+    }
+    
+    // ==================== Public Methods ====================
+    
+    fun login(email: String, password: String) {
         viewModelScope.launch(exceptionHandler.handler) {
-            _loginState.value = UiState.Loading
-            Timber.d("Attempting login for user: $username")
+            _uiState.value = AuthUiState.Loading
             
-            authRepository.login(username, password)
-                .onSuccess { user ->
-                    Timber.d("Login successful for user: ${user.email}")
-                    _loginState.value = UiState.Success(user)
-                    _events.send(UiEvent.ShowToast("خوش آمدید ${user.name}"))
-                    _events.send(UiEvent.Navigate("home"))
+            try {
+                // ✅ Validate email
+                validateEmailUseCase(email)
+                // ✅ Validate password
+                validatePasswordUseCase(password)
+                
+                // ✅ If validation passes, proceed with login
+                val params = LoginUseCase.Params(
+                    email = email,
+                    password = password
+                )
+                val result = loginUseCase(params)
+                
+                if (result.isSuccess) {
+                    val user = result.getOrNull()
+                    _currentUser.value = user
+                    _isAuthenticated.value = true
+                    _uiState.value = AuthUiState.Success(user!!)
+                    
+                    _uiEvent.emit(
+                        UiEvent.ShowToast(
+                            resourceProvider.getString(
+                                R.string.welcome_user,
+                                user.name
+                            )
+                        )
+                    )
+                    Timber.d("User logged in: ${user.email}")
+                } else {
+                    val error = result.exceptionOrNull()
+                    _uiState.value = AuthUiState.Error(error?.message ?: "Login failed")
+                    Timber.e(error, "Login failed")
                 }
-                .onError { error ->
-                    Timber.e("Login failed: ${error.message}")
-                    _loginState.value = UiState.Error(error)
-                    _events.send(UiEvent.ShowError(error))
-                }
+            } catch (e: Exception) {
+                // Validation exception caught here
+                _uiState.value = AuthUiState.Error(e.message ?: "Validation error")
+                Timber.e(e, "Validation error during login")
+            }
         }
     }
     
-    fun register(name: String, email: String, password: String, confirmPassword: String) {
-        // Validation
-        if (name.isBlank() || email.isBlank() || password.isBlank()) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("لطفاً تمام فیلدها را پر کنید"))
-            }
-            return
-        }
-        
-        if (password.length < 6) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("رمز عبور باید حداقل ۶ کاراکتر باشد"))
-            }
-            return
-        }
-        
-        if (password != confirmPassword) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("رمز عبور و تأیید آن یکسان نیست"))
-            }
-            return
-        }
-        
+    fun register(
+        name: String,
+        email: String,
+        password: String,
+        confirmPassword: String
+    ) {
         viewModelScope.launch(exceptionHandler.handler) {
-            _registerState.value = UiState.Loading
-            Timber.d("Attempting registration for email: $email")
+            _uiState.value = AuthUiState.Loading
             
-            authRepository.register(name, email, password)
-                .onSuccess { user ->
-                    Timber.d("Registration successful for user: ${user.email}")
-                    _registerState.value = UiState.Success(user)
-                    _events.send(UiEvent.ShowToast("ثبت‌نام با موفقیت انجام شد"))
-                    _events.send(UiEvent.Navigate("home"))
+            try {
+                // ✅ Validate all fields (ALL validation in domain layer)
+                validateEmailUseCase(email)
+                validatePasswordUseCase(password)
+                validatePasswordConfirmationUseCase(
+                    ValidatePasswordConfirmationUseCase.Params(
+                        password = password,
+                        confirmPassword = confirmPassword
+                    )
+                )
+                
+                // ✅ If validation passes, proceed with registration
+                val params = RegisterUseCase.Params(
+                    name = name,
+                    email = email,
+                    password = password
+                )
+                val result = registerUseCase(params)
+                
+                if (result.isSuccess) {
+                    val user = result.getOrNull()
+                    _currentUser.value = user
+                    _isAuthenticated.value = true
+                    _uiState.value = AuthUiState.Success(user!!)
+                    
+                    _uiEvent.emit(
+                        UiEvent.ShowToast(
+                            resourceProvider.getString(R.string.success_registration)
+                        )
+                    )
+                    Timber.d("User registered: ${user.email}")
+                } else {
+                    val error = result.exceptionOrNull()
+                    _uiState.value = AuthUiState.Error(error?.message ?: "Registration failed")
+                    Timber.e(error, "Registration failed")
                 }
-                .onError { error ->
-                    Timber.e("Registration failed: ${error.message}")
-                    _registerState.value = UiState.Error(error)
-                    _events.send(UiEvent.ShowError(error))
-                }
+            } catch (e: Exception) {
+                // Validation exception caught here
+                _uiState.value = AuthUiState.Error(e.message ?: "Validation error")
+                Timber.e(e, "Validation error during registration")
+            }
         }
     }
     
     fun logout() {
         viewModelScope.launch(exceptionHandler.handler) {
-            Timber.d("Logging out")
+            val result = logoutUseCase(Unit)
             
-            authRepository.logout()
-                .onSuccess {
-                    Timber.d("Logout successful")
-                    _events.send(UiEvent.ShowToast("با موفقیت خارج شدید"))
-                    _events.send(UiEvent.Navigate("login"))
+            if (result.isSuccess) {
+                _currentUser.value = null
+                _isAuthenticated.value = false
+                _uiState.value = AuthUiState.Idle
+                
+                _uiEvent.emit(
+                    UiEvent.ShowToast(
+                        resourceProvider.getString(R.string.success_logout)
+                    )
+                )
+                Timber.d("User logged out")
+            } else {
+                val error = result.exceptionOrNull()
+                _uiEvent.emit(UiEvent.ShowError(error?.message ?: "Logout failed"))
+            }
+        }
+    }
+    
+    fun checkAuthentication() {
+        viewModelScope.launch {
+            val isAuth = isAuthenticatedUseCase(Unit)
+            
+            if (isAuth.isSuccess && isAuth.getOrNull() == true) {
+                _isAuthenticated.value = true
+                
+                // Get current user if authenticated
+                val userResult = getCurrentUserUseCase(Unit)
+                if (userResult.isSuccess) {
+                    _currentUser.value = userResult.getOrNull()
                 }
-                .onError { error ->
-                    Timber.e("Logout failed: ${error.message}")
-                    _events.send(UiEvent.ShowError(error))
-                }
+            } else {
+                _isAuthenticated.value = false
+            }
         }
     }
 }
