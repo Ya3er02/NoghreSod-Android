@@ -2,110 +2,183 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.core.error.GlobalExceptionHandler
-import com.noghre.sod.core.util.onError
-import com.noghre.sod.core.util.onSuccess
+import com.noghre.sod.core.exception.GlobalExceptionHandler
+import com.noghre.sod.core.util.UiEvent
 import com.noghre.sod.domain.model.Order
-import com.noghre.sod.domain.repository.OrderRepository
-import com.noghre.sod.presentation.common.UiEvent
-import com.noghre.sod.presentation.common.UiState
+import com.noghre.sod.domain.usecase.cart.CalculateCartTotalUseCase
+import com.noghre.sod.domain.usecase.order.CancelOrderUseCase
+import com.noghre.sod.domain.usecase.order.CreateOrderUseCase
+import com.noghre.sod.domain.usecase.order.GetOrderByIdUseCase
+import com.noghre.sod.domain.usecase.order.GetOrdersUseCase
+import com.noghre.sod.domain.usecase.order.GetOrderTrackingUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+sealed class OrderUiState {
+    object Idle : OrderUiState()
+    object Loading : OrderUiState()
+    data class Success(val orders: List<Order>) : OrderUiState()
+    data class OrderCreated(val order: Order) : OrderUiState()
+    data class Error(val message: String) : OrderUiState()
+}
+
+data class OrderTrackingUiModel(
+    val orderId: String,
+    val trackingNumber: String,
+    val status: String,
+    val location: String,
+    val estimatedDaysLeft: Int
+)
+
 @HiltViewModel
 class OrderViewModel @Inject constructor(
-    private val orderRepository: OrderRepository,
+    // ✅ Order UseCases
+    private val createOrderUseCase: CreateOrderUseCase,
+    private val getOrdersUseCase: GetOrdersUseCase,
+    private val getOrderByIdUseCase: GetOrderByIdUseCase,
+    private val cancelOrderUseCase: CancelOrderUseCase,
+    private val getOrderTrackingUseCase: GetOrderTrackingUseCase,
+    
+    // ✅ Cart UseCase for total calculation
+    private val calculateCartTotalUseCase: CalculateCartTotalUseCase,
+    
+    // Infrastructure
     private val exceptionHandler: GlobalExceptionHandler
 ) : ViewModel() {
     
-    private val _uiState = MutableStateFlow<UiState<List<Order>>>(UiState.Idle)
-    val uiState: StateFlow<UiState<List<Order>>> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<OrderUiState>(OrderUiState.Idle)
+    val uiState: StateFlow<OrderUiState> = _uiState.asStateFlow()
     
-    private val _events = Channel<UiEvent>(Channel.BUFFERED)
-    val events = _events.receiveAsFlow()
+    private val _orders = MutableStateFlow<List<Order>>(emptyList())
+    val orders: StateFlow<List<Order>> = _orders.asStateFlow()
     
-    private val _currentPage = MutableStateFlow(1)
-    val currentPage: StateFlow<Int> = _currentPage.asStateFlow()
+    private val _selectedOrder = MutableStateFlow<Order?>(null)
+    val selectedOrder: StateFlow<Order?> = _selectedOrder.asStateFlow()
+    
+    private val _orderTracking = MutableStateFlow<OrderTrackingUiModel?>(null)
+    val orderTracking: StateFlow<OrderTrackingUiModel?> = _orderTracking.asStateFlow()
+    
+    private val _uiEvent = MutableSharedFlow<UiEvent>()
+    val uiEvent = _uiEvent.asSharedFlow()
     
     init {
         loadOrders()
     }
     
-    fun loadOrders(page: Int = 1) {
+    fun loadOrders() {
         viewModelScope.launch(exceptionHandler.handler) {
-            _uiState.value = UiState.Loading
-            _currentPage.value = page
-            Timber.d("Loading orders for page: $page")
+            _uiState.value = OrderUiState.Loading
             
-            orderRepository.getUserOrders(page)
-                .onSuccess { orders ->
-                    Timber.d("Orders loaded: ${orders.size}")
-                    _uiState.value = if (orders.isEmpty()) {
-                        UiState.Empty
-                    } else {
-                        UiState.Success(orders)
-                    }
-                }
-                .onError { error ->
-                    Timber.e("Failed to load orders: ${error.message}")
-                    _uiState.value = UiState.Error(error)
-                    _events.send(UiEvent.ShowError(error))
-                }
-        }
-    }
-    
-    fun onOrderClick(orderId: String) {
-        viewModelScope.launch {
-            Timber.d("Order clicked: $orderId")
-            _events.send(UiEvent.Navigate("order_detail/$orderId"))
-        }
-    }
-    
-    fun onCancelOrder(orderId: String, reason: String) {
-        if (reason.isBlank()) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("لطفاً لال لغو را وارد کنید"))
+            val result = getOrdersUseCase(Unit)
+            
+            if (result.isSuccess) {
+                val orders = result.getOrNull() ?: emptyList()
+                _orders.value = orders
+                _uiState.value = OrderUiState.Success(orders)
+                Timber.d("Loaded ${orders.size} orders")
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.value = OrderUiState.Error(error?.message ?: "Failed to load orders")
             }
-            return
         }
-        
+    }
+    
+    fun getOrderDetails(orderId: String) {
         viewModelScope.launch(exceptionHandler.handler) {
-            Timber.d("Cancelling order: $orderId")
+            _uiState.value = OrderUiState.Loading
             
-            orderRepository.cancelOrder(orderId, reason)
-                .onSuccess {
-                    Timber.d("Order cancelled successfully")
-                    _events.send(UiEvent.ShowToast("سفارش لغو شد"))
-                    loadOrders()
-                }
-                .onError { error ->
-                    Timber.e("Failed to cancel order: ${error.message}")
-                    _events.send(UiEvent.ShowError(error))
-                }
+            val result = getOrderByIdUseCase(orderId)
+            
+            if (result.isSuccess) {
+                val order = result.getOrNull()
+                _selectedOrder.value = order
+                _uiState.value = OrderUiState.Success(listOf(order!!))
+                Timber.d("Loaded order: $orderId")
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.value = OrderUiState.Error(error?.message ?: "Failed to load order")
+            }
         }
     }
     
-    fun onRetryClick() {
-        Timber.d("Retry clicked")
-        loadOrders()
+    fun createOrder(
+        cartId: String,
+        shippingAddressId: String,
+        shippingMethodId: String,
+        paymentMethodId: String,
+        insuranceId: String? = null,
+        couponCode: String? = null
+    ) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            _uiState.value = OrderUiState.Loading
+            
+            val params = CreateOrderUseCase.Params(
+                cartId = cartId,
+                shippingAddressId = shippingAddressId,
+                shippingMethodId = shippingMethodId,
+                paymentMethodId = paymentMethodId,
+                insuranceId = insuranceId,
+                couponCode = couponCode
+            )
+            val result = createOrderUseCase(params)
+            
+            if (result.isSuccess) {
+                val order = result.getOrNull()
+                _selectedOrder.value = order
+                _uiState.value = OrderUiState.OrderCreated(order!!)
+                _uiEvent.emit(UiEvent.ShowToast("Order created successfully"))
+                Timber.d("Order created: ${order.id}")
+                loadOrders()
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.value = OrderUiState.Error(error?.message ?: "Failed to create order")
+            }
+        }
     }
     
-    fun onNextPage() {
-        Timber.d("Loading next page")
-        loadOrders(_currentPage.value + 1)
+    fun cancelOrder(orderId: String, reason: String) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            val params = CancelOrderUseCase.Params(
+                orderId = orderId,
+                reason = reason
+            )
+            val result = cancelOrderUseCase(params)
+            
+            if (result.isSuccess) {
+                val cancelledOrder = result.getOrNull()
+                _selectedOrder.value = cancelledOrder
+                _uiEvent.emit(UiEvent.ShowToast("Order cancelled"))
+                Timber.d("Order cancelled: $orderId")
+                loadOrders()
+            } else {
+                val error = result.exceptionOrNull()
+                _uiEvent.emit(UiEvent.ShowError(error?.message ?: "Failed to cancel order"))
+            }
+        }
     }
     
-    fun onPreviousPage() {
-        if (_currentPage.value > 1) {
-            Timber.d("Loading previous page")
-            loadOrders(_currentPage.value - 1)
+    fun getOrderTracking(orderId: String) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            val result = getOrderTrackingUseCase(orderId)
+            
+            if (result.isSuccess) {
+                val tracking = result.getOrNull()
+                _orderTracking.value = OrderTrackingUiModel(
+                    orderId = tracking?.orderId ?: "",
+                    trackingNumber = tracking?.trackingNumber ?: "",
+                    status = tracking?.status ?: "",
+                    location = tracking?.location ?: "",
+                    estimatedDaysLeft = tracking?.estimatedDaysLeft ?: 0
+                )
+                Timber.d("Tracking info loaded for $orderId")
+            }
         }
     }
 }
