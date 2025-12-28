@@ -1,15 +1,18 @@
 # NoghreSod Android - Silver Jewelry E-Commerce App
 
+## 🚀 Quick Start (5 Minutes)
+
+**New Developer?** Follow this sequence:
+1. 💻 [Environment Setup](ENVIRONMENT_SETUP.md) - JDK, Android SDK, IDE setup
+2. 🔐 [Setup Secrets & Payment Gateway](SETUP_SECRETS.md) - Configure Zarinpal credentials
+3. 🔨 [Build & Rebuild Guide](BUILD_AND_REBUILD_GUIDE.md) - Build and run the project
+4. ⚡ [Quick Start](QUICK_START.md) - First build and launch
+
+---
+
 ## Current Status: Quality 82/100 ✅ (Session 2 Complete)
 
 Enterprise-grade Android e-commerce application for silver jewelry with offline-first architecture.
-
-### 🔐 Quick Setup
-
-**New Project Members:** Before building, complete the payment gateway setup:
-- 📖 [Setup Secrets & Configuration Guide](SETUP_SECRETS.md) - Required reading
-- Configure `local.properties` with your Zarinpal credentials
-- See [QUICK_START.md](QUICK_START.md) for first-time setup
 
 ### 📊 Project Metrics
 
@@ -20,6 +23,27 @@ Enterprise-grade Android e-commerce application for silver jewelry with offline-
 | Code Coverage | 85%+ | ✅ Strong |
 | Critical Issues | 3.5/8 Fixed | ✅ On Track |
 | Test Files | 11 | ✅ Organized |
+| Documentation | 9 Guides | ✅ Complete |
+
+### 📚 Documentation Roadmap
+
+**Getting Started:**
+- [Environment Setup](ENVIRONMENT_SETUP.md) - 💻 JDK, SDK, IDE configuration
+- [Setup Secrets & Payment](SETUP_SECRETS.md) - 🔐 Zarinpal credentials (REQUIRED)
+- [Build & Rebuild Guide](BUILD_AND_REBUILD_GUIDE.md) - 🔨 Build commands & troubleshooting
+- [Quick Start](QUICK_START.md) - ⚡ First-time developer setup
+
+**Architecture & Testing:**
+- [SESSION-1-SUMMARY.md](SESSION-1-SUMMARY.md) - 📋 Initial unit tests
+- [SESSION-2-FINAL-SUMMARY.md](SESSION-2-FINAL-SUMMARY.md) - 🏗️ Offline-first architecture
+- [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) - 🎯 Feature implementation
+- [WEEK-4-ROADMAP-UPDATED.md](WEEK-4-ROADMAP-UPDATED.md) - 📈 Complete development roadmap
+
+**Deployment:**
+- [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md) - 🚀 Production deployment
+- [COMPLETE_DOCUMENTATION.md](COMPLETE_DOCUMENTATION.md) - 📖 Full technical docs
+
+---
 
 ### 🔥 Critical Issues Progress
 
@@ -130,26 +154,34 @@ app/src/test/kotlin/com/noghre/sod/
 ### 📋 How to Run Tests
 
 ```bash
+# Setup environment first (see guides above)
+
 # Run all unit tests
 ./gradlew test
 
 # Run tests with coverage
-./gradlew testDebugUnitTest --coverage
+./gradlew test --coverage
 
 # Run specific test file
-./gradlew testDebugUnitTest --tests "*ProductsViewModelTest"
+./gradlew test --tests "*ProductsViewModelTest"
 
 # Run instrumentation tests (when ready)
 ./gradlew connectedAndroidTest
 ```
 
-### 📚 Documentation
+### 📚 Documentation Index
 
-- [SETUP_SECRETS.md](SETUP_SECRETS.md) - **🔐 Payment gateway setup guide (START HERE)**
-- [QUICK_START.md](QUICK_START.md) - First-time setup and build instructions
-- [SESSION-1-SUMMARY.md](SESSION-1-SUMMARY.md) - Initial unit tests
-- [SESSION-2-FINAL-SUMMARY.md](SESSION-2-FINAL-SUMMARY.md) - Offline-first architecture
-- [WEEK-4-ROADMAP-UPDATED.md](WEEK-4-ROADMAP-UPDATED.md) - Complete roadmap
+| Document | Purpose | Status |
+|----------|---------|--------|
+| [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) | JDK, SDK, IDE setup | ✅ New |
+| [SETUP_SECRETS.md](SETUP_SECRETS.md) | 🔐 Payment credentials | ✅ New |
+| [BUILD_AND_REBUILD_GUIDE.md](BUILD_AND_REBUILD_GUIDE.md) | Build commands | ✅ New |
+| [QUICK_START.md](QUICK_START.md) | First-time setup | ✅ Existing |
+| [SESSION-1-SUMMARY.md](SESSION-1-SUMMARY.md) | Unit tests | ✅ Existing |
+| [SESSION-2-FINAL-SUMMARY.md](SESSION-2-FINAL-SUMMARY.md) | Offline-first | ✅ Existing |
+| [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) | Feature guide | ✅ Existing |
+| [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md) | Deployment | ✅ Existing |
+| [COMPLETE_DOCUMENTATION.md](COMPLETE_DOCUMENTATION.md) | Full reference | ✅ Existing |
 
 ### ✅ Quality Gates Passed
 
@@ -163,6 +195,7 @@ app/src/test/kotlin/com/noghre/sod/
 - ✅ All dependencies resolved
 - ✅ Production-ready code
 - ✅ Secrets kept out of version control
+- ✅ Comprehensive documentation
 
 ### 📊 Timeline
 
@@ -184,6 +217,28 @@ Session3: 88/100 📅 (+6)
 Session4: 92/100 📅 (+4)
 Target:   90+/100 🎯
 ```
+
+---
+
+## 🔐 Security & Best Practices
+
+- ✅ Secrets management via `local.properties` (not committed)
+- ✅ BuildConfig injection at compile time
+- ✅ Environment-based credential switching
+- ✅ CI/CD integration with GitHub Secrets
+- ✅ Zero hardcoded credentials
+
+See [SETUP_SECRETS.md](SETUP_SECRETS.md) for details.
+
+---
+
+## 💡 Getting Help
+
+1. **Setup Issues?** → [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md)
+2. **Payment Gateway?** → [SETUP_SECRETS.md](SETUP_SECRETS.md)
+3. **Build Problems?** → [BUILD_AND_REBUILD_GUIDE.md](BUILD_AND_REBUILD_GUIDE.md)
+4. **Architecture Questions?** → [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)
+5. **Deployment?** → [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md)
 
 ---
 
