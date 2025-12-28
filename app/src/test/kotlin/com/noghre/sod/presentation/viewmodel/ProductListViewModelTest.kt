@@ -1,101 +1,118 @@
 package com.noghre.sod.presentation.viewmodel
 
-import androidx.paging.PagingData
+import com.noghre.sod.core.error.AppException
+import com.noghre.sod.core.util.Result
 import com.noghre.sod.domain.model.Product
 import com.noghre.sod.domain.repository.ProductRepository
+import com.noghre.sod.presentation.common.UiState
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
-import java.math.BigDecimal
 
-/**
- * Unit tests for ProductListViewModel.
- * Tests business logic, state management, and repository interactions.
- * 
- * @since 1.0.0
- */
-@OptIn(ExperimentalCoroutinesApi::class)
+@ExperimentalCoroutinesApi
 class ProductListViewModelTest {
     
-    private val testDispatcher = StandardTestDispatcher()
-    private val mockRepository: ProductRepository = mockk(relaxed = true)
+    @get:Rule
+    val instantExecutorRule = InstantExecutorRule()
+    
     private lateinit var viewModel: ProductListViewModel
+    private val productRepository = mockk<ProductRepository>()
     
     @Before
     fun setUp() {
-        Dispatchers.setMain(testDispatcher)
-        viewModel = ProductListViewModel(mockRepository)
-    }
-    
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
+        viewModel = ProductListViewModel(productRepository)
     }
     
     @Test
-    fun viewModel_initializes_with_empty_products() = runTest {
-        // Products should be empty initially
-        assert(viewModel.products != null)
-    }
-    
-    @Test
-    fun searchProducts_calls_repository_search() = runTest {
-        // Mock repository response
-        val mockProducts = listOf(
+    fun loadProducts_success() = runTest {
+        // Arrange
+        val products = listOf(
             Product(
                 id = "1",
-                name = "Silver Ring",
-                price = BigDecimal("99.99"),
-                inStock = true,
-                discountPercentage = BigDecimal.ZERO,
-                rating = 4.5f
+                name = "Test Product 1",
+                price = 100.0,
+                description = "Test",
+                image = "image1.jpg",
+                isFavorite = false
+            ),
+            Product(
+                id = "2",
+                name = "Test Product 2",
+                price = 200.0,
+                description = "Test",
+                image = "image2.jpg",
+                isFavorite = false
             )
         )
         
-        coEvery { mockRepository.searchProducts("silver") } returns mockProducts
+        coEvery { productRepository.getProducts(1) } returns Result.Success(products)
         
-        // Call search
+        // Act
+        viewModel.loadProducts()
+        advanceUntilIdle()
+        
+        // Assert
+        val state = viewModel.uiState.value
+        assert(state is UiState.Success)
+        assert((state as UiState.Success).data.size == 2)
+    }
+    
+    @Test
+    fun loadProducts_error() = runTest {
+        // Arrange
+        val error = AppException.NetworkException("Network error")
+        coEvery { productRepository.getProducts(1) } returns Result.Error(error)
+        
+        // Act
+        viewModel.loadProducts()
+        advanceUntilIdle()
+        
+        // Assert
+        val state = viewModel.uiState.value
+        assert(state is UiState.Error)
+    }
+    
+    @Test
+    fun loadProducts_empty() = runTest {
+        // Arrange
+        coEvery { productRepository.getProducts(1) } returns Result.Success(emptyList())
+        
+        // Act
+        viewModel.loadProducts()
+        advanceUntilIdle()
+        
+        // Assert
+        val state = viewModel.uiState.value
+        assert(state is UiState.Empty)
+    }
+    
+    @Test
+    fun searchProducts_success() = runTest {
+        // Arrange
+        val products = listOf(
+            Product(
+                id = "1",
+                name = "Silver Ring",
+                price = 150.0,
+                description = "Test",
+                image = "ring.jpg",
+                isFavorite = false
+            )
+        )
+        
+        coEvery { productRepository.searchProducts("silver") } returns Result.Success(products)
+        
+        // Act
         viewModel.searchProducts("silver")
+        advanceUntilIdle()
         
-        // Wait for coroutine
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        // Verify repository was called
-        coEvery { mockRepository.searchProducts("silver") }
-    }
-    
-    @Test
-    fun getProducts_returns_paged_data() = runTest {
-        // Mock paged response
-        val mockPagingData = PagingData.empty<Product>()
-        
-        coEvery { mockRepository.getProductsPaged() } returns flowOf(mockPagingData)
-        
-        // Verify products flow exists
-        assert(viewModel.products != null)
-    }
-    
-    @Test
-    fun error_handling_displays_error_state() = runTest {
-        // Mock error from repository
-        coEvery { mockRepository.searchProducts(any()) } throws Exception("Network error")
-        
-        // Call search
-        viewModel.searchProducts("test")
-        
-        // Wait for coroutine
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        // Error should be handled gracefully
-        // ViewModel should not crash
+        // Assert
+        val state = viewModel.uiState.value
+        assert(state is UiState.Success)
+        assert((state as UiState.Success).data[0].name.contains("Silver"))
     }
 }
