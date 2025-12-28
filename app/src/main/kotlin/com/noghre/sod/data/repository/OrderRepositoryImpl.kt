@@ -1,306 +1,139 @@
 package com.noghre.sod.data.repository
 
-import com.noghre.sod.core.error.*
+import com.noghre.sod.core.error.AppException
 import com.noghre.sod.core.util.Result
-import com.noghre.sod.data.remote.api.ApiService
-import com.noghre.sod.data.remote.dto.CreateOrderRequestDto
-import com.noghre.sod.domain.model.*
+import com.noghre.sod.data.local.OrderDao
+import com.noghre.sod.data.remote.OrderApi
+import com.noghre.sod.domain.model.Order
 import com.noghre.sod.domain.repository.OrderRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import timber.log.Timber
 import javax.inject.Inject
 
-/**
- * 📋 Order Repository Implementation
- * 
- * Handles order operations with comprehensive error handling.
- * All operations return Result<T> with proper error classification.
- */
 class OrderRepositoryImpl @Inject constructor(
-    private val apiService: ApiService,
-    private val exceptionHandler: GlobalExceptionHandler
+    private val orderApi: OrderApi,
+    private val orderDao: OrderDao
 ) : OrderRepository {
-
-    /**
-     * ➕ Create a new order
-     */
-    override suspend fun createOrder(
-        shippingAddress: Address,
-        billingAddress: Address?,
-        paymentMethod: PaymentMethod,
-        notes: String?,
-    ): Result<Order> {
-        return try {
-            Timber.d("[ORDER] Creating order for address: ${shippingAddress.title}")
-            
-            // Validate inputs
-            if (shippingAddress.id.isNullOrBlank()) {
-                Timber.w("[ORDER] Invalid shipping address")
-                return Result.Error(AppError.Validation(
-                    message = "آدرس تحویل انتخاب نشده است",
-                    field = "shippingAddress"
-                ))
-            }
-            
-            val request = CreateOrderRequestDto(
-                shippingAddressId = shippingAddress.id,
-                billingAddressId = billingAddress?.id,
-                paymentMethod = paymentMethod.name,
-                notes = notes
-            )
-            
-            val response = apiService.createOrder(request)
-            
-            if (response.isSuccessful) {
-                if (response.data != null) {
-                    Timber.d("[ORDER] Order created successfully: ${response.data.orderNumber}")
-                    Result.Success(response.data.toOrder())
-                } else {
-                    Timber.w("[ORDER] Order creation response is empty")
-                    Result.Error(AppError.Network(
-                        message = "پاسخ سرور نامعتبر است",
-                        statusCode = 200
-                    ))
-                }
-            } else {
-                Timber.w("[ORDER] Order creation failed: ${response.code()}")
-                Result.Error(when (response.code()) {
-                    400 -> AppError.Validation(
-                        message = "اطلاعات سفارش نامعتبر است",
-                        field = "order"
-                    )
-                    402 -> AppError.Network(
-                        message = "موجودی کافی نیست",
-                        statusCode = 402
-                    )
-                    else -> AppError.Network(
-                        message = response.message ?: "ایجاد سفارش ناموفق",
-                        statusCode = response.code()
-                    )
-                })
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "[ORDER] Create order error")
-            Result.Error(exceptionHandler.handleException(e))
-        }
-    }
-
-    /**
-     * 🔍 Get order by ID
-     */
-    override fun getOrderById(orderId: String): Flow<Result<Order>> = flow {
+    
+    override suspend fun getUserOrders(page: Int): Result<List<Order>> = try {
+        Timber.d("Fetching user orders, page: $page")
+        val response = orderApi.getUserOrders(page)
+        
+        // Save to local database
+        orderDao.insertAll(response.orders)
+        Timber.d("Orders saved to local DB: ${response.orders.size}")
+        
+        Result.Success(response.orders)
+    } catch (e: Exception) {
+        Timber.e("Error fetching orders: ${e.message}")
+        // Fallback to local data
         try {
-            emit(Result.Loading)
-            Timber.d("[ORDER] Loading order: $orderId")
-            
-            if (orderId.isBlank()) {
-                Timber.w("[ORDER] Invalid order ID")
-                emit(Result.Error(AppError.Validation(
-                    message = "شناسه سفارش نامعتبر است",
-                    field = "orderId"
-                )))
-                return@flow
-            }
-            
-            val response = apiService.getOrderById(orderId)
-            
-            if (response.isSuccessful) {
-                if (response.data != null) {
-                    Timber.d("[ORDER] Order loaded: ${response.data.orderNumber}")
-                    emit(Result.Success(response.data.toOrder()))
-                } else {
-                    Timber.w("[ORDER] Order response is empty")
-                    emit(Result.Error(AppError.Network(
-                        message = "سفارش یافت نشد",
-                        statusCode = 200
-                    )))
-                }
+            val localOrders = orderDao.getAllOrders()
+            if (localOrders.isNotEmpty()) {
+                Timber.d("Returning local orders: ${localOrders.size}")
+                Result.Success(localOrders)
             } else {
-                Timber.w("[ORDER] Get order failed: ${response.code()}")
-                emit(Result.Error(when (response.code()) {
-                    404 -> AppError.Network(
-                        message = "سفارش یافت نشد",
-                        statusCode = 404
-                    )
-                    else -> AppError.Network(
-                        message = response.message ?: "بارگیری سفارش ناموفق",
-                        statusCode = response.code()
-                    )
-                }))
+                Result.Error(AppException.NetworkException("No orders found"))
             }
-        } catch (e: Exception) {
-            Timber.e(e, "[ORDER] Get order error")
-            emit(Result.Error(exceptionHandler.handleException(e)))
+        } catch (ex: Exception) {
+            Timber.e("Error loading local orders: ${ex.message}")
+            Result.Error(AppException.DatabaseException(ex.message ?: "Unknown error"))
         }
     }
-
-    /**
-     * 📦 Get user's orders with pagination
-     */
-    override fun getUserOrders(page: Int, pageSize: Int): Flow<Result<List<OrderSummary>>> = flow {
+    
+    override suspend fun getOrderById(id: String): Result<Order> = try {
+        Timber.d("Fetching order by ID: $id")
+        val response = orderApi.getOrderById(id)
+        
+        // Save to local database
+        orderDao.insert(response)
+        Timber.d("Order saved to local DB: ${response.id}")
+        
+        Result.Success(response)
+    } catch (e: Exception) {
+        Timber.e("Error fetching order: ${e.message}")
+        // Fallback to local data
         try {
-            emit(Result.Loading)
-            Timber.d("[ORDER] Loading orders: page=$page, size=$pageSize")
-            
-            // Validate pagination params
-            if (page < 1) {
-                Timber.w("[ORDER] Invalid page number")
-                emit(Result.Error(AppError.Validation(
-                    message = "صفحه باید بزرگتر از صفر باشد",
-                    field = "page"
-                )))
-                return@flow
-            }
-            
-            if (pageSize < 1) {
-                Timber.w("[ORDER] Invalid page size")
-                emit(Result.Error(AppError.Validation(
-                    message = "اندازه صفحه باید بزرگتر از صفر باشد",
-                    field = "pageSize"
-                )))
-                return@flow
-            }
-            
-            val response = apiService.getUserOrders(page, pageSize)
-            
-            if (response.isSuccessful) {
-                if (response.data != null) {
-                    val orders = response.data.items.map { it.toOrderSummary() }
-                    Timber.d("[ORDER] Orders loaded: ${orders.size} items")
-                    
-                    if (orders.isEmpty()) {
-                        emit(Result.Success(emptyList()))
-                    } else {
-                        emit(Result.Success(orders))
-                    }
-                } else {
-                    Timber.w("[ORDER] Orders response is empty")
-                    emit(Result.Success(emptyList()))
-                }
+            val localOrder = orderDao.getOrderById(id)
+            if (localOrder != null) {
+                Timber.d("Returning local order: ${localOrder.id}")
+                Result.Success(localOrder)
             } else {
-                Timber.w("[ORDER] Get orders failed: ${response.code()}")
-                emit(Result.Error(AppError.Network(
-                    message = response.message ?: "بارگیری سفارش‌ها ناموفق",
-                    statusCode = response.code()
-                )))
+                Result.Error(AppException.NetworkException("Order not found"))
             }
-        } catch (e: Exception) {
-            Timber.e(e, "[ORDER] Get user orders error")
-            emit(Result.Error(exceptionHandler.handleException(e)))
+        } catch (ex: Exception) {
+            Timber.e("Error loading local order: ${ex.message}")
+            Result.Error(AppException.DatabaseException(ex.message ?: "Unknown error"))
         }
     }
-
-    /**
-     * ❌ Cancel an order
-     */
-    override suspend fun cancelOrder(orderId: String, reason: String?): Result<Order> {
-        return try {
-            Timber.d("[ORDER] Cancelling order: $orderId")
-            
-            if (orderId.isBlank()) {
-                Timber.w("[ORDER] Invalid order ID for cancel")
-                return Result.Error(AppError.Validation(
-                    message = "شناسه سفارش نامعتبر است",
-                    field = "orderId"
-                ))
-            }
-            
-            // TODO: Implement when API is ready
-            Result.Error(AppError.Unknown(
-                message = "امکان‌سازی این بخش برنامه انجام نشده"
-            ))
-        } catch (e: Exception) {
-            Timber.e(e, "[ORDER] Cancel order error")
-            Result.Error(exceptionHandler.handleException(e))
-        }
-    }
-
-    /**
-     * 🔄 Request return for order items
-     */
-    override suspend fun requestReturn(
-        orderId: String,
-        items: List<String>,
-        reason: String,
-    ): Result<ReturnRequest> {
-        return try {
-            Timber.d("[ORDER] Requesting return for order: $orderId, items: ${items.size}")
-            
-            // Validate inputs
-            if (orderId.isBlank()) {
-                Timber.w("[ORDER] Invalid order ID for return")
-                return Result.Error(AppError.Validation(
-                    message = "شناسه سفارش نامعتبر است",
-                    field = "orderId"
-                ))
-            }
-            
-            if (items.isEmpty()) {
-                Timber.w("[ORDER] No items selected for return")
-                return Result.Error(AppError.Validation(
-                    message = "حداقل یک محصول انتخاب کنید",
-                    field = "items"
-                ))
-            }
-            
-            if (reason.isBlank()) {
-                Timber.w("[ORDER] Return reason not provided")
-                return Result.Error(AppError.Validation(
-                    message = "دلیل بازگرداندن الزامی است",
-                    field = "reason"
-                ))
-            }
-            
-            // TODO: Implement when API is ready
-            Result.Error(AppError.Unknown(
-                message = "امکان‌سازی این بخش برنامه انجام نشده"
-            ))
-        } catch (e: Exception) {
-            Timber.e(e, "[ORDER] Request return error")
-            Result.Error(exceptionHandler.handleException(e))
-        }
-    }
-
-    // ============================================
-    // 🔄 Mapper Functions
-    // ============================================
-
-    private fun com.noghre.sod.data.remote.dto.OrderDto.toOrder(): Order {
-        return Order(
-            id = id,
-            orderNumber = orderNumber,
-            items = items.map { OrderItem(it.id, it.productId, it.quantity, it.price) },
-            totalPrice = total,
-            status = try {
-                OrderStatus.valueOf(status.uppercase())
-            } catch (e: IllegalArgumentException) {
-                Timber.w("[ORDER] Unknown order status: $status")
-                OrderStatus.PENDING
-            },
-            paymentStatus = try {
-                PaymentStatus.valueOf(paymentStatus.uppercase())
-            } catch (e: IllegalArgumentException) {
-                Timber.w("[ORDER] Unknown payment status: $paymentStatus")
-                PaymentStatus.PENDING
-            },
-            createdAt = createdAt,
-            estimatedDeliveryDate = estimatedDelivery,
+    
+    override suspend fun createOrder(orderDetails: Map<String, String>): Result<String> = try {
+        Timber.d("Creating order")
+        
+        val response = orderApi.createOrder(orderDetails)
+        
+        // Create order object and save to local DB
+        val order = Order(
+            id = response.id,
+            userId = "",
+            totalPrice = orderDetails["total_price"]?.toDoubleOrNull() ?: 0.0,
+            status = "pending",
+            date = System.currentTimeMillis().toString(),
+            items = emptyList()
         )
+        orderDao.insert(order)
+        Timber.d("Order created successfully: ${response.id}")
+        
+        Result.Success(response.id)
+    } catch (e: Exception) {
+        Timber.e("Error creating order: ${e.message}")
+        Result.Error(AppException.NetworkException(e.message ?: "Failed to create order"))
     }
-
-    private fun com.noghre.sod.data.remote.dto.OrderDto.toOrderSummary(): OrderSummary {
-        return OrderSummary(
-            id = id,
-            orderNumber = orderNumber,
-            totalPrice = total,
-            status = try {
-                OrderStatus.valueOf(status.uppercase())
-            } catch (e: IllegalArgumentException) {
-                Timber.w("[ORDER] Unknown status for summary: $status")
-                OrderStatus.PENDING
-            },
-            createdAt = createdAt,
-        )
+    
+    override suspend fun cancelOrder(orderId: String, reason: String): Result<Unit> = try {
+        Timber.d("Cancelling order: $orderId, reason: $reason")
+        
+        orderApi.cancelOrder(orderId, reason)
+        
+        // Update local database
+        val order = orderDao.getOrderById(orderId)
+        if (order != null) {
+            val updatedOrder = order.copy(status = "cancelled")
+            orderDao.update(updatedOrder)
+            Timber.d("Order cancelled: $orderId")
+        }
+        
+        Result.Success(Unit)
+    } catch (e: Exception) {
+        Timber.e("Error cancelling order: ${e.message}")
+        Result.Error(AppException.NetworkException(e.message ?: "Failed to cancel order"))
+    }
+    
+    override suspend fun updateOrderStatus(orderId: String, status: String): Result<Unit> = try {
+        Timber.d("Updating order status: $orderId -> $status")
+        
+        val order = orderDao.getOrderById(orderId)
+        if (order != null) {
+            val updatedOrder = order.copy(status = status)
+            orderDao.update(updatedOrder)
+            Timber.d("Order status updated: $status")
+            Result.Success(Unit)
+        } else {
+            Timber.w("Order not found: $orderId")
+            Result.Error(AppException.NotFound("Order not found"))
+        }
+    } catch (e: Exception) {
+        Timber.e("Error updating order status: ${e.message}")
+        Result.Error(AppException.DatabaseException(e.message ?: "Unknown error"))
+    }
+    
+    override fun observeOrders(): Flow<List<Order>> {
+        Timber.d("Observing orders")
+        return orderDao.observeAllOrders()
+    }
+    
+    override fun observeOrderById(id: String): Flow<Order?> {
+        Timber.d("Observing order: $id")
+        return orderDao.observeOrderById(id)
     }
 }
