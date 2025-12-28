@@ -1,176 +1,158 @@
 package com.noghre.sod.data.payment
 
-import com.noghre.sod.core.error.AppError
-import com.noghre.sod.core.util.Result
-import com.noghre.sod.domain.model.PaymentRequest
-import com.noghre.sod.domain.model.PaymentResponse
-import com.noghre.sod.domain.model.PaymentVerification
-import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Singleton
+import com.squareup.moshi.Json
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import retrofit2.http.Body
+import retrofit2.http.Header
+import retrofit2.http.POST
 
 /**
- * IDPay Payment Gateway Service (STUB - Not Yet Implemented)
- * 
- * Status: PENDING IMPLEMENTATION
- * Priority: MEDIUM
- * Effort: 2-3 days (API research + integration)
- * 
- * IDPay Details:
- * - Website: https://idpay.ir
- * - Popular in Iran for e-commerce
- * - Good documentation available
- * - Supports both SOAP and REST APIs
- * - Recommended: Use REST API
- * 
- * Implementation Checklist:
- * - [ ] Add IDPay REST API dependency to build.gradle
- * - [ ] Create data models for IDPay request/response
- * - [ ] Map PaymentRequest to IDPay API format
- * - [ ] Implement requestPayment() with actual API call
- * - [ ] Map IDPay response to PaymentResponse
- * - [ ] Implement verifyPayment() with verification API
- * - [ ] Add error code mapping to AppError
- * - [ ] Add unit tests with mock HTTP client
- * - [ ] Add integration tests with sandbox API
- * - [ ] Document API credentials setup
- * 
- * API Endpoints (Sandbox):
- * - Request: POST https://api.idpay.ir/v1.1/payment
- * - Verify: POST https://api.idpay.ir/v1.1/payment/verify
- * 
- * Required Headers:
- * - X-API-KEY: [Your API Key]
- * - Content-Type: application/json
- * 
- * @see PaymentService
+ * API Service for IDPay Payment Gateway
+ * آی‌دی‌پی قابل اعتماد
  */
-@Singleton
-class IDPayPaymentService @Inject constructor(
-    // TODO: Inject IDPay API client (Retrofit interface)
-    // private val httpClient: IDPayApiClient,
-    // TODO: Inject configuration
-    // private val config: IDPayConfiguration,
+interface IDPayApiService {
+    
+    @POST("api/v1.1/payment")
+    suspend fun requestPayment(
+        @Header("X-API-KEY") apiKey: String,
+        @Body request: IDPayPaymentRequest
+    ): IDPayPaymentResponse
+    
+    @POST("api/v1.1/payment/verify")
+    suspend fun verifyPayment(
+        @Header("X-API-KEY") apiKey: String,
+        @Body request: IDPayVerifyRequest
+    ): IDPayVerifyResponse
+}
+
+data class IDPayPaymentRequest(
+    @Json(name = "order_id")
+    val orderId: String,
+    
+    @Json(name = "amount")
+    val amount: Long,  // به تومان
+    
+    @Json(name = "phone")
+    val phone: String,
+    
+    @Json(name = "mail")
+    val email: String,
+    
+    @Json(name = "desc")
+    val description: String,
+    
+    @Json(name = "callback")
+    val callbackUrl: String
+)
+
+data class IDPayPaymentResponse(
+    @Json(name = "link")
+    val link: String,  // لینک پرداخت
+    
+    @Json(name = "id")
+    val id: String,
+    
+    @Json(name = "status")
+    val status: Int
+)
+
+data class IDPayVerifyRequest(
+    @Json(name = "id")
+    val id: String,
+    
+    @Json(name = "order_id")
+    val orderId: String
+)
+
+data class IDPayVerifyResponse(
+    @Json(name = "status")
+    val status: Int,
+    
+    @Json(name = "track_id")
+    val trackId: String,
+    
+    @Json(name = "order_id")
+    val orderId: String,
+    
+    @Json(name = "amount")
+    val amount: Long,
+    
+    @Json(name = "date")
+    val date: String
+)
+
+/**
+ * IDPay Payment Service Implementation
+ */
+class IDPayPaymentService(
+    private val api: IDPayApiService,
+    private val apiKey: String = "YOUR_IDPAY_API_KEY"
 ) : PaymentService {
     
-    override suspend fun requestPayment(request: PaymentRequest): Result<PaymentResponse> {
-        return try {
-            Timber.d("IDPayPaymentService: requestPayment called but not yet implemented")
+    override suspend fun requestPayment(
+        orderId: String,
+        amount: Long,
+        phone: String,
+        email: String,
+        description: String,
+        callbackUrl: String
+    ): PaymentResponse = withContext(Dispatchers.IO) {
+        try {
+            val request = IDPayPaymentRequest(
+                orderId = orderId,
+                amount = amount,
+                phone = phone,
+                email = email,
+                description = description,
+                callbackUrl = callbackUrl
+            )
             
-            // TODO: Implement actual IDPay API call
-            // val idpayRequest = IDPayPaymentRequest(
-            //     merchantId = config.merchantId,
-            //     amount = request.amount,
-            //     orderId = request.orderId,
-            //     description = request.description,
-            //     phone = request.mobile,
-            //     mail = request.email,
-            //     callback = request.callbackUrl
-            // )
-            // val response = httpClient.requestPayment(idpayRequest)
-            // return Result.Success(PaymentResponse(
-            //     authority = response.id,
-            //     paymentUrl = response.link,
-            //     status = PaymentStatus.PENDING,
-            //     message = "درخواست پرداخت ارسال شد"
-            // ))
+            val response = api.requestPayment(apiKey, request)
             
-            Result.Error(AppError.Payment(
-                "سرویس IDPay هنوز پیاده‌سازی نشده است. لطفاً از درگاه دیگری استفاده کنید"
-            ))
+            PaymentResponse(
+                success = response.status == 1,
+                paymentUrl = response.link,
+                transactionId = response.id,
+                message = "درخواست پرداخت با موفقیت ارسال شد"
+            )
         } catch (e: Exception) {
-            Timber.e(e, "IDPayPaymentService: Exception in requestPayment")
-            Result.Error(AppError.Unknown(
-                message = "خطا در درگاه پرداخت IDPay",
-                throwable = e
-            ))
+            PaymentResponse(
+                success = false,
+                paymentUrl = null,
+                transactionId = null,
+                message = "خطا در درخواست پرداخت: ${e.message}"
+            )
         }
     }
     
     override suspend fun verifyPayment(
-        authority: String,
-        amount: Long
-    ): Result<PaymentVerification> {
-        return try {
-            Timber.d("IDPayPaymentService: verifyPayment called but not yet implemented")
+        transactionId: String,
+        orderId: String
+    ): VerifyResponse = withContext(Dispatchers.IO) {
+        try {
+            val request = IDPayVerifyRequest(
+                id = transactionId,
+                orderId = orderId
+            )
             
-            // TODO: Implement actual IDPay verification API call
-            // val verifyRequest = IDPayVerifyRequest(
-            //     merchantId = config.merchantId,
-            //     id = authority
-            // )
-            // val response = httpClient.verifyPayment(verifyRequest)
-            // if (response.status == 100) {
-            //     return Result.Success(PaymentVerification(
-            //         orderId = response.orderId,
-            //         authority = authority,
-            //         refId = response.trackId,
-            //         cardPan = response.cardNo?.takeLast(4),
-            //         cardHash = null,
-            //         feeType = null,
-            //         fee = null,
-            //         status = PaymentStatus.SUCCESS,
-            //         verifiedAt = System.currentTimeMillis()
-            //     ))
-            // } else {
-            //     return Result.Error(AppError.Payment("پرداخت ناموفق: ${response.message}"))
-            // }
+            val response = api.verifyPayment(apiKey, request)
             
-            Result.Error(AppError.Payment(
-                "سرویس IDPay هنوز پیاده‌سازی نشده است"
-            ))
+            VerifyResponse(
+                success = response.status == 1,
+                transactionId = response.trackId,
+                orderId = response.orderId,
+                amount = response.amount,
+                message = اگر response.status == 1 "پرداخت تایید شد" else "پرداخت ناموفق"
+            )
         } catch (e: Exception) {
-            Timber.e(e, "IDPayPaymentService: Exception in verifyPayment")
-            Result.Error(AppError.Unknown(
-                message = "خطا در تالید IDPay",
-                throwable = e
-            ))
+            VerifyResponse(
+                success = false,
+                transactionId = null,
+                orderId = orderId,
+                amount = 0,
+                message = "خطا در تایید: ${e.message}"
+            )
         }
     }
 }
-
-// TODO: Create IDPay data models
-// data class IDPayPaymentRequest(
-//     val merchantId: String,
-//     val amount: Long,
-//     val orderId: String,
-//     val description: String,
-//     val phone: String?,
-//     val mail: String?,
-//     val callback: String
-// )
-//
-// data class IDPayPaymentResponse(
-//     val id: String,
-//     val link: String,
-//     val code: Int,
-//     val message: String
-// )
-//
-// data class IDPayVerifyRequest(
-//     val merchantId: String,
-//     val id: String
-// )
-//
-// data class IDPayVerifyResponse(
-//     val status: Int,
-//     val trackId: String?,
-//     val orderId: String,
-//     val amount: Long,
-//     val cardNo: String?,
-//     val message: String,
-//     val date: Long
-// )
-
-// TODO: Create IDPayApiClient interface
-// interface IDPayApiClient {
-//     @POST("v1.1/payment")
-//     suspend fun requestPayment(
-//         @Body request: IDPayPaymentRequest
-//     ): IDPayPaymentResponse
-//
-//     @POST("v1.1/payment/verify")
-//     suspend fun verifyPayment(
-//         @Body request: IDPayVerifyRequest
-//     ): IDPayVerifyResponse
-// }
