@@ -4,6 +4,13 @@
 
 Enterprise-grade Android e-commerce application for silver jewelry with offline-first architecture.
 
+### 🔐 Quick Setup
+
+**New Project Members:** Before building, complete the payment gateway setup:
+- 📖 [Setup Secrets & Configuration Guide](SETUP_SECRETS.md) - Required reading
+- Configure `local.properties` with your Zarinpal credentials
+- See [QUICK_START.md](QUICK_START.md) for first-time setup
+
 ### 📊 Project Metrics
 
 | Metric | Value | Status |
@@ -82,6 +89,11 @@ app/src/test/kotlin/com/noghre/sod/
 - WorkManager - Background sync
 - Coroutines - Concurrency
 
+**Payment Gateway**
+- Zarinpal - Primary payment processor
+- BuildConfig Secrets - Secure credential injection
+- Environment-specific configurations (dev/staging/prod)
+
 ### 📈 Coverage by Module
 
 | Module | Classes | Tests | Coverage |
@@ -133,6 +145,8 @@ app/src/test/kotlin/com/noghre/sod/
 
 ### 📚 Documentation
 
+- [SETUP_SECRETS.md](SETUP_SECRETS.md) - **🔐 Payment gateway setup guide (START HERE)**
+- [QUICK_START.md](QUICK_START.md) - First-time setup and build instructions
 - [SESSION-1-SUMMARY.md](SESSION-1-SUMMARY.md) - Initial unit tests
 - [SESSION-2-FINAL-SUMMARY.md](SESSION-2-FINAL-SUMMARY.md) - Offline-first architecture
 - [WEEK-4-ROADMAP-UPDATED.md](WEEK-4-ROADMAP-UPDATED.md) - Complete roadmap
@@ -148,6 +162,7 @@ app/src/test/kotlin/com/noghre/sod/
 - ✅ Zero code duplication
 - ✅ All dependencies resolved
 - ✅ Production-ready code
+- ✅ Secrets kept out of version control
 
 ### 📊 Timeline
 
@@ -173,6 +188,6 @@ Target:   90+/100 🎯
 ---
 
 **Status**: 🟢 On Track & Ahead of Schedule
-**Last Updated**: December 27, 2025
+**Last Updated**: December 28, 2025
 **Next Session**: Instrumentation Tests 📱
 **Goal**: 90+/100 Quality by December 31, 2025 ✅
