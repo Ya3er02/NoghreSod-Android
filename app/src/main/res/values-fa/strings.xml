@@ -1,176 +1,222 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- App Name -->
-    <string name="app_name">نقره سُد</string>
-    
-    <!-- Main Navigation -->
-    <string name="nav_home">خانه</string>
-    <string name="nav_categories">دسته‌بندی‌ها</string>
-    <string name="nav_cart">سبد خرید</string>
-    <string name="nav_favorites">علاقه‌مندی‌ها</string>
-    <string name="nav_profile">پروفایل</string>
-    
-    <!-- Product Screen -->
-    <string name="products_title">محصولات نقره</string>
-    <string name="products_empty">محصولی یافت نشد</string>
-    <string name="products_error">خطا در دریافت محصولات</string>
-    <string name="products_loading">در حال بارگذاری…</string>
-    <string name="product_add_to_cart">افزودن به سبد خرید</string>
-    <string name="product_buy_now">خرید فوری</string>
-    <string name="product_price">%s تومان</string>
-    <string name="product_available">موجود</string>
-    <string name="product_unavailable">ناموجود</string>
-    <string name="product_quantity">تعداد</string>
-    <string name="product_description">توضیحات محصول</string>
-    <string name="product_specifications">مشخصات فنی</string>
-    <string name="product_weight">وزن: %s گرم</string>
-    <string name="product_purity">عیار: %s</string>
-    <string name="product_material">جنس: نقره</string>
-    
-    <!-- Cart Screen -->
-    <string name="cart_title">سبد خرید</string>
-    <string name="cart_empty">سبد خرید شما خالی است</string>
-    <string name="cart_empty_action">مشاهده محصولات</string>
-    <string name="cart_item_count">%d محصول</string>
-    <string name="cart_total">جمع کل</string>
-    <string name="cart_subtotal">مبلغ کل</string>
-    <string name="cart_discount">تخفیف</string>
-    <string name="cart_tax">مالیات</string>
-    <string name="cart_shipping">هزینه ارسال</string>
-    <string name="cart_free_shipping">ارسال رایگان</string>
-    <string name="cart_checkout">تکمیل خرید</string>
-    <string name="cart_continue_shopping">ادامه خرید</string>
-    <string name="cart_clear">خالی کردن سبد</string>
-    <string name="cart_remove_item">حذف محصول</string>
-    <string name="cart_item_removed">محصول از سبد خرید حذف شد</string>
-    
-    <!-- Checkout Screen -->
-    <string name="checkout_title">تکمیل خرید</string>
-    <string name="checkout_shipping_info">اطلاعات ارسال</string>
-    <string name="checkout_payment_method">روش پرداخت</string>
-    <string name="checkout_order_summary">خلاصه سفارش</string>
-    <string name="checkout_fullname">نام و نام خانوادگی</string>
-    <string name="checkout_phone">شماره تماس</string>
-    <string name="checkout_address">آدرس کامل</string>
-    <string name="checkout_city">شهر</string>
-    <string name="checkout_province">استان</string>
-    <string name="checkout_postal_code">کد پستی</string>
-    <string name="checkout_payment_online">پرداخت آنلاین</string>
-    <string name="checkout_payment_cash">پرداخت در محل</string>
-    <string name="checkout_submit">ثبت سفارش و پرداخت</string>
-    <string name="checkout_processing">در حال پردازش…</string>
-    
-    <!-- Payment Gateways -->
-    <string name="payment_zarinpal">زرین‌پال</string>
-    <string name="payment_idpay">آیدی‌پی</string>
-    <string name="payment_nextpay">نکست‌پی</string>
-    <string name="payment_jibit">جیبیت</string>
-    <string name="payment_sadad">سداد</string>
-    <string name="payment_mellat">بانک ملت</string>
-    <string name="payment_parsian">بانک پارسیان</string>
-    <string name="payment_pasargad">بانک پاسارگاد</string>
-    <string name="payment_success">پرداخت موفق</string>
-    <string name="payment_failed">پرداخت ناموفق</string>
-    <string name="payment_pending">در انتظار پرداخت</string>
-    <string name="payment_redirect">در حال انتقال به درگاه…</string>
-    
-    <!-- Profile Screen -->
-    <string name="profile_title">پروفایل من</string>
-    <string name="profile_edit">ویرایش پروفایل</string>
-    <string name="profile_orders">سفارش‌های من</string>
-    <string name="profile_addresses">آدرس‌های من</string>
-    <string name="profile_favorites">علاقه‌مندی‌ها</string>
-    <string name="profile_settings">تنظیمات</string>
-    <string name="profile_logout">خروج از حساب</string>
-    <string name="profile_name">نام</string>
-    <string name="profile_email">ایمیل</string>
-    <string name="profile_phone">شماره موبایل</string>
-    <string name="profile_password">رمز عبور</string>
-    <string name="profile_change_password">تغییر رمز عبور</string>
-    
-    <!-- Auth Screen -->
-    <string name="auth_login">ورود</string>
-    <string name="auth_register">ثبت‌نام</string>
-    <string name="auth_phone_number">شماره موبایل</string>
-    <string name="auth_password">رمز عبور</string>
-    <string name="auth_confirm_password">تکرار رمز عبور</string>
-    <string name="auth_forgot_password">فراموشی رمز عبور</string>
-    <string name="auth_otp_code">کد تایید</string>
-    <string name="auth_send_otp">ارسال کد</string>
-    <string name="auth_verify_otp">تایید کد</string>
-    <string name="auth_welcome">خوش آمدید</string>
-    <string name="auth_login_success">ورود موفقیت‌آمیز</string>
-    <string name="auth_register_success">ثبت‌نام موفقیت‌آمیز</string>
-    
-    <!-- Orders Screen -->
-    <string name="orders_title">سفارش‌های من</string>
-    <string name="orders_empty">سفارشی ثبت نشده است</string>
-    <string name="orders_status_pending">در انتظار پرداخت</string>
-    <string name="orders_status_processing">در حال آماده‌سازی</string>
-    <string name="orders_status_shipped">ارسال شده</string>
-    <string name="orders_status_delivered">تحویل داده شده</string>
-    <string name="orders_status_cancelled">لغو شده</string>
-    <string name="orders_tracking_code">کد رهگیری: %s</string>
-    <string name="orders_view_details">مشاهده جزئیات</string>
-    
-    <!-- Search Screen -->
-    <string name="search_title">جستجو</string>
-    <string name="search_hint">جستجو در محصولات…</string>
-    <string name="search_recent">جستجوهای اخیر</string>
-    <string name="search_clear_history">پاک کردن تاریخچه</string>
-    <string name="search_no_results">نتیجه‌ای یافت نشد</string>
-    
-    <!-- Errors -->
-    <string name="error_network">خطا در اتصال به اینترنت</string>
-    <string name="error_server">خطای سرور</string>
-    <string name="error_unknown">خطای نامشخص</string>
-    <string name="error_validation">لطفاً تمام فیلدها را پر کنید</string>
-    <string name="error_invalid_phone">شماره موبایل نامعتبر است</string>
-    <string name="error_invalid_email">ایمیل نامعتبر است</string>
-    <string name="error_password_mismatch">رمز عبور مطابقت ندارد</string>
-    <string name="error_password_length">رمز عبور باید حداقل ۶ کاراکتر باشد</string>
-    
-    <!-- Common -->
-    <string name="common_ok">تأیید</string>
-    <string name="common_cancel">انصراف</string>
-    <string name="common_save">ذخیره</string>
-    <string name="common_delete">حذف</string>
-    <string name="common_edit">ویرایش</string>
-    <string name="common_copy">کپی</string>
-    <string name="common_share">اشتراک‌گذاری</string>
-    <string name="common_download">دانلود</string>
-    <string name="common_upload">بارگذاری</string>
-    <string name="common_retry">تلاش مجدد</string>
-    <string name="common_loading">در حال بارگذاری…</string>
-    <string name="common_search">جستجو</string>
-    <string name="common_filter">فیلتر</string>
-    <string name="common_sort">مرتب‌سازی</string>
-    <string name="common_apply">اعمال</string>
-    <string name="common_reset">بازنشانی</string>
-    <string name="common_close">بستن</string>
-    <string name="common_back">بازگشت</string>
-    <string name="common_next">بعدی</string>
-    <string name="common_previous">قبلی</string>
-    <string name="common_finish">پایان</string>
-    
-    <!-- Notifications -->
-    <string name="notif_order_confirmed">سفارش شما ثبت شد</string>
-    <string name="notif_order_shipped">سفارش شما ارسال شد</string>
-    <string name="notif_order_delivered">سفارش شما تحویل داده شد</string>
-    <string name="notif_new_product">محصول جدید اضافه شد</string>
-    <string name="notif_discount">تخفیف ویژه برای شما</string>
-    
-    <!-- Settings -->
-    <string name="settings_title">تنظیمات</string>
-    <string name="settings_theme">تم</string>
-    <string name="settings_theme_light">روشن</string>
-    <string name="settings_theme_dark">تیره</string>
-    <string name="settings_theme_system">پیش‌فرض سیستم</string>
-    <string name="settings_notifications">اعلان‌ها</string>
-    <string name="settings_language">زبان</string>
-    <string name="settings_about">درباره ما</string>
-    <string name="settings_terms">قوانین و مقررات</string>
-    <string name="settings_privacy">حریم خصوصی</string>
-    <string name="settings_contact">تماس با ما</string>
-    <string name="settings_version">نسخه %s</string>
+    <!-- اسلامی -->
+    <string name="app_name">نقره سود</string>
+    <string name="app_description">فروشگاه بزرگ نقره‌جات ایران</string>
+
+    <!-- خوش آمدید -->
+    <string name="welcome">خوش آمدید به نقره‌سود</string>
+    <string name="welcome_message">بهترین محل ابری رافاعل عالی ایرانی</string>
+    <string name="goodbye">تشکر از خرید خودتان</string>
+
+    <!-- ناویگیشن -->
+    <string name="home">صفحه اصلی</string>
+    <string name="catalog">نمانای</string>
+    <string name="cart">سبد خريد</string>
+    <string name="wishlist">لیست علاقه</string>
+    <string name="profile">پروفایل</string>
+    <string name="settings">تنظیمات</string>
+
+    <!-- محصولات -->
+    <string name="ring">نهفتانگ</string>
+    <string name="necklace">گردنبند</string>
+    <string name="bracelet">دستبند</string>
+    <string name="earring">گوشواره</string>
+    <string name="pendant">آویزه</string>
+    <string name="set">سرویس</string>
+
+    <!-- مخصوصات -->
+    <string name="weight">وزن: %s گرم</string>
+    <string name="size">اندازه: %s</string>
+    <string name="hallmark">الای عيار: %s</string>
+    <string name="material">ماده: %s</string>
+    <string name="color">رنگ: %s</string>
+    <string name="gem">سنگ: %s</string>
+
+    <!-- قیمت -->
+    <string name="price">قیمت: %s تومان</string>
+    <string name="price_per_gram">قیمت هر گرم: %s تومان</string>
+    <string name="discount">تخفيف: %s %%</string>
+    <string name="tax">مالیات (%s %%):</string>
+    <string name="subtotal">مجموع: %s تومان</string>
+    <string name="shipping">هزینه ارسال: %s تومان</string>
+    <string name="insurance">بیمه: %s تومان</string>
+    <string name="total_price">قیمت نهايی: %s تومان</string>
+    <string name="free_shipping">ارسال رایگان</string>
+
+    <!-- سبد خريد -->
+    <string name="cart_empty">سبد خريد خالی است</string>
+    <string name="add_to_cart">افزودن به سبد</string>
+    <string name="remove_from_cart">حذف از سبد</string>
+    <string name="update_quantity">بهروز رسانی تعداد</string>
+    <string name="quantity">تعداد: %d</string>
+    <string name="item_count">تعداد محصول: %d</string>
+
+    <!-- لیست علاقه -->
+    <string name="add_to_wishlist">افزودن به لیست علاقه</string>
+    <string name="remove_from_wishlist">حذف از لیست علاقه</string>
+    <string name="price_alert_enabled">هشدار قایم است</string>
+    <string name="price_alert_disabled">هشدار غيرفعال است</string>
+
+    <!-- درگاه‌های پرداخت -->
+    <string name="payment_gateway">درگاه پرداخت</string>
+    <string name="select_payment_gateway">بررسی درگاه پرداخت</string>
+    <string name="zarinpal">زرین‌پال</string>
+    <string name="idpay">آی‌دی‌پی</string>
+    <string name="nextpay">نکست‌پی</string>
+    <string name="zibal">زیبال</string>
+    <string name="cash_on_delivery">پرداخت در محل</string>
+
+    <!-- پرداخت -->
+    <string name="payment">پرداخت</string>
+    <string name="pay_now">هم اکنون پرداخت کنید</string>
+    <string name="payment_processing">در حال انجام پرداخت...</string>
+    <string name="payment_success">پرداخت با موفقیت انجام شد</string>
+    <string name="payment_failed">پرداخت رد شد</string>
+    <string name="payment_cancelled">پرداخت لغو شد</string>
+    <string name="payment_pending">پرداخت در انتظار</string>
+    <string name="payment_verification">تایید پرداخت...</string>
+
+    <!-- سفارشات -->
+    <string name="order">سفارش</string>
+    <string name="orders">سفارشات</string>
+    <string name="order_number">شماره سفارش: %s</string>
+    <string name="order_status">وضعیت سفارش</string>
+    <string name="order_date">تاریخ سفارش</string>
+    <string name="order_placed">سفارش ثبت شد</string>
+    <string name="order_confirmed">سفارش تایید شد</string>
+    <string name="order_preparing">سفارش در حال آماده‌سازی</string>
+    <string name="order_shipped">سفارش ارسال شد</string>
+    <string name="order_delivered">سفارش دریافت شد</string>
+    <string name="order_cancelled">سفارش لغو شد</string>
+    <string name="order_returned">سفارش برگردانده شد</string>
+    <string name="track_order">رهگابری سفارش</string>
+    <string name="tracking_number">شماره رهگابری: %s</string>
+
+    <!-- آدرس -->
+    <string name="address">آدرس</string>
+    <string name="billing_address">آدرس برای برهآن</string>
+    <string name="shipping_address">آدرس ارسال</string>
+    <string name="province">استان</string>
+    <string name="city">شهر</string>
+    <string name="postal_code">کد پستی</string>
+    <string name="address_details">جزئیات آدرس</string>
+    <string name="recipient_name">نام دریافت‌کننده</string>
+    <string name="phone_number">شماره تلفن</string>
+    <string name="add_address">افزودن آدرس</string>
+    <string name="edit_address">ويرایش آدرس</string>
+    <string name="delete_address">حذف آدرس</string>
+
+    <!-- ارسال -->
+    <string name="shipping">ارسال</string>
+    <string name="shipping_method">روش ارسال</string>
+    <string name="dena">دنا</string>
+    <string name="montaqel_ol_bad">منتقل الباد</string>
+    <string name="jooe_post">جور پست</string>
+    <string name="zerbahar">زرباخر</string>
+    <string name="standard_shipping">ارسال معمولی</string>
+    <string name="express_shipping">ارسال سريع</string>
+    <string name="delivery_time">زمان تحویل: %d روز</string>
+    <string name="tracking_info">اطلاعات رهگابری</string>
+
+    <!-- بیمه -->
+    <string name="insurance">بیمه</string>
+    <string name="add_insurance">افزودن بیمه</string>
+    <string name="insurance_coverage">بوله بیمه: %s تومان</string>
+    <string name="insurance_claim">درخواست از بیمه</string>
+
+    <!-- تي توپوگرافي -->
+    <string name="ring_sizer">اندازه‌یاب نهفتانگ</string>
+    <string name="zoom_hallmark">بررسی لیا عيار</string>
+    <string name="high_resolution_image">تصوير با قطعیت بالا</string>
+
+    <!-- فرمها -->
+    <string name="full_name">نام و نام‌خانواده</string>
+    <string name="email">راایل</string>
+    <string name="password">رمز عبور</string>
+    <string name="confirm_password">تایید رمز عبور</string>
+    <string name="login">روز رسانى</string>
+    <string name="register">ثبت‌نام</string>
+    <string name="logout">خروج</string>
+    <string name="forgot_password">رمز عبور را فراموش کرده‌ايد?</string>
+    <string name="reset_password">تنظیم مجدد رمز عبور</string>
+
+    <!-- یادداشته‌ها -->
+    <string name="validation_required">این فيلد الزامی است</string>
+    <string name="invalid_email">راایل نامعتبر</string>
+    <string name="invalid_phone">شماره تلفن نامعتبر</string>
+    <string name="password_mismatch">رمز عبور مطابقت ندارد</string>
+    <string name="invalid_quantity">تعداد نامعتبر</string>
+
+    <!-- خطاها -->
+    <string name="error">خطا</string>
+    <string name="error_network">اماته اينترنت</string>
+    <string name="error_server">خطا در سرور</string>
+    <string name="error_timeout">زمان منصرفی</string>
+    <string name="error_invalid_response">پاسخ نامعتبر</string>
+    <string name="error_try_again">لطفا دوباره تلاش کنید</string>
+    <string name="error_loading">خطا در بارگذاری اطلاعات</string>
+    <string name="error_connection">اماته اتصال</string>
+
+    <!-- راهنما -->
+    <string name="ok">تامام</string>
+    <string name="cancel">لغو</string>
+    <string name="confirm">تایید</string>
+    <string name="delete">حذف</string>
+    <string name="edit">ويرايش</string>
+    <string name="save">ذخيره</string>
+    <string name="search">جستجو</string>
+    <string name="filter">فيلتر</string>
+    <string name="sort">مرتب کردن</string>
+    <string name="back">برگردن</string>
+    <string name="next">بعدی</string>
+    <string name="previous">قبلی</string>
+    <string name="view_all">مشاهده تمام</string>
+    <string name="loading">در حال بارگذاری...</string>
+    <string name="retry">تلاش مجدد</string>
+
+    <!-- زمانی -->
+    <string name="today">امروز</string>
+    <string name="tomorrow">فردا</string>
+    <string name="yesterday">ديروز</string>
+    <string name="this_week">این هفته</string>
+    <string name="this_month">این ماه</string>
+    <string name="last_30_days">سي روز گذشته</string>
+    <string name="january">فروردین</string>
+    <string name="february">اردیبهشت</string>
+    <string name="march">خرداد</string>
+    <string name="april">تیر</string>
+    <string name="may">مرداد</string>
+    <string name="june">شهریور</string>
+    <string name="july">مهر</string>
+    <string name="august">آبان</string>
+    <string name="september">آذر</string>
+    <string name="october">دي</string>
+    <string name="november">بهمن</string>
+    <string name="december">اسفند</string>
+    <string name="saturday">شنبه</string>
+    <string name="sunday">یکشنبه</string>
+    <string name="monday">دوشنبه</string>
+    <string name="tuesday">سه‌شنبه</string>
+    <string name="wednesday">چهارشنبه</string>
+    <string name="thursday">پنج‌شنبه</string>
+    <string name="friday">جمعه</string>
+
+    <!-- رابط و سلام -->
+    <string name="help">کمک</string>
+    <string name="contact_us">تماس با ما</string>
+    <string name="about_us">درباره ما</string>
+    <string name="terms_of_service">شرايط خدمات</string>
+    <string name="privacy_policy">سياست حريم اختصاص</string>
+    <string name="return_policy">سياست برگردانده</string>
+    <string name="customer_service">خدمات مشتريان</string>
+    <string name="customer_service_phone">۰۲۶-۰۰۰۰۰۰</string>
+    <string name="email_support">support@noghresod.ir</string>
+    <string name="working_hours">ساعات کاری: روز یکشنبه تا پنجشنبه از ۹ تا ۱۸</string>
+
+    <!-- تاکيدی -->
+    <string name="thank_you">تشکر</string>
+    <string name="thanks_for_purchase">تشکر از خريد</string>
+    <string name="success">موفق</string>
+    <string name="dear_customer">مشتری گرامی</string>
 </resources>
