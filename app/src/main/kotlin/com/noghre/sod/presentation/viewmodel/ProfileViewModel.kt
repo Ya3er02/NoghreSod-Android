@@ -2,34 +2,59 @@ package com.noghre.sod.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.noghre.sod.core.error.GlobalExceptionHandler
-import com.noghre.sod.core.util.onError
-import com.noghre.sod.core.util.onSuccess
+import com.noghre.sod.R
+import com.noghre.sod.core.exception.GlobalExceptionHandler
+import com.noghre.sod.core.util.UiEvent
+import com.noghre.sod.domain.common.ResourceProvider
 import com.noghre.sod.domain.model.User
-import com.noghre.sod.domain.repository.UserRepository
-import com.noghre.sod.presentation.common.UiEvent
-import com.noghre.sod.presentation.common.UiState
+import com.noghre.sod.domain.usecase.profile.DeleteAccountUseCase
+import com.noghre.sod.domain.usecase.profile.GetUserProfileUseCase
+import com.noghre.sod.domain.usecase.profile.UpdateProfileImageUseCase
+import com.noghre.sod.domain.usecase.profile.UpdateUserProfileUseCase
+import com.noghre.sod.domain.usecase.validation.ValidateEmailUseCase
+import com.noghre.sod.domain.usecase.validation.ValidatePhoneNumberUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
+sealed class ProfileUiState {
+    object Idle : ProfileUiState()
+    object Loading : ProfileUiState()
+    data class Success(val user: User) : ProfileUiState()
+    data class Error(val message: String) : ProfileUiState()
+}
+
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val userRepository: UserRepository,
+    // ✅ Profile UseCases
+    private val getUserProfileUseCase: GetUserProfileUseCase,
+    private val updateUserProfileUseCase: UpdateUserProfileUseCase,
+    private val updateProfileImageUseCase: UpdateProfileImageUseCase,
+    private val deleteAccountUseCase: DeleteAccountUseCase,
+    
+    // ✅ Validation UseCases
+    private val validateEmailUseCase: ValidateEmailUseCase,
+    private val validatePhoneNumberUseCase: ValidatePhoneNumberUseCase,
+    
+    // Infrastructure
+    private val resourceProvider: ResourceProvider,
     private val exceptionHandler: GlobalExceptionHandler
 ) : ViewModel() {
     
-    private val _uiState = MutableStateFlow<UiState<User>>(UiState.Idle)
-    val uiState: StateFlow<UiState<User>> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Idle)
+    val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
     
-    private val _events = Channel<UiEvent>(Channel.BUFFERED)
-    val events = _events.receiveAsFlow()
+    private val _userProfile = MutableStateFlow<User?>(null)
+    val userProfile: StateFlow<User?> = _userProfile.asStateFlow()
+    
+    private val _uiEvent = MutableSharedFlow<UiEvent>()
+    val uiEvent = _uiEvent.asSharedFlow()
     
     init {
         loadProfile()
@@ -37,92 +62,98 @@ class ProfileViewModel @Inject constructor(
     
     fun loadProfile() {
         viewModelScope.launch(exceptionHandler.handler) {
-            _uiState.value = UiState.Loading
-            Timber.d("Loading user profile")
+            _uiState.value = ProfileUiState.Loading
             
-            userRepository.getCurrentUser()
-                .onSuccess { user ->
-                    Timber.d("Profile loaded: ${user.email}")
-                    _uiState.value = UiState.Success(user)
-                }
-                .onError { error ->
-                    Timber.e("Failed to load profile: ${error.message}")
-                    _uiState.value = UiState.Error(error)
-                    _events.send(UiEvent.ShowError(error))
-                }
+            val result = getUserProfileUseCase(Unit)
+            
+            if (result.isSuccess) {
+                val user = result.getOrNull()
+                _userProfile.value = user
+                _uiState.value = ProfileUiState.Success(user!!)
+                Timber.d("Profile loaded: ${user.email}")
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.value = ProfileUiState.Error(error?.message ?: "Failed to load profile")
+            }
         }
     }
     
-    fun onEditProfile(name: String, phone: String) {
-        if (name.isBlank() || phone.isBlank()) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("لطفاً تمام فیلدها را پر کنید"))
-            }
-            return
-        }
-        
+    fun updateProfile(
+        name: String? = null,
+        email: String? = null,
+        phoneNumber: String? = null,
+        address: String? = null,
+        city: String? = null,
+        postalCode: String? = null
+    ) {
         viewModelScope.launch(exceptionHandler.handler) {
-            Timber.d("Updating profile")
+            _uiState.value = ProfileUiState.Loading
             
-            userRepository.updateProfile(name = name, phone = phone)
-                .onSuccess {
-                    Timber.d("Profile updated successfully")
-                    _events.send(UiEvent.ShowToast("پروفایل به روز رسانی شد"))
-                    loadProfile()
+            try {
+                // ✅ Validate fields if provided
+                if (email != null) {
+                    validateEmailUseCase(email)
                 }
-                .onError { error ->
-                    Timber.e("Failed to update profile: ${error.message}")
-                    _events.send(UiEvent.ShowError(error))
+                if (phoneNumber != null) {
+                    validatePhoneNumberUseCase(phoneNumber)
                 }
+                
+                // ✅ Update profile
+                val params = UpdateUserProfileUseCase.Params(
+                    name = name,
+                    email = email,
+                    phoneNumber = phoneNumber,
+                    address = address,
+                    city = city,
+                    postalCode = postalCode
+                )
+                val result = updateUserProfileUseCase(params)
+                
+                if (result.isSuccess) {
+                    val updatedUser = result.getOrNull()
+                    _userProfile.value = updatedUser
+                    _uiState.value = ProfileUiState.Success(updatedUser!!)
+                    _uiEvent.emit(UiEvent.ShowToast("Profile updated successfully"))
+                    Timber.d("Profile updated")
+                } else {
+                    val error = result.exceptionOrNull()
+                    _uiState.value = ProfileUiState.Error(error?.message ?: "Failed to update")
+                }
+            } catch (e: Exception) {
+                _uiState.value = ProfileUiState.Error(e.message ?: "Validation error")
+            }
         }
     }
     
-    fun onChangePassword(oldPassword: String, newPassword: String, confirmPassword: String) {
-        if (oldPassword.isBlank() || newPassword.isBlank() || confirmPassword.isBlank()) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("لطفاً تمام فیلدها را پر کنید"))
-            }
-            return
-        }
-        
-        if (newPassword.length < 6) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("رمز عبور باید حداقل ۶ کاراکتر باشد"))
-            }
-            return
-        }
-        
-        if (newPassword != confirmPassword) {
-            viewModelScope.launch {
-                _events.send(UiEvent.ShowToast("رمز عبور و تأیید آن یکسان نیست"))
-            }
-            return
-        }
-        
+    fun updateProfileImage(imagePath: String) {
         viewModelScope.launch(exceptionHandler.handler) {
-            Timber.d("Changing password")
+            val result = updateProfileImageUseCase(imagePath)
             
-            userRepository.changePassword(oldPassword, newPassword)
-                .onSuccess {
-                    Timber.d("Password changed successfully")
-                    _events.send(UiEvent.ShowToast("رمز عبور با موفقیت تغییر یافت"))
-                }
-                .onError { error ->
-                    Timber.e("Failed to change password: ${error.message}")
-                    _events.send(UiEvent.ShowError(error))
-                }
+            if (result.isSuccess) {
+                val updatedUser = result.getOrNull()
+                _userProfile.value = updatedUser
+                _uiEvent.emit(UiEvent.ShowToast("Photo updated"))
+                Timber.d("Profile image updated")
+            } else {
+                val error = result.exceptionOrNull()
+                _uiEvent.emit(UiEvent.ShowError(error?.message ?: "Failed to update photo"))
+            }
         }
     }
     
-    fun onLogout() {
-        viewModelScope.launch {
-            Timber.d("Logout triggered from profile")
-            _events.send(UiEvent.Navigate("login"))
+    fun deleteAccount(password: String) {
+        viewModelScope.launch(exceptionHandler.handler) {
+            val result = deleteAccountUseCase(password)
+            
+            if (result.isSuccess) {
+                _userProfile.value = null
+                _uiState.value = ProfileUiState.Idle
+                _uiEvent.emit(UiEvent.ShowToast("Account deleted"))
+                Timber.d("Account deleted")
+            } else {
+                val error = result.exceptionOrNull()
+                _uiEvent.emit(UiEvent.ShowError(error?.message ?: "Failed to delete account"))
+            }
         }
-    }
-    
-    fun onRetryClick() {
-        Timber.d("Retry clicked")
-        loadProfile()
     }
 }
