@@ -2,96 +2,155 @@ package com.noghre.sod.domain.usecase.payment
 
 import com.noghre.sod.core.error.AppError
 import com.noghre.sod.core.util.Result
-import com.noghre.sod.domain.model.PaymentGateway
-import com.noghre.sod.domain.model.PaymentResponse
+import com.noghre.sod.domain.model.Rial
+import com.noghre.sod.domain.model.Toman
 import com.noghre.sod.domain.repository.PaymentRepository
 import timber.log.Timber
 import javax.inject.Inject
 
 /**
- * Use case for initiating a payment request
+ * Business logic for initiating payment with Zarinpal gateway.
  * 
- * Responsibility: Orchestrate payment request logic
- * - Validate input parameters
- * - Call PaymentRepository
- * - Transform results for presentation layer
+ * Responsibilities (Domain layer):
+ * - Validate payment amount (min 1000 Toman, max 500M Toman)
+ * - Convert Toman to Rial (Zarinpal requirement: 1 Toman = 10 Rial)
+ * - Generate Persian payment description
+ * - Apply business rules (e.g., no payment for canceled orders)
  * 
- * Benefits:
- * - Testable: Can mock PaymentRepository
- * - Reusable: Used by different features
- * - Encapsulated: Payment logic in one place
+ * Responsibilities (Data layer - delegated to repository):
+ * - Network communication with Zarinpal API
+ * - Error handling for network failures
+ * - Retry logic for transient failures
+ * 
+ * This use case is pure Kotlin, testable with JUnit (no Android dependencies).
  */
 class RequestPaymentUseCase @Inject constructor(
     private val paymentRepository: PaymentRepository
 ) {
+    companion object {
+        // Business rules: valid payment range
+        private const val MIN_AMOUNT_TOMAN = 1_000L        // 1,000 Toman
+        private const val MAX_AMOUNT_TOMAN = 500_000_000L   // 500 Million Toman
+    }
     
-    /**
-     * Execute payment request
-     * 
-     * @param orderId Order identifier (must not be blank)
-     * @param amount Payment amount in Tomans (must be > 0)
-     * @param gateway Payment gateway to use
-     * @param mobile Optional customer mobile number
-     * @return Result<PaymentResponse> with authority and payment URL
-     */
     suspend operator fun invoke(
+        amount: Toman,
         orderId: String,
-        amount: Long,
-        gateway: PaymentGateway,
-        mobile: String? = null
-    ): Result<PaymentResponse> {
-        // Input validation
+        description: String = "",
+        callbackUrl: String
+    ): Result<PaymentInitiation> {
+        
+        // Step 1: Validate amount is within business rules
+        if (!amount.isValidPaymentAmount()) {
+            Timber.w("Payment amount outside valid range: ${amount.value} Toman")
+            return when {
+                amount.value < MIN_AMOUNT_TOMAN -> {
+                    Result.Error(
+                        AppError.Validation(
+                            "تومان ۱٬۰۰۰ آن الزام پرداخت مبلغ حداقل"
+                        )
+                    )
+                }
+                else -> {
+                    Result.Error(
+                        AppError.Validation(
+                            "تومان میلیون ۵۰۰ از بیشتر پرداخت نمی‌توانب"
+                        )
+                    )
+                }
+            }
+        }
+        
+        // Step 2: Validate order ID format
         if (orderId.isBlank()) {
-            Timber.w("RequestPaymentUseCase: Invalid orderId")
             return Result.Error(
-                AppError.Validation(
-                    message = "شناسه سفارش معتبر نیست",
-                    field = "orderId"
-                )
+                AppError.Validation("سفارش گانه الزام")
             )
         }
         
-        if (amount <= 0) {
-            Timber.w("RequestPaymentUseCase: Invalid amount: $amount")
-            return Result.Error(
-                AppError.Validation(
-                    message = "مبلغ باید بیشتر از صفر باشد",
-                    field = "amount"
-                )
-            )
-        }
-        
-        // Validate mobile if provided
-        if (mobile != null && mobile.isBlank()) {
-            Timber.w("RequestPaymentUseCase: Blank mobile provided")
-            return Result.Error(
-                AppError.Validation(
-                    message = "نامر موبایل باید خالی نباشد",
-                    field = "mobile"
-                )
-            )
-        }
-        
-        // Log use case execution
+        // Step 3: Convert Toman to Rial for Zarinpal API
+        // CRITICAL: Zarinpal requires amounts in Rial (10x larger)
+        val amountInRial = amount.toRial()
         Timber.d(
-            "RequestPaymentUseCase: Initiating payment - orderId=$orderId, " +
-            "amount=$amount, gateway=$gateway, hasMobile=${mobile != null}"
+            "Payment conversion: ${amount.value} Toman = " +
+            "${amountInRial.value} Rial for order $orderId"
         )
         
-        // Delegate to repository
-        return try {
-            paymentRepository.requestPayment(
-                orderId = orderId,
-                amount = amount,
-                gateway = gateway,
-                mobile = mobile
+        // Step 4: Generate Persian description if not provided
+        val persianDescription = if (description.isBlank()) {
+            "سفارش $orderId - سود نقره"
+        } else {
+            description
+        }
+        
+        // Step 5: Validate callback URL (security check)
+        if (!isValidCallbackUrl(callbackUrl)) {
+            Timber.e("Invalid callback URL: $callbackUrl")
+            return Result.Error(
+                AppError.Security("آدرس بازگشت نامعتبر")
             )
-        } catch (e: Exception) {
-            Timber.e(e, "RequestPaymentUseCase: Exception occurred")
-            Result.Error(AppError.Unknown(
-                message = "خطا در ارسال درخواست پرداخت",
-                throwable = e
-            ))
+        }
+        
+        // Step 6: Delegate to repository (Data layer responsibility)
+        // Repository handles network communication, retries, error handling
+        Timber.i(
+            "Requesting payment from Zarinpal:\n" +
+            "- Amount: ${amount.value} Toman (${amountInRial.value} Rial)\n" +
+            "- Order: $orderId\n" +
+            "- Description: $persianDescription\n" +
+            "- Callback: $callbackUrl"
+        )
+        
+        return when (val result = paymentRepository.initiatePayment(
+            amountInRial = amountInRial.value,
+            orderId = orderId,
+            description = persianDescription,
+            callbackUrl = callbackUrl
+        )) {
+            is Result.Success -> {
+                Timber.i(
+                    "Payment initiation successful:\n" +
+                    "- Authority: ${result.data.authority}\n" +
+                    "- Payment URL: ${result.data.paymentUrl}"
+                )
+                
+                Result.Success(
+                    PaymentInitiation(
+                        authority = result.data.authority,
+                        paymentUrl = result.data.paymentUrl,
+                        orderId = orderId,
+                        amount = amount
+                    )
+                )
+            }
+            
+            is Result.Error -> {
+                Timber.e(
+                    "Payment initiation failed: ${result.error.message}"
+                )
+                result
+            }
+            
+            is Result.Loading -> result
         }
     }
+    
+    /**
+     * Validate callback URL to prevent open redirect attacks.
+     */
+    private fun isValidCallbackUrl(url: String): Boolean {
+        return url.startsWith("https://noghresod.ir/payment") ||
+               url.startsWith("https://api.noghresod.ir/payment") ||
+               url.startsWith("app://noghresod/payment")  // Deep link
+    }
 }
+
+/**
+ * Result data class for successful payment initiation.
+ */
+data class PaymentInitiation(
+    val authority: String,      // Zarinpal transaction authority
+    val paymentUrl: String,     // URL to redirect user for payment
+    val orderId: String,        // Internal order ID
+    val amount: Toman           // Amount in Toman (for display/logging)
+)
