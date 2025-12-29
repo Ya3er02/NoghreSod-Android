@@ -1,153 +1,153 @@
 package com.noghre.sod.core.util
 
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
+import com.noghre.sod.domain.model.Price
+import com.noghre.sod.domain.model.Toman
 
 /**
- * فرمت‌کننده اعداد ایرانی
- * برای کار با اعداد فارسی و ریال‌ها و تومان‌ها
+ * Formatter for converting numbers to Persian (Farsi) representation.
+ * 
+ * Handles:
+ * - Arabic numerals (0-9) → Persian digits (۰-۹)
+ * - Thousands separator (Persian comma: ٬)
+ * - Negative number sign (Persian minus: −)
+ * 
+ * Example:
+ * - 1234567 → ۱٬۲۳۴٬۵۶۷
+ * - -500 → −۵۰۰
  */
 object PersianNumberFormatter {
     
-    private val farsiDigits = arrayOf(
-        "۰", "۱", "۲", "۳", "۴",
-        "۵", "۶", "۷", "۸", "۹"
+    // Persian digit mapping (Farsi digits)
+    private val persianDigits = arrayOf(
+        '۰',  // 0 → ۰
+        '۱',  // 1 → ۱
+        '۲',  // 2 → ۲
+        '۳',  // 3 → ۳
+        '۴',  // 4 → ۴
+        '۵',  // 5 → ۵
+        '۶',  // 6 → ۶
+        '۷',  // 7 → ۷
+        '۸',  // 8 → ۸
+        '۹'   // 9 → ۹
     )
     
-    /**
-     * تبدیل قیمت به فرمت فارسی
-     * 1250000 → ۱٬۲۵۰٬۰۰۰ تومان
-     */
-    fun formatPrice(amount: Long): String {
-        val formatted = String.format("%,d", amount)
-        val farsiFormatted = toFarsiNumbers(formatted)
-        return "$farsiFormatted تومان"
-    }
+    // Persian thousands separator (comma in Persian: ٬)
+    private const val PERSIAN_COMMA = '٬'  // Persian separator for thousands
+    
+    // Persian minus sign
+    private const val PERSIAN_MINUS = '−'   // Unicode minus sign
     
     /**
-     * تبدیل قیمت بدون یام
-     * 1250000 → ۱٬۲۵۰٬۰۰۰
+     * Format a number in Persian.
+     * 
+     * @param value Number to format
+     * @return Formatted string with Persian digits and separators
+     * 
+     * Examples:
+     * - 0 → "۰"
+     * - 123 → "۱۲۳"
+     * - 1234 → "۱٬۲۳۴"
+     * - 1234567 → "۱٬۲۳۴٬۵۶۷"
+     * - -500 → "−۵۰۰"
      */
-    fun formatPriceWithoutCurrency(amount: Long): String {
-        val formatted = String.format("%,d", amount)
-        return toFarsiNumbers(formatted)
-    }
-    
-    /**
-     * تبدیل شماره موبایل
-     * 09101234567 → زمینه: 0910 123 4567
-     */
-    fun formatPhoneNumber(phone: String): String {
-        var cleaned = phone.replace(Regex("[^0-9]"), "")
+    fun format(value: Long): String {
+        if (value == 0L) return persianDigits[0].toString()
         
-        // تبدیل +98 به 0
-        if (cleaned.startsWith("+98")) {
-            cleaned = "0" + cleaned.substring(3)
-        } else if (cleaned.startsWith("98")) {
-            cleaned = "0" + cleaned.substring(2)
+        val isNegative = value < 0
+        val absValue = if (isNegative) -value else value
+        
+        // Convert to string and split from right to left in groups of 3
+        val stringValue = absValue.toString()
+        val parts = stringValue.reversed().chunked(3).reversed()
+        
+        // Format each part and rejoin with Persian comma
+        val formattedParts = parts.map { part ->
+            part.reversed().map { digit ->
+                persianDigits[digit.toString().toInt()]
+            }.joinToString("")
         }
         
-        // فرمت: 0910 123 4567
-        return if (cleaned.length >= 10) {
-            val formatted = "${cleaned.substring(0, 4)} ${cleaned.substring(4, 7)} ${cleaned.substring(7)}"
-            toFarsiNumbers(formatted)
-        } else {
-            toFarsiNumbers(cleaned)
+        var result = formattedParts.joinToString(PERSIAN_COMMA.toString())
+        
+        // Add Persian minus sign if negative
+        if (isNegative) {
+            result = "$PERSIAN_MINUS$result"
         }
+        
+        return result
     }
     
     /**
-     * تبدیل شماره کارت با mask
-     * 6037697126661 → 603769 *** 6661
+     * Format a Toman amount with currency label.
+     * 
+     * @param toman Toman value
+     * @return Formatted string with Persian digits and "تومان" label
+     * 
+     * Example: Toman(123456) → "۱٬۲۳۴٬۵۶ تومان"
      */
-    fun formatCardNumber(cardNumber: String): String {
-        val cleaned = cardNumber.replace(Regex("[^0-9]"), "")
-        return if (cleaned.length >= 10) {
-            val masked = "${cleaned.substring(0, 6)} *** ${cleaned.substring(cleaned.length - 4)}"
-            toFarsiNumbers(masked)
-        } else {
-            toFarsiNumbers(cleaned)
-        }
+    fun formatTomanPrice(toman: Toman): String {
+        return "${format(toman.value)} تومان"
     }
     
     /**
-     * تبدیل اعداد انگلیسی به فارسی
+     * Format a Price object for display.
+     * 
+     * @param price Price object containing amount and display format
+     * @return Formatted price string with Persian numerals
      */
-    fun toFarsiNumbers(input: String): String {
-        var output = input
-        for (i in 0..9) {
-            output = output.replace(i.toString(), farsiDigits[i])
-        }
-        return output
+    fun formatPrice(price: Price): String {
+        return formatTomanPrice(price.amount)
     }
     
     /**
-     * تبدیل اعداد فارسی به انگلیسی
+     * Format percentage for display.
+     * 
+     * @param percent Percentage value (0-100)
+     * @return Formatted percentage string
+     * 
+     * Example: 15 → "۱۵%"
      */
-    fun toEnglishNumbers(input: String): String {
-        var output = input
-        for (i in 0..9) {
-            output = output.replace(farsiDigits[i], i.toString())
-        }
-        return output
+    fun formatPercent(percent: Int): String {
+        return "${format(percent.toLong())}%"
     }
     
     /**
-     * کالکولاسیون وزن و قیمت نقره
-     * weight (gram) و price per gram → total price
+     * Format quantity (for shopping cart items).
+     * 
+     * @param quantity Item quantity
+     * @return Formatted quantity string with Persian digits
+     * 
+     * Example: 5 → "۵"
      */
-    fun calculateSilverPrice(weight: Double, pricePerGram: Long): Long {
-        return (weight * pricePerGram).toLong()
+    fun formatQuantity(quantity: Int): String {
+        return format(quantity.toLong())
     }
     
     /**
-     * مالیات 9% را اضافه کنید
+     * Convert individual digit to Persian.
+     * 
+     * @param digit Single digit (0-9)
+     * @return Persian digit character
      */
-    fun addTax(basePrice: Long, taxRate: Float = 0.09f): Long {
-        return (basePrice * (1 + taxRate)).toLong()
+    fun formatDigit(digit: Int): Char {
+        require(digit in 0..9) { "Digit must be 0-9, got: $digit" }
+        return persianDigits[digit]
     }
     
     /**
-     * قیمت نهايی = قیمت + مالیات + هزینه ارسال
+     * Format date numbers for Persian calendar.
+     * 
+     * @param year Jalali year (e.g., 1404)
+     * @param month Jalali month (1-12)
+     * @param day Jalali day (1-31)
+     * @return Formatted date string
+     * 
+     * Example: (1404, 10, 8) → "۱۴۰۴/۱۰/۰۸"
      */
-    fun calculateFinalPrice(
-        basePrice: Long,
-        shippingCost: Long = 0,
-        taxRate: Float = 0.09f
-    ): Long {
-        val subtotal = basePrice + shippingCost
-        val tax = (subtotal * taxRate).toLong()
-        return subtotal + tax
-    }
-    
-    /**
-     * فرمت وزن با گرم
-     * 15.5 → ۱۵.۵ گرم
-     */
-    fun formatWeight(weight: Double): String {
-        val formatted = String.format("%.1f", weight)
-        return "${toFarsiNumbers(formatted)} گرم"
-    }
-    
-    /**
-     * فرمت آیدی (شناسه مالی ایرانی)
-     */
-    fun formatIranianNationalId(id: String): String {
-        val cleaned = id.replace(Regex("[^0-9]"), "")
-        return if (cleaned.length == 10) {
-            val formatted = "${cleaned.substring(0, 3)}-${cleaned.substring(3, 7)}-${cleaned.substring(7)}"
-            toFarsiNumbers(formatted)
-        } else {
-            toFarsiNumbers(cleaned)
-        }
-    }
-    
-    /**
-     * فرمت شبان (شناسه حساب بانکی)
-     */
-    fun formatIBAN(iban: String): String {
-        val cleaned = iban.replace(Regex("[^A-Z0-9]"), "")
-        val parts = cleaned.chunked(4).map { it }
-        return parts.joinToString(" ").also { toFarsiNumbers(it) }
+    fun formatJalaliDate(year: Int, month: Int, day: Int): String {
+        val yearStr = format(year.toLong())
+        val monthStr = String.format("%02d", month).map { persianDigits[it.toString().toInt()] }.joinToString("")
+        val dayStr = String.format("%02d", day).map { persianDigits[it.toString().toInt()] }.joinToString("")
+        return "$yearStr/$monthStr/$dayStr"
     }
 }
