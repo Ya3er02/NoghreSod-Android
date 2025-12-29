@@ -3,7 +3,7 @@
 kotlin = "2.1.0"
 
 # Android Gradle Plugin - Latest stable
-androidGradlePlugin = "8.8.0"
+androidGradlePlugin = "8.13.2"
 
 # Compose - Latest stable
 composeCompiler = "1.5.14"
