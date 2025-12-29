@@ -3,6 +3,7 @@ plugins {
     id("kotlin-android")
     id("com.google.dagger.hilt.android")
     id("kotlin-kapt")
+    id("jacoco")
 }
 
 android {
@@ -16,7 +17,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.noghre.sod.HiltTestRunner"
         vectorDrawables.useSupportLibrary = true
         
         // فارسی (ایران)
@@ -33,18 +34,52 @@ android {
             )
         }
     }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    
     kotlinOptions {
         jvmTarget = "11"
     }
+    
     buildFeatures {
         compose = true
     }
+    
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.0"
+    }
+    
+    // NDK Configuration
+    ndkVersion = "26.1.10909125"
+    
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.18.1"
+        }
+    }
+    
+    // Packaging Options
+    packagingOptions {
+        pickFirst("lib/armeabi-v7a/libc++_shared.so")
+        pickFirst("lib/arm64-v8a/libc++_shared.so")
+        pickFirst("lib/x86/libc++_shared.so")
+        pickFirst("lib/x86_64/libc++_shared.so")
+        exclude("META-INF/proguard/androidx-*.pro")
+        exclude("META-INF/LICENSE")
+        exclude("META-INF/LICENSE.txt")
+    }
+}
+
+jacocoTestReport {
+    dependsOn("testDebugUnitTest")
+    
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
     }
 }
 
@@ -97,15 +132,27 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.0")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    
+    // App Startup
+    implementation("androidx.startup:startup-runtime:1.1.1")
+    
+    // Timber Logging
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
-    // Testing
+    // Testing - Unit
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    
+    // Testing - Instrumentation
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.48")
+    kaptAndroidTest("com.google.dagger:hilt-compiler:2.48")
+    
+    // Testing - Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
