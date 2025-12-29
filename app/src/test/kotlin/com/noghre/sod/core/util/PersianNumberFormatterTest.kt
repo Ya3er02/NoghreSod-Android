@@ -1,108 +1,215 @@
 package com.noghre.sod.core.util
 
 import org.junit.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import org.junit.Before
+import com.google.common.truth.Truth.assertThat
+import com.noghre.sod.domain.model.Toman
+import com.noghre.sod.domain.model.Rial
 
+/**
+ * Unit tests برای Persian number formatting
+ * 
+ * اهداف:
+ * - تبدیل ارقام انگلیسی به فارسی
+ * - اضافه جداکننده‌ی هزاری
+ * - قالب زبانی پول و درصد
+ */
 class PersianNumberFormatterTest {
     
+    private lateinit var formatter: PersianNumberFormatter
+    
+    @Before
+    fun setup() {
+        formatter = PersianNumberFormatter()
+    }
+    
+    // ==================== Basic Digit Conversion ====================
+    
     @Test
-    fun testFormatPrice() {
-        val result = PersianNumberFormatter.formatPrice(850000)
-        assertEquals("۸۵۰٬۰۰۰ تومان", result)
+    fun `formatPersianDigits should convert English digits to Persian`() {
+        val result = formatter.formatPersianDigits("0123456789")
+        assertThat(result).isEqualTo("۰۱۲۳۴۵۶۷۸۹")
     }
     
     @Test
-    fun testFormatPriceWithoutCurrency() {
-        val result = PersianNumberFormatter.formatPriceWithoutCurrency(1250000)
-        assertEquals("۱٬۲۵۰٬۰۰۰", result)
+    fun `formatPersianDigits should handle mixed content`() {
+        val result = formatter.formatPersianDigits("Price: 123 Toman")
+        assertThat(result).contains("۱۲۳")
     }
     
     @Test
-    fun testFormatPhoneNumber() {
-        val result = PersianNumberFormatter.formatPhoneNumber("09101234567")
-        assertTrue(result.contains("۰۹۱۰"))  // 0910 in Persian
-        assertTrue(result.contains("۳۴۵۶"))  // 3456 in Persian
+    fun `formatPersianDigits should preserve non-digit characters`() {
+        val result = formatter.formatPersianDigits("Hello123World")
+        assertThat(result).isEqualTo("Hello۱۲۳World")
+    }
+    
+    // ==================== Number Formatting with Separators ====================
+    
+    @Test
+    fun `formatNumber should add thousand separator`() {
+        val result = formatter.formatNumber(1000)
+        assertThat(result).contains(",")
     }
     
     @Test
-    fun testFormatPhoneNumberWithPlus98() {
-        val result = PersianNumberFormatter.formatPhoneNumber("+989101234567")
-        assertTrue(result.contains("۰۹۱۰"))  // Should convert to 0910
+    fun `formatNumber should convert digits to Persian`() {
+        val result = formatter.formatNumber(123)
+        assertThat(result).isEqualTo("۱۲۳")
     }
     
     @Test
-    fun testFormatCardNumber() {
-        val result = PersianNumberFormatter.formatCardNumber("6037697126661")
-        assertTrue(result.contains("۶۰۳۷۶۹"))  // First 6 digits
-        assertTrue(result.contains("۶۶۶۱"))  // Last 4 digits
-        assertTrue(result.contains("***"))  // Masked middle
+    fun `formatNumber should handle large numbers with separators`() {
+        val result = formatter.formatNumber(1234567)
+        assertThat(result).isEqualTo("۱,۲۳۴,۵۶۷")
     }
     
     @Test
-    fun testToFarsiNumbers() {
-        assertEquals("۲۰۲۴", PersianNumberFormatter.toFarsiNumbers("2024"))
-        assertEquals("۱۴۰۳", PersianNumberFormatter.toFarsiNumbers("1403"))
-        assertEquals("۰-۹۹۹", PersianNumberFormatter.toFarsiNumbers("0-999"))
+    fun `formatNumber should handle zero`() {
+        val result = formatter.formatNumber(0)
+        assertThat(result).isEqualTo("۰")
     }
     
     @Test
-    fun testToEnglishNumbers() {
-        assertEquals("2024", PersianNumberFormatter.toEnglishNumbers("۲۰۲۴"))
-        assertEquals("1403", PersianNumberFormatter.toEnglishNumbers("۱۴۰۳"))
+    fun `formatNumber should handle negative numbers`() {
+        val result = formatter.formatNumber(-500)
+        assertThat(result).contains("−") // Persian minus
+        assertThat(result).contains("۵۰۰")
+    }
+    
+    // ==================== Currency Formatting ====================
+    
+    @Test
+    fun `formatTomanPrice should include Toman suffix`() {
+        val price = Toman(100000)
+        val result = formatter.formatTomanPrice(price)
+        
+        assertThat(result).endsWith("تومان")
     }
     
     @Test
-    fun testCalculateSilverPrice() {
-        val weight = 15.5
-        val pricePerGram = 2_500_000L
-        val result = PersianNumberFormatter.calculateSilverPrice(weight, pricePerGram)
-        assertEquals(38_750_000L, result)
+    fun `formatTomanPrice should format with separators`() {
+        val price = Toman(123456)
+        val result = formatter.formatTomanPrice(price)
+        
+        assertThat(result).contains(",")
+        assertThat(result).contains("۱۲۳,۴۵۶")
     }
     
     @Test
-    fun testAddTax() {
-        val basePrice = 1_000_000L
-        val result = PersianNumberFormatter.addTax(basePrice, 0.09f)
-        assertEquals(1_090_000L, result)
+    fun `formatRialPrice should include Rial suffix`() {
+        val price = Rial(1000000)
+        val result = formatter.formatRialPrice(price)
+        
+        assertThat(result).endsWith("ریال")
     }
     
     @Test
-    fun testCalculateFinalPrice() {
-        val basePrice = 1_000_000L
-        val shipping = 50_000L
-        val result = PersianNumberFormatter.calculateFinalPrice(
-            basePrice = basePrice,
-            shippingCost = shipping,
-            taxRate = 0.09f
-        )
-        // (1,000,000 + 50,000) * 1.09 = 1,144,500
-        assertEquals(1_144_500L, result)
+    fun `formatRialPrice should format with separators`() {
+        val price = Rial(1234567)
+        val result = formatter.formatRialPrice(price)
+        
+        assertThat(result).contains(",")
+    }
+    
+    // ==================== Percentage Formatting ====================
+    
+    @Test
+    fun `formatPercent should include percent symbol`() {
+        val result = formatter.formatPercent(50.0)
+        assertThat(result).endsWith("%")
     }
     
     @Test
-    fun testFormatWeight() {
-        val result = PersianNumberFormatter.formatWeight(15.5)
-        assertTrue(result.contains("۱۵"))  // 15 in Persian
-        assertTrue(result.contains("۵"))  // 5 in Persian
-        assertTrue(result.contains("گرم"))  // gram
+    fun `formatPercent should convert digits to Persian`() {
+        val result = formatter.formatPercent(50.0)
+        assertThat(result).contains("۵۰")
     }
     
     @Test
-    fun testFormatIranianNationalId() {
-        val result = PersianNumberFormatter.formatIranianNationalId("0123456789")
-        assertTrue(result.contains("-"))  // Should have dashes
+    fun `formatPercent should handle decimal values`() {
+        val result = formatter.formatPercent(25.5)
+        assertThat(result).contains("۲۵")
+        assertThat(result).contains("٫") // Persian decimal separator
+        assertThat(result).contains("۵")
     }
     
     @Test
-    fun testLargeNumberFormatting() {
-        val result = PersianNumberFormatter.formatPriceWithoutCurrency(999_999_999L)
-        assertTrue(result.contains("٬"))  // Should have thousands separator
+    fun `formatPercent should handle zero`() {
+        val result = formatter.formatPercent(0.0)
+        assertThat(result).isEqualTo("۰%")
     }
     
     @Test
-    fun testSmallNumberFormatting() {
-        val result = PersianNumberFormatter.formatPrice(1000)
-        assertTrue(result.contains("۱٬۰۰۰"))  // 1,000 formatted
+    fun `formatPercent should handle 100 percent`() {
+        val result = formatter.formatPercent(100.0)
+        assertThat(result).isEqualTo("۱۰۰%")
+    }
+    
+    // ==================== Edge Cases ====================
+    
+    @Test
+    fun `formatNumber should handle very large numbers`() {
+        val result = formatter.formatNumber(Long.MAX_VALUE / 2)
+        assertThat(result).contains(",")
+        assertThat(result).doesNotContain("0".."9") // Only Persian digits
+    }
+    
+    @Test
+    fun `formatNumber should handle single digit`() {
+        val result = formatter.formatNumber(5)
+        assertThat(result).isEqualTo("۵")
+    }
+    
+    @Test
+    fun `formatNumber should handle numbers ending in zero`() {
+        val result = formatter.formatNumber(1000000)
+        assertThat(result).isEqualTo("۱,۰۰۰,۰۰۰")
+    }
+    
+    // ==================== RTL Character Handling ====================
+    
+    @Test
+    fun `formatted output should be suitable for RTL layout`() {
+        val result = formatter.formatTomanPrice(Toman(12345))
+        
+        // Should have Persian text (Toman suffix)
+        assertThat(result).contains("تومان")
+        // Should have Persian digits
+        assertThat(result).doesNotContain("0".."9")
+    }
+    
+    // ==================== Consistency Tests ====================
+    
+    @Test
+    fun `same input should produce same output`() {
+        val input = 123456
+        val result1 = formatter.formatNumber(input)
+        val result2 = formatter.formatNumber(input)
+        
+        assertThat(result1).isEqualTo(result2)
+    }
+    
+    @Test
+    fun `currency format should be consistent`() {
+        val price = Toman(100000)
+        val result1 = formatter.formatTomanPrice(price)
+        val result2 = formatter.formatTomanPrice(price)
+        
+        assertThat(result1).isEqualTo(result2)
+    }
+    
+    // ==================== Integration Tests ====================
+    
+    @Test
+    fun `price conversion should maintain formatting`() {
+        val toman = Toman(100)
+        val rial = toman.toRial()
+        
+        val tomanFormatted = formatter.formatTomanPrice(toman)
+        val rialFormatted = formatter.formatRialPrice(rial)
+        
+        // Both should be formatted in Persian
+        assertThat(tomanFormatted).doesNotContain("0".."9")
+        assertThat(rialFormatted).doesNotContain("0".."9")
     }
 }
