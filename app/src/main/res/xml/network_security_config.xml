@@ -1,99 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 
-📱 Network Security Configuration for NoghreSod Android App
-
-Purpose:
-- Enforce secure connections (TLS 1.2+)
-- Disable clear-text (HTTP) traffic
-- Enable certificate pinning for API domain
-- Configure domain-specific security policies
-
-Security Levels:
-- PRODUCTION: Strict (pinning enforced)
-- DEBUG: Relaxed (allow system CA for development/testing)
-
-IMPORTANT:
-1. Replace api.noghresod.com with actual domain
-2. Obtain certificate pins from your server certificate
-3. Keep backup pins for certificate rotation
-4. Update pins before certificate expiration
--->
 <network-security-config>
-    <!-- Default policy for all domains -->
-    <domain-config cleartextTrafficPermitted="false">
-        <!-- Enforce TLS 1.2 and higher -->
-        <trust-anchors>
-            <!-- System CA certificates (for production) -->
-            <certificates src="system" />
-            
-            <!-- User-installed CA certificates (for development only) -->
-            <!-- Uncomment for debugging with custom proxies like Charles/Fiddler -->
-            <!-- <certificates src="user" /> -->
-        </trust-anchors>
-        
-        <!-- Minimum TLS version: 1.2 (API 24+) -->
-        <min-tls-version value="1.2" />
-        
-        <!-- Disable certain weak ciphers (optional but recommended) -->
-        <!-- Leave empty to use system defaults -->
-    </domain-config>
-    
-    <!-- Primary API Domain Configuration -->
-    <domain-config>
-        <domain includeSubdomains="true">api.noghresod.com</domain>
-        <domain includeSubdomains="true">noghresod.com</domain>
-        <domain includeSubdomains="true">www.noghresod.com</domain>
-        
-        <!-- Disable clear-text for this domain -->
-        <cleartextTrafficPermitted>false</cleartextTrafficPermitted>
-        
-        <!-- Certificate Pinning Configuration -->
-        <!-- 
-        ℹ️ HOW TO GET CERTIFICATE PINS:
-        
-        1. Connect to your server:
-        openssl s_client -connect api.noghresod.com:443 -showcerts
-        
-        2. Extract certificate from output (-----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----)
-        Save it as certificate.pem
-        
-        3. Get the public key:
-        openssl x509 -in certificate.pem -pubkey -noout > pubkey.pem
-        
-        4. Generate pin (SHA-256 of DER-encoded public key, base64):
-        openssl rsa -in pubkey.pem -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64
-        
-        5. Output will be like: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-        Replace the pin value below with actual value
-        -->
-        <pin-set expiration="2026-12-27">  <!-- Update expiration before cert renewal -->
-            <!-- Primary pin (current certificate) -->
-            <pin digest="SHA-256">PLACEHOLDER_PIN_1_REPLACE_WITH_ACTUAL_VALUE</pin>
-            
-            <!-- Backup pin #1 (for certificate rotation) -->
-            <pin digest="SHA-256">PLACEHOLDER_PIN_2_REPLACE_WITH_BACKUP_VALUE</pin>
-            
-            <!-- Backup pin #2 (intermediate CA if applicable) -->
-            <!-- <pin digest="SHA-256">PLACEHOLDER_PIN_3_REPLACE_WITH_INTERMEDIATE_CA</pin> -->
-        </pin-set>
-        
-        <!-- Trust system CAs as fallback -->
+    <!-- Production: HTTPS only, no cleartext traffic -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
-        
-        <!-- Minimum TLS version: 1.2 -->
-        <min-tls-version value="1.2" />
-    </domain-config>
+    </base-config>
     
-    <!-- Debug/Development Configuration (Only for DEBUG builds) -->
-    <!-- This allows testing with custom certificates and proxies -->
+    <!-- Debug builds: Allow localhost for emulator testing -->
     <debug-overrides>
-        <!-- Allow system CA certificates for debugging -->
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
         </trust-anchors>
     </debug-overrides>
     
+    <!-- Zarinpal payment gateway - Strict HTTPS only -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.zarinpal.com</domain>
+        <domain includeSubdomains="true">payment.zarinpal.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- NextPay payment gateway - Strict HTTPS only -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.nextpay.org</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- NoghreSod API backend -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.noghresod.ir</domain>
+        <domain includeSubdomains="true">noghresod.ir</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
 </network-security-config>
