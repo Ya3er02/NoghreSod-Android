@@ -1,111 +1,103 @@
 package com.noghre.sod.core.security
 
-import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
-import java.util.LinkedList
-import java.util.Queue
-import javax.inject.Inject
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.locks.ReentrantReadWriteLock
 import javax.inject.Singleton
+import timber.log.Timber
 
 /**
- * Rate limiter for payment requests to prevent:
- * - DoS attacks on payment gateway
- * - Accidental double-charges from user double-clicking
- * - Merchant account being flagged as high-risk
+ * Thread-safe rate limiter برای payment requests
  * 
- * Configuration:
- * - Max 5 payment requests per user per minute
- * - Sliding window implementation
- * - Thread-safe with ConcurrentHashMap
+ * محدودیت: Maximum 5 requests per user per 60 seconds
  */
 @Singleton
-class PaymentRateLimiter @Inject constructor() {
+class PaymentRateLimiter {
+    private val attempts = ConcurrentHashMap<String, ConcurrentLinkedQueue<Long>>()
+    private val lock = ReentrantReadWriteLock()
     
     companion object {
-        // Maximum payment requests per user in the time window
         private const val MAX_ATTEMPTS = 5
-        
-        // Time window in milliseconds (1 minute)
-        private const val WINDOW_MS = 60_000L
-        
-        // Map<UserId, Queue<Timestamp>> tracking attempt history
-        private val attempts = ConcurrentHashMap<String, Queue<Long>>()
+        private const val WINDOW_MS = 60_000L // 60 seconds
     }
     
     /**
-     * Check if user can attempt a payment request.
+     * بررسی اگر user می‌تواند شروع پرداخت کند
      * 
-     * @param userId Unique user identifier (can be account ID or device ID)
-     * @return true if payment request allowed, false if rate limit exceeded
+     * @param userId Unique user identifier
+     * @return true اگر request allowed, false اگر rate limited
      */
     fun canAttempt(userId: String): Boolean {
-        if (userId.isBlank()) {
-            Timber.w("Rate limiter: Empty userId provided")
-            return false
-        }
-        
-        val now = System.currentTimeMillis()
-        val userAttempts = attempts.getOrPut(userId) { LinkedList() }
-        
-        // Remove attempts outside the current time window
-        synchronized(userAttempts) {
-            while (userAttempts.isNotEmpty() && userAttempts.peek() < now - WINDOW_MS) {
-                userAttempts.poll()
+        lock.writeLock().lock()
+        try {
+            val now = System.currentTimeMillis()
+            val userAttempts = attempts.getOrPut(userId) { ConcurrentLinkedQueue() }
+            
+            // Remove expired attempts (older than WINDOW_MS)
+            while (userAttempts.isNotEmpty()) {
+                val oldestAttempt = userAttempts.peek()
+                if (oldestAttempt != null && now - oldestAttempt > WINDOW_MS) {
+                    userAttempts.poll()
+                } else {
+                    break
+                }
             }
             
-            // Check if user exceeded rate limit
+            // Check if user has exceeded limit
             if (userAttempts.size >= MAX_ATTEMPTS) {
-                Timber.w(
-                    "Rate limit exceeded for user $userId: " +
-                    "${userAttempts.size}/$MAX_ATTEMPTS attempts in $WINDOW_MS ms"
-                )
+                Timber.w("⚠ï Rate limit exceeded for user: $userId (${userAttempts.size}/$MAX_ATTEMPTS)")
                 return false
             }
             
             // Record this attempt
             userAttempts.offer(now)
-            val remaining = MAX_ATTEMPTS - userAttempts.size
-            
-            Timber.d(
-                "Payment attempt allowed for $userId. " +
-                "Remaining: $remaining/$MAX_ATTEMPTS"
-            )
-            
+            Timber.d("✅ Payment attempt allowed for user: $userId (${userAttempts.size}/$MAX_ATTEMPTS)")
             return true
+            
+        } finally {
+            lock.writeLock().unlock()
         }
     }
     
     /**
-     * Get remaining attempts for a user in the current window.
-     * 
-     * @return Number of remaining payment attempts (0-5)
+     * دریافت جاری attempt count برای user
      */
-    fun getRemainingAttempts(userId: String): Int {
-        if (userId.isBlank()) return 0
-        
-        val now = System.currentTimeMillis()
-        val userAttempts = attempts[userId] ?: return MAX_ATTEMPTS
-        
-        synchronized(userAttempts) {
-            // Count only recent attempts within time window
-            val recentCount = userAttempts.count { it > now - WINDOW_MS }
-            return MAX_ATTEMPTS - recentCount
+    fun getAttemptCount(userId: String): Int {
+        lock.readLock().lock()
+        try {
+            val userAttempts = attempts[userId] ?: return 0
+            
+            val now = System.currentTimeMillis()
+            // Count non-expired attempts
+            return userAttempts.count { (now - it) <= WINDOW_MS }
+        } finally {
+            lock.readLock().unlock()
         }
     }
     
     /**
-     * Reset rate limit for a user (admin/support function).
+     * حذف attempts برای user (debug/testing)
      */
     fun resetUser(userId: String) {
-        attempts.remove(userId)
-        Timber.i("Rate limit reset for user $userId")
+        lock.writeLock().lock()
+        try {
+            attempts.remove(userId)
+            Timber.d("🗑️ Rate limiter reset for user: $userId")
+        } finally {
+            lock.writeLock().unlock()
+        }
     }
     
     /**
-     * Clear all rate limit records (for testing).
+     * حذف تمام cached attempts (برای app restart scenarios)
      */
     fun clearAll() {
-        attempts.clear()
-        Timber.w("All rate limits cleared")
+        lock.writeLock().lock()
+        try {
+            attempts.clear()
+            Timber.d("🗑️ All rate limiter data cleared")
+        } finally {
+            lock.writeLock().unlock()
+        }
     }
 }
