@@ -1,43 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Production: HTTPS only, no cleartext traffic -->
+    <!-- Default configuration for all connections -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
     
-    <!-- Debug builds: Allow localhost for emulator testing -->
-    <debug-overrides>
-        <trust-anchors>
-            <certificates src="system" />
-            <certificates src="user" />
-        </trust-anchors>
-    </debug-overrides>
-    
-    <!-- Zarinpal payment gateway - Strict HTTPS only -->
+    <!-- Zarinpal Payment Gateway Configuration -->
+    <!-- 
+    Get pins from:
+    openssl s_client -connect api.zarinpal.com:443 -showcerts
+    Then for each certificate:
+    openssl x509 -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | base64
+    -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">api.zarinpal.com</domain>
         <domain includeSubdomains="true">payment.zarinpal.com</domain>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
+        <domain includeSubdomains="true">zarinpal.com</domain>
+        
+        <!-- Certificate pins for Zarinpal -->
+        <pin-set expiration="2026-12-31">
+            <!-- Public key pin for primary certificate -->
+            <!-- PLACEHOLDER: Replace with actual pin from certificate -->
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            
+            <!-- Backup pin for certificate renewal -->
+            <!-- PLACEHOLDER: Replace with actual backup pin -->
+            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+        </pin-set>
     </domain-config>
     
-    <!-- NextPay payment gateway - Strict HTTPS only -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.nextpay.org</domain>
+    <!-- Debug/Development Configuration -->
+    <!-- 
+    IMPORTANT: Only use in debug builds!
+    Remove for production releases.
+    -->
+    <debug-overrides>
         <trust-anchors>
+            <!-- Allow user-installed CA certificates for debugging -->
+            <certificates src="user" />
             <certificates src="system" />
         </trust-anchors>
-    </domain-config>
-    
-    <!-- NoghreSod API backend -->
-    <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">api.noghresod.ir</domain>
-        <domain includeSubdomains="true">noghresod.ir</domain>
-        <trust-anchors>
-            <certificates src="system" />
-        </trust-anchors>
-    </domain-config>
+        
+        <!-- Allow cleartext traffic only for local testing -->
+        <domain-config cleartextTrafficPermitted="true">
+            <domain includeSubdomains="true">localhost</domain>
+            <domain includeSubdomains="true">127.0.0.1</domain>
+            <domain includeSubdomains="true">192.168.1.0</domain>
+        </domain-config>
+    </debug-overrides>
 </network-security-config>
