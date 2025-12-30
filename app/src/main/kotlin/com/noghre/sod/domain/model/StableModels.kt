@@ -19,6 +19,8 @@ import androidx.compose.runtime.Stable
 
 /**
  * 📋 Product Model
+ * 
+ * 🔧 Fix 3.1: Added safe discount percentage calculation method
  */
 @Immutable
 data class Product(
@@ -36,7 +38,29 @@ data class Product(
     val sku: String,
     val createdAt: String,
     val updatedAt: String,
-)
+) {
+    /**
+     * 🔧 Fix 3.1: Calculate discount percentage safely
+     * 
+     * Validates:
+     * - discountPrice is not null
+     * - price > 0 (prevents division by zero)
+     * - discountPrice is in valid range [0..price]
+     * - result is positive (1-99%)
+     * 
+     * Returns null if any validation fails (no badge shown)
+     */
+    fun getDiscountPercentage(): Int? {
+        return if (discountPrice != null && 
+                   price > 0 && 
+                   discountPrice > 0 && 
+                   discountPrice < price) {
+            ((price - discountPrice) / price * 100).toInt().coerceIn(1, 99)
+        } else {
+            null
+        }
+    }
+}
 
 /**
  * 🛒 Cart Item Model
