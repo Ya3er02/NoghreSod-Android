@@ -28,11 +28,51 @@ value class Toman(val value: Long) {
     operator fun plus(other: Toman): Toman = Toman(value + other.value)
     
     /**
-     * Subtract another amount in Toman.
+     * 🔧 Fix 2.4: Subtraction with proper validation
+     * Throws exception instead of silently returning zero on negative result.
+     * This prevents silent business logic errors.
+     * 
+     * @throws IllegalArgumentException if result would be negative
+     * @return New Toman value (guaranteed >= 0)
      */
     operator fun minus(other: Toman): Toman {
         val result = value - other.value
-        return Toman(if (result < 0) 0 else result)
+        require(result >= 0) {
+            "Cannot subtract $other from $this: result would be negative. " +
+            "Use subtractOrNull() or subtractSafely() for graceful handling."
+        }
+        return Toman(result)
+    }
+    
+    /**
+     * Safely subtract another amount, returning null if result would be negative.
+     * Useful for wallet/balance operations where negative is invalid state.
+     * 
+     * @return New Toman value if valid, null if result would be negative
+     */
+    fun subtractOrNull(other: Toman): Toman? {
+        val result = value - other.value
+        return if (result >= 0) Toman(result) else null
+    }
+    
+    /**
+     * Safely subtract with error result handling.
+     * Preferred for use in Result-based code patterns.
+     * 
+     * @return Result.Success with new Toman if valid, Result.Error if insufficient
+     */
+    fun subtractSafely(other: Toman): Result<Toman> {
+        val result = value - other.value
+        return if (result >= 0) {
+            Result.Success(Toman(result))
+        } else {
+            Result.Error(
+                AppError.Validation(
+                    "مبلغ کافی نیست. موجودی: ${this.value} تومان، " +
+                    "درخواست: ${other.value} تومان"
+                )
+            )
+        }
     }
     
     /**
@@ -52,6 +92,11 @@ value class Toman(val value: Long) {
         return value in 1_000..500_000_000  // 1K - 500M Toman
     }
     
+    /**
+     * Check if this amount is sufficient (greater than or equal to another).
+     */
+    fun isSufficientFor(required: Toman): Boolean = value >= required.value
+    
     override fun toString(): String = "$value تومان"
 }
 
@@ -64,7 +109,9 @@ value class Toman(val value: Long) {
 value class Rial(val value: Long) {
     init {
         require(value >= 0) { "Amount must be non-negative, got: $value" }
-        require(value % 10 == 0L) { "Rial must be multiple of 10 (represents 10 Rial = 1 Toman), got: $value" }
+        require(value % 10 == 0L) { 
+            "Rial must be multiple of 10 (represents 10 Rial = 1 Toman), got: $value" 
+        }
     }
     
     /**
@@ -114,12 +161,12 @@ data class Price(
         
         /**
          * Format Toman value with Persian number formatting and thousands separator.
-         * 1234567 → "۱٬۲۳۴٬۵۶۷"
+         * 1234567 → "۱،۲۳۴،۵۶۷"
          */
         private fun formatToman(value: Long): String {
             val persianDigits = charArrayOf('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹')
             val parts = value.toString().reversed().chunked(3).reversed()
-            return parts.joinToString("٬") { part ->
+            return parts.joinToString("،") { part ->
                 part.reversed().map { digit ->
                     persianDigits[digit.toString().toInt()]
                 }.joinToString("")
