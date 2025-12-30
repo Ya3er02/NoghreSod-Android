@@ -10,7 +10,7 @@ composeCompiler = "1.5.14"
 composeBom = "2025.01.00"
 
 # AndroidX - Core libraries
-androidxCore = "1.13.1"
+androidxCore = "1.17.0"
 androidxLifecycle = "2.8.7"
 androidxActivity = "1.9.3"
 androidxFragment = "1.8.5"
