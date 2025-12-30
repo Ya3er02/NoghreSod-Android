@@ -4,6 +4,8 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-kapt")
     id("jacoco")
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -99,10 +101,14 @@ dependencies {
     implementation("androidx.paging:paging-runtime-ktx:3.2.1")
     implementation("androidx.paging:paging-compose:3.2.1")
 
+    // Jetpack WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
     // Hilt
     implementation("com.google.dagger:hilt-android:2.48")
     kapt("com.google.dagger:hilt-compiler:2.48")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.hilt:hilt-work:1.1.0")
 
     // Coroutines & Flows
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
@@ -147,6 +153,21 @@ dependencies {
 
     // Persian Date Library
     implementation("com.github.samanzamani:PersianDate:1.7.1")
+
+    // Shimmer Loading
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.2.0")
+
+    // Pull-to-Refresh (Accompanist)
+    implementation("com.google.accompanist:accompanist-swiperefresh:0.32.0")
+
+    // Biometric Authentication
+    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
+
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-crashlytics-ktx")
+    implementation("com.google.firebase:firebase-perf-ktx")
 
     // Testing - Unit
     testImplementation("junit:junit:4.13.2")
