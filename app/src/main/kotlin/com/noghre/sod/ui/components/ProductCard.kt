@@ -73,10 +73,8 @@ fun ProductCard(
                     contentScale = ContentScale.Crop
                 )
 
-                // Discount badge
-                if (product.discountPrice != null) {
-                    val discountPercent =
-                        ((product.price - product.discountPrice!!) / product.price * 100).toInt()
+                // 🔧 Fix 3.1: Discount badge with comprehensive validation
+                product.getDiscountPercentage()?.let { discountPercent ->
                     DiscountBadge(discountPercent)
                 }
 
@@ -133,6 +131,12 @@ fun ProductCard(
     }
 }
 
+/**
+ * Display discount badge if there's a valid discount
+ *
+ * @param discountPercent Discount percentage (0-100)
+ * @param modifier Modifier for the badge
+ */
 @Composable
 fun DiscountBadge(
     discountPercent: Int,
