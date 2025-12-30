@@ -145,6 +145,9 @@ dependencies {
     // Timber Logging
     implementation("com.jakewharton.timber:timber:5.0.1")
 
+    // Persian Date Library
+    implementation("com.github.samanzamani:PersianDate:1.7.1")
+
     // Testing - Unit
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.8")
