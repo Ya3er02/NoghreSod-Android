@@ -38,7 +38,7 @@
             android:value="warn" />
         
         <activity
-            android:name=".presentation.ui.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
