@@ -12,29 +12,55 @@ import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import javax.inject.Inject
 
+/**
+ * Product Repository Implementation with smart caching strategy
+ * - Implements TTL (Time-To-Live) for cache invalidation
+ * - Handles pagination correctly with proper offset
+ * - Syncs favorites with network when possible
+ */
 class ProductRepositoryImpl @Inject constructor(
     private val productApi: ProductApi,
     private val productDao: ProductDao
 ) : ProductRepository {
     
+    companion object {
+        // Cache TTL: 24 hours
+        private const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L
+        // Pagination
+        private const val PAGE_SIZE = 20
+    }
+    
     override suspend fun getProducts(page: Int): Result<List<Product>> = try {
+        require(page > 0) { "Page must be greater than 0" }
         Timber.d("Fetching products from API, page: $page")
+        
         val response = productApi.getProducts(page)
         
-        // Save to local database
-        productDao.insertAll(response.products)
+        // ✅ Fix 2.1: Only clear cache on first page (fresh load)
+        if (page == 1) {
+            Timber.d("First page requested - clearing old cache")
+            productDao.deleteAllProducts()
+        }
+        
+        // Insert products with current timestamp for TTL tracking
+        response.products.forEach { product ->
+            productDao.insert(product)
+        }
         Timber.d("Products saved to local DB: ${response.products.size}")
         
         Result.Success(response.products)
     } catch (e: Exception) {
         Timber.e("Error fetching products: ${e.message}")
-        // Fallback to local data
-        try {
-            val localProducts = productDao.getAllProducts()
+        // ✅ Fix 2.2: Fallback respects pagination
+        return try {
+            val offset = (page - 1) * PAGE_SIZE
+            val localProducts = productDao.getProductsPaginated(PAGE_SIZE, offset)
+            
             if (localProducts.isNotEmpty()) {
-                Timber.d("Returning local products: ${localProducts.size}")
+                Timber.d("Returning local products for page $page: ${localProducts.size}")
                 Result.Success(localProducts)
             } else {
+                Timber.w("No cached data available for page: $page")
                 Result.Error(AppException.NetworkException("No products available"))
             }
         } catch (ex: Exception) {
@@ -47,7 +73,7 @@ class ProductRepositoryImpl @Inject constructor(
         Timber.d("Fetching product by ID: $id")
         val response = productApi.getProductById(id)
         
-        // Save to local database
+        // Save to local database with timestamp
         productDao.insert(response)
         Timber.d("Product saved to local DB: ${response.name}")
         
@@ -55,12 +81,17 @@ class ProductRepositoryImpl @Inject constructor(
     } catch (e: Exception) {
         Timber.e("Error fetching product: ${e.message}")
         // Fallback to local data
-        try {
+        return try {
             val localProduct = productDao.getProductById(id)
             if (localProduct != null) {
-                Timber.d("Returning local product: ${localProduct.name}")
+                Timber.d("Returning cached product: ${localProduct.name}")
+                // Check if cache is expired
+                if (isCacheExpired(localProduct.cachedAt)) {
+                    Timber.w("Cache for product $id is expired but using as fallback")
+                }
                 Result.Success(localProduct)
             } else {
+                Timber.w("Product not found in cache: $id")
                 Result.Error(AppException.NetworkException("Product not found"))
             }
         } catch (ex: Exception) {
@@ -88,7 +119,7 @@ class ProductRepositoryImpl @Inject constructor(
     override suspend fun getFavorites(): Result<List<Product>> = try {
         Timber.d("Fetching favorites")
         val favorites = productDao.getFavorites()
-        Timber.d("Favorites: ${favorites.size}")
+        Timber.d("Favorites count: ${favorites.size}")
         Result.Success(favorites)
     } catch (e: Exception) {
         Timber.e("Error fetching favorites: ${e.message}")
@@ -100,9 +131,25 @@ class ProductRepositoryImpl @Inject constructor(
         
         val product = productDao.getProductById(productId)
         if (product != null) {
-            val updatedProduct = product.copy(isFavorite = !product.isFavorite)
+            val newFavoriteState = !product.isFavorite
+            val updatedProduct = product.copy(isFavorite = newFavoriteState)
             productDao.update(updatedProduct)
-            Timber.d("Favorite toggled for: $productId")
+            
+            // ✅ Fix 2.3: Try to sync with backend, but don't fail if network is down
+            try {
+                if (newFavoriteState) {
+                    productApi.addToFavorites(productId)
+                    Timber.d("Synced favorite addition to server: $productId")
+                } else {
+                    productApi.removeFromFavorites(productId)
+                    Timber.d("Synced favorite removal to server: $productId")
+                }
+            } catch (networkError: Exception) {
+                Timber.w("Failed to sync favorite with server, but local update succeeded: ${networkError.message}")
+                // Continue anyway - local state is updated
+            }
+            
+            Timber.d("Favorite toggled for: $productId, new state: $newFavoriteState")
             Result.Success(Unit)
         } else {
             Timber.w("Product not found: $productId")
@@ -120,6 +167,15 @@ class ProductRepositoryImpl @Inject constructor(
         if (product != null) {
             val updatedProduct = product.copy(isFavorite = false)
             productDao.update(updatedProduct)
+            
+            // Try to sync with backend
+            try {
+                productApi.removeFromFavorites(productId)
+                Timber.d("Synced favorite removal to server: $productId")
+            } catch (networkError: Exception) {
+                Timber.w("Failed to sync removal with server: ${networkError.message}")
+            }
+            
             Timber.d("Removed from favorites: $productId")
             Result.Success(Unit)
         } else {
@@ -139,5 +195,30 @@ class ProductRepositoryImpl @Inject constructor(
     override fun observeFavorites(): Flow<List<Product>> {
         Timber.d("Observing favorites")
         return productDao.observeFavorites()
+    }
+    
+    /**
+     * Check if cache entry has expired based on TTL
+     */
+    private fun isCacheExpired(cachedAtMs: Long): Boolean {
+        val ageMs = System.currentTimeMillis() - cachedAtMs
+        return ageMs > CACHE_TTL_MS
+    }
+    
+    /**
+     * Clear all expired cache entries
+     */
+    suspend fun clearExpiredCache() {
+        try {
+            val allProducts = productDao.getAllProducts()
+            val expiredProducts = allProducts.filter { isCacheExpired(it.cachedAt) }
+            
+            if (expiredProducts.isNotEmpty()) {
+                expiredProducts.forEach { productDao.delete(it) }
+                Timber.i("Cleared ${expiredProducts.size} expired cache entries")
+            }
+        } catch (e: Exception) {
+            Timber.e("Error clearing expired cache: ${e.message}")
+        }
     }
 }
