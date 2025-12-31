@@ -1,15 +1,19 @@
 package com.noghre.sod.data.mapper
 
-import com.noghre.sod.data.remote.dto.ProductDto
-import com.noghre.sod.domain.model.Category
-import com.noghre.sod.domain.model.Currency
+import com.noghre.sod.data.database.entity.ProductEntity
+import com.noghre.sod.data.network.dto.ProductDto
 import com.noghre.sod.domain.model.Product
-import java.math.BigDecimal
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 /**
- * Mapper for converting ProductDto to Product domain model.
+ * Mapper for Product DTOs to Domain models.
+ *
+ * Handles conversion:
+ * - ProductDto (API response) → Product (domain model)
+ * - ProductEntity (Database) → Product (domain model)
+ * - Product (domain) → ProductEntity (database)
+ *
+ * @author NoghreSod Team
+ * @version 1.0.0
  */
 object ProductMapper {
 
@@ -17,95 +21,92 @@ object ProductMapper {
      * Convert ProductDto to Product domain model.
      */
     fun ProductDto.toDomain(): Product = Product(
-        id = id.orEmpty(),
-        name = name.orEmpty(),
-        description = description.orEmpty(),
-        price = Product.Money(
-            amount = price?.toBigDecimal() ?: BigDecimal.ZERO,
-            currency = parseCurrency(currency)
-        ),
-        images = images.orEmpty().mapIndexed { index, url ->
-            Product.ImageUrl(
-                url = url,
-                isMain = index == 0
-            )
-        },
-        category = Category(
-            id = categoryId.orEmpty(),
-            name = categoryName.orEmpty()
-        ),
-        specifications = Product.ProductSpecifications(
-            weight = weight,
-            dimensions = dimensions,
-            material = material,
-            color = color,
-            brand = brand,
-            sku = sku
-        ),
-        availability = parseStockStatus(stock, preOrderDate),
-        rating = Product.Rating(
-            average = rating ?: 0.0,
-            count = reviewCount ?: 0
-        ),
-        reviews = reviews.orEmpty().map { reviewDto ->
-            Product.ProductReview(
-                id = reviewDto.id.orEmpty(),
-                userId = reviewDto.userId.orEmpty(),
-                userName = reviewDto.userName.orEmpty(),
-                rating = reviewDto.rating ?: 0,
-                title = reviewDto.title.orEmpty(),
-                content = reviewDto.content.orEmpty(),
-                helpful = reviewDto.helpful ?: 0,
-                createdAt = reviewDto.createdAt.orEmpty()
-            )
-        },
-        tags = tags.orEmpty(),
-        isNew = isNew ?: false,
-        isOnSale = isOnSale ?: false,
-        createdAt = createdAt.orEmpty(),
-        updatedAt = updatedAt.orEmpty()
+        id = id ?: "",
+        name = name ?: "",
+        description = description ?: "",
+        price = price ?: 0.0,
+        currentPrice = currentPrice ?: price ?: 0.0,
+        discount = discount ?: 0,
+        images = images ?: emptyList(),
+        rating = rating ?: 0.0,
+        reviewCount = reviewCount ?: 0,
+        weight = weight ?: 0.0,
+        gemType = gemType ?: "",
+        hallmark = hallmark ?: "925",
+        categoryId = categoryId ?: "",
+        categoryName = categoryName ?: "",
+        isFeatured = isFeatured ?: false,
+        onSale = onSale ?: false,
+        inStock = inStock ?: true,
+        stockCount = stockCount ?: 0,
+        variants = variants ?: emptyList(),
+        specifications = specifications ?: emptyMap(),
+        lastUpdated = System.currentTimeMillis()
     )
 
     /**
-     * Parse currency from string.
+     * Convert ProductEntity to Product domain model.
      */
-    private fun parseCurrency(currencyCode: String?): Currency {
-        return when (currencyCode?.uppercase()) {
-            "USD" -> Currency.USD
-            "EUR" -> Currency.EUR
-            "GBP" -> Currency.GBP
-            else -> Currency.IRR
-        }
-    }
+    fun ProductEntity.toDomain(): Product = Product(
+        id = id,
+        name = name,
+        description = description,
+        price = price,
+        currentPrice = currentPrice,
+        discount = discount,
+        images = images,
+        rating = rating,
+        reviewCount = reviewCount,
+        weight = weight,
+        gemType = gemType,
+        hallmark = hallmark,
+        categoryId = categoryId,
+        categoryName = categoryName,
+        isFeatured = isFeatured,
+        onSale = onSale,
+        inStock = inStock,
+        stockCount = stockCount,
+        variants = variants,
+        specifications = specifications,
+        lastUpdated = lastUpdated
+    )
 
     /**
-     * Parse stock status from DTO.
+     * Convert Product domain to ProductEntity for database.
      */
-    private fun parseStockStatus(
-        stock: Int?,
-        preOrderDate: String?
-    ): Product.StockStatus {
-        return when {
-            !preOrderDate.isNullOrBlank() -> {
-                try {
-                    val date = LocalDate.parse(preOrderDate, DateTimeFormatter.ISO_LOCAL_DATE)
-                    Product.StockStatus.PreOrder(date)
-                } catch (e: Exception) {
-                    Product.StockStatus.OutOfStock
-                }
-            }
-            stock == null || stock <= 0 -> Product.StockStatus.OutOfStock
-            else -> Product.StockStatus.Available(stock)
-        }
-    }
+    fun Product.toEntity(): ProductEntity = ProductEntity(
+        id = id,
+        name = name,
+        description = description,
+        price = price,
+        currentPrice = currentPrice,
+        discount = discount,
+        images = images,
+        rating = rating,
+        reviewCount = reviewCount,
+        weight = weight,
+        gemType = gemType,
+        hallmark = hallmark,
+        categoryId = categoryId,
+        categoryName = categoryName,
+        isFeatured = isFeatured,
+        onSale = onSale,
+        inStock = inStock,
+        stockCount = stockCount,
+        variants = variants,
+        specifications = specifications,
+        lastUpdated = lastUpdated
+    )
+
+    /**
+     * Convert list of DTOs to domain models.
+     */
+    fun List<ProductDto>.toDomainList(): List<Product> =
+        this.map { it.toDomain() }
+
+    /**
+     * Convert list of entities to domain models.
+     */
+    fun List<ProductEntity>.toDomainListFromEntity(): List<Product> =
+        this.map { it.toDomain() }
 }
-
-/**
- * Convert ProductDto to Product.
- */
-fun ProductDto.toDomain(): Product = ProductMapper.run { toDomain() }
-
-/**
- * Convert list of ProductDto to list of Product.
- */
-fun List<ProductDto>.toDomainList(): List<Product> = map { it.toDomain() }
