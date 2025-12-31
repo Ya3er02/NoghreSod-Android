@@ -1,142 +1,179 @@
 package com.noghre.sod.data.repository
 
 import com.noghre.sod.core.result.Result
+import com.noghre.sod.data.error.ExceptionHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import retrofit2.Response
+import timber.log.Timber
 
 /**
- * Generic offline-first pattern implementation using Flow.
+ * Single Source of Truth (SSOT) pattern for data access.
  *
- * This utility implements the offline-first strategy:
- * 1. Load data from local cache and emit as Loading state
- * 2. Fetch fresh data from network
- * 3. If fetch is successful, save to cache and emit as Success
- * 4. If fetch fails, emit Error with cached data if available
- *
- * Usage example:
- * ```
- * fun getProducts(): Flow<Result<List<Product>>> =
- *     networkBoundResource(
- *         query = { productDao.getAllProductsFlow() },
- *         fetch = { apiService.getProducts() },
- *         saveFetchResult = { products -> productDao.insertProducts(...) },
- *         shouldFetch = { cached -> cached.isEmpty() || isCacheStale() }
- *     )
- * ```
- *
- * @param T Type of resource (e.g., Product, List<Product>)
- * @param query Suspend function that queries local cache, returns Flow
- * @param fetch Suspend function that fetches from network
- * @param saveFetchResult Suspend function that saves network result to cache
- * @param shouldFetch Predicate to determine if fresh fetch is needed
- * @return Flow of Result states (Loading -> Success/Error)
- */
-fun <T> networkBoundResource(
-    query: suspend () -> Flow<T>,
-    fetch: suspend () -> T,
-    saveFetchResult: suspend (T) -> Unit,
-    shouldFetch: suspend (T) -> Boolean = { true }
-): Flow<Result<T>> = flow {
-    // 1. Start by emitting cached data as Loading state
-    val cachedData = query()
-    emitAll(
-        cachedData.map { cached ->
-            Result.Loading(data = cached)
-        }
-    )
-
-    try {
-        // 2. Check if we should fetch fresh data
-        val data = cachedData.lastOrNull() // Get the latest emitted value
-        if (data != null && !shouldFetch(data)) {
-            // Cache is still valid, emit success
-            emit(Result.Success(data))
-            return@flow
-        }
-
-        // 3. Fetch from network
-        val networkResult = fetch()
-        
-        // 4. Save to cache
-        saveFetchResult(networkResult)
-        
-        // 5. Emit success
-        emit(Result.Success(networkResult))
-    } catch (e: Exception) {
-        // 6. On error, get latest cached data
-        val cachedData = cachedData.lastOrNull()
-        // 7. Emit error with cached data as fallback
-        emit(Result.Error(e.toAppError(), data = cachedData))
-    }
-}
-
-/**
- * Simplified version for one-time fetch (no Flow from query).
+ * Implements network-first caching strategy:
+ * 1. Query local database first
+ * 2. If data exists and not stale, emit it
+ * 3. Fetch fresh data from network in parallel
+ * 4. Cache the network response locally
+ * 5. Emit fresh data if different from cache
  *
  * Usage:
  * ```
- * suspend fun getProduct(id: String): Result<Product> =
- *     networkBoundResource(
- *         query = { productDao.getProduct(id) },
- *         fetch = { apiService.getProductDetail(id) },
- *         saveFetchResult = { product -> productDao.insertProduct(...) }
- *     )
+ * override fun getProducts(): Flow<Result<List<Product>>> = networkBoundResource(
+ *     query = { productDao.getAllProducts() },
+ *     fetch = { api.getProducts() },
+ *     saveFetchResult = { response -> 
+ *         productDao.clear()
+ *         productDao.insertAll(response.toEntities()) 
+ *     },
+ *     shouldFetch = { localData -> 
+ *         localData.isEmpty() || isCacheExpired() 
+ *     }
+ * )
  * ```
+ *
+ * @author NoghreSod Team
+ * @version 2.0.0
  */
-suspend fun <T> networkBoundResourceSuspend(
-    query: suspend () -> T?,
-    fetch: suspend () -> T,
-    saveFetchResult: suspend (T) -> Unit,
-    shouldFetch: suspend (T?) -> Boolean = { true }
-): Result<T> = try {
-    val cached = query()
-    
-    if (cached != null && !shouldFetch(cached)) {
-        return Result.Success(cached)
+
+/**
+ * Creates a network-bound resource with caching strategy.
+ *
+ * @param query Function to query local database
+ * @param fetch Function to fetch from network
+ * @param saveFetchResult Function to save network response to database
+ * @param shouldFetch Predicate to determine if network fetch is needed
+ * @param onFetchFailed Optional handler when network fetch fails
+ * @return Flow emitting Result with cached then fresh data
+ */
+inline fun <ResultType, RequestType> networkBoundResource(
+    crossinline query: suspend () -> ResultType,
+    crossinline fetch: suspend () -> Response<RequestType>,
+    crossinline saveFetchResult: suspend (RequestType) -> Unit,
+    crossinline shouldFetch: (ResultType) -> Boolean = { true },
+    noinline onFetchFailed: (Exception) -> Unit = { Timber.e(it) }
+): Flow<Result<ResultType>> = flow {
+
+    // 1. Emit loading state
+    emit(Result.loading())
+
+    try {
+        // 2. Query local database
+        val localData = query()
+
+        // 3. Check if we should fetch from network
+        if (shouldFetch(localData)) {
+            try {
+                // 4. Fetch from network
+                val response = fetch()
+
+                if (response.isSuccessful) {
+                    // 5. Save to database
+                    val responseBody = response.body()
+                    if (responseBody != null) {
+                        saveFetchResult(responseBody)
+                        
+                        // 6. Query updated local data
+                        val refreshedData = query()
+                        emit(Result.success(refreshedData))
+                        
+                        Timber.d("Successfully fetched and cached data")
+                    } else {
+                        // Response body is null but status is successful
+                        emit(Result.success(localData))
+                        Timber.w("Response body is null despite successful status")
+                    }
+                } else {
+                    // Network request failed with HTTP error
+                    val errorState = when (response.code()) {
+                        401 -> Exception("Unauthorized")
+                        404 -> Exception("Not Found")
+                        500 -> Exception("Server Error")
+                        else -> Exception("HTTP Error: ${response.code()}")
+                    }
+                    
+                    onFetchFailed(errorState)
+                    
+                    // Emit cached data if available, otherwise error
+                    if (localData != null) {
+                        emit(Result.success(localData))
+                        Timber.w("Network failed, emitting cached data")
+                    } else {
+                        emit(Result.failure(errorState))
+                        Timber.e(errorState, "Network failed and no cache available")
+                    }
+                }
+            } catch (e: Exception) {
+                onFetchFailed(e)
+                
+                // Emit cached data if available, otherwise error
+                if (localData != null) {
+                    emit(Result.success(localData))
+                    Timber.w(e, "Network exception, emitting cached data")
+                } else {
+                    emit(Result.failure(e))
+                    Timber.e(e, "Network exception and no cache available")
+                }
+            }
+        } else {
+            // Use cached data without fetching
+            emit(Result.success(localData))
+            Timber.d("Using cached data, skip network fetch")
+        }
+    } catch (e: Exception) {
+        // Error querying local database
+        emit(Result.failure(e))
+        Timber.e(e, "Error querying local database")
     }
+}
+
+/**
+ * Creates a simpler network-bound resource without local caching.
+ *
+ * Useful for data that doesn't need local caching.
+ *
+ * @param fetch Function to fetch from network
+ * @return Flow emitting Result with network data
+ */
+inline fun <ResultType> networkResource(
+    crossinline fetch: suspend () -> Response<ResultType>
+): Flow<Result<ResultType>> = flow {
+    emit(Result.loading())
     
-    val networkResult = fetch()
-    saveFetchResult(networkResult)
-    Result.Success(networkResult)
-} catch (e: Exception) {
-    val cached = query()
-    Result.Error(e.toAppError(), data = cached)
+    try {
+        val response = fetch()
+        
+        if (response.isSuccessful) {
+            val body = response.body()
+            if (body != null) {
+                emit(Result.success(body))
+            } else {
+                emit(Result.failure(Exception("Empty response body")))
+            }
+        } else {
+            val errorState = ExceptionHandler.handle(
+                Exception("HTTP ${response.code()}: ${response.message()}")
+            )
+            emit(Result.failure(Exception(errorState.toString())))
+        }
+    } catch (e: Exception) {
+        emit(Result.failure(e))
+        Timber.e(e, "Network request failed")
+    }
 }
 
 /**
- * Extension function to get the last emitted value from a Flow.
- * Used internally by networkBoundResource.
+ * Result class representing loading state for UI.
  */
-suspend fun <T> Flow<T>.lastOrNull(): T? {
-    var value: T? = null
-    kotlinx.coroutines.flow.collect { value = it }
-    return value
-}
+sealed class LoadingResult<T> {
+    class Loading<T> : LoadingResult<T>()
+    data class Success<T>(val data: T) : LoadingResult<T>()
+    data class Error<T>(val exception: Exception) : LoadingResult<T>()
 
-/**
- * Extension function to convert Throwable to AppError.
- * Import from your error handling module.
- */
-fun Throwable.toAppError(): com.noghre.sod.core.result.AppError {
-    return when (this) {
-        is java.io.IOException -> com.noghre.sod.core.result.AppError.NetworkError(
-            message = "خطا در اتصال به اینترنت",
-            throwable = this
-        )
-        is java.net.SocketTimeoutException -> com.noghre.sod.core.result.AppError.TimeoutError(
-            message = "مهلت زمانی درخواست پایان یافت",
-            throwable = this
-        )
-        is retrofit2.HttpException -> com.noghre.sod.core.result.AppError.ServerError(
-            code = this.code(),
-            message = this.message(),
-            throwable = this
-        )
-        else -> com.noghre.sod.core.result.AppError.UnknownError(
-            message = this.message ?: "خطای نامشخص",
-            throwable = this
-        )
+    fun getOrNull(): T? = when (this) {
+        is Success -> data
+        else -> null
     }
 }
