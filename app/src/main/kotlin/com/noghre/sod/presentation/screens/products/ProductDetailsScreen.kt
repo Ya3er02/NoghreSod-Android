@@ -1,6 +1,7 @@
 package com.noghre.sod.presentation.screens.products
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,24 +16,31 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.noghre.sod.domain.model.Product
 import com.noghre.sod.presentation.components.PersianButton
 import com.noghre.sod.presentation.components.StarRating
+import com.noghre.sod.ui.components.shimmer.shimmer
 
 /**
  * Product Details Screen - Product detail page.
  * 
-* Shows complete product information with images.
- * Add to cart, wishlist functionality.
- * Related products and reviews.
+ * Shows complete product information with images.
+ * Features:
+ * - High-resolution product image with zoom/pinch capability
+ * - RTL-aware layout for Persian text
+ * - Add to cart, wishlist functionality
+ * - Related products and reviews
+ * - Detailed product specifications
  * 
  * @author NoghreSod Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 @Composable
 fun ProductDetailsScreen(
@@ -134,7 +142,7 @@ fun ProductDetailsContent(
         contentPadding = PaddingValues(bottom = 16.dp)
     ) {
         item {
-            // Product image with zoom
+            // Product image with zoom capability
             ProductImageViewer(
                 imageUrl = product.imageUrl,
                 modifier = Modifier
@@ -310,16 +318,75 @@ fun ProductImageViewer(
     imageUrl: String?,
     modifier: Modifier = Modifier
 ) {
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(0.dp)
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, pan, gestureZoom, rotation ->
+                        scale *= gestureZoom
+                        offsetX += pan.x
+                        offsetY += pan.y
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
-            // TODO: Load image with Coil and implement zoom functionality
-            Text("تصویر محصول")
+            if (imageUrl.isNullOrEmpty()) {
+                // Fallback placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("بدون تصویر")
+                }
+            } else {
+                // Actual image with Coil - supports zoom and pan
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = "تصویر محصول",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY
+                        ),
+                    contentScale = ContentScale.Fit,
+                    loading = { placeholder ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .shimmer(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    },
+                    error = { error ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.errorContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "خطا در بارگیری تصویر",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -338,13 +405,30 @@ fun RelatedProductCard(
             modifier = Modifier.padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            // Product image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("تصویر")
+                if (product.imageUrl.isNullOrEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("بدون تصویر")
+                    }
+                } else {
+                    AsyncImage(
+                        model = product.imageUrl,
+                        contentDescription = product.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
 
             Text(
@@ -363,3 +447,18 @@ fun RelatedProductCard(
         }
     }
 }
+
+// GraphicsLayer for zoom transform
+private fun Modifier.graphicsLayer(
+    scaleX: Float,
+    scaleY: Float,
+    translationX: Float,
+    translationY: Float
+) = this.then(
+    Modifier.graphicsLayer {
+        this.scaleX = scaleX
+        this.scaleY = scaleY
+        this.translationX = translationX
+        this.translationY = translationY
+    }
+)
