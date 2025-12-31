@@ -29,10 +29,16 @@ data class ProductsUiState(
 /**
  * ViewModel for Products screen.
  * 
-* Manages product list, filtering, searching, and pagination.
+ * Manages product list, filtering, searching, and pagination.
+ * Features:
+ * - Load and paginate products
+ * - Advanced filtering by price, category, rating
+ * - Real-time search
+ * - Filter management
+ * - Product selection for detail view
  * 
  * @author NoghreSod Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 @HiltViewModel
 class ProductsViewModel @Inject constructor(
@@ -131,7 +137,9 @@ class ProductsViewModel @Inject constructor(
     }
 
     /**
-     * Apply filters and refresh.
+     * Apply filters using ProductFilters object.
+     * 
+     * @param filters ProductFilters object with all filter criteria
      */
     fun applyFilters(filters: ProductFilters) {
         _productsUiState.value = _productsUiState.value.copy(
@@ -139,6 +147,33 @@ class ProductsViewModel @Inject constructor(
             currentPage = 1
         )
         loadProducts()
+    }
+
+    /**
+     * Apply filters using individual parameters.
+     * Convenience method for direct parameter passing from UI.
+     * 
+     * @param minPrice Minimum price filter
+     * @param maxPrice Maximum price filter
+     * @param category Product category filter
+     * @param rating Minimum rating filter
+     * @param sortBy Sort field (latest, price_asc, price_desc, rating, popularity)
+     */
+    fun applyFilters(
+        minPrice: Float = 0f,
+        maxPrice: Float = Float.MAX_VALUE,
+        category: String? = null,
+        rating: Double = 0.0,
+        sortBy: String = "latest"
+    ) {
+        val filters = ProductFilters(
+            minPrice = minPrice.toDouble(),
+            maxPrice = maxPrice.toDouble(),
+            category = category,
+            minRating = rating,
+            sortBy = sortBy
+        )
+        applyFilters(filters)
     }
 
     /**
@@ -152,7 +187,7 @@ class ProductsViewModel @Inject constructor(
     }
 
     /**
-     * Clear filters.
+     * Clear filters and reset to default.
      */
     fun clearFilters() {
         applyFilters(ProductFilters())
