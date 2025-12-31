@@ -13,25 +13,36 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.noghre.sod.R
 import com.noghre.sod.domain.model.Product
+import com.noghre.sod.presentation.components.FilterBottomSheet
 import com.noghre.sod.presentation.components.PersianButton
 import com.noghre.sod.presentation.components.PersianTextField
+import com.noghre.sod.ui.components.shimmer.shimmer
 import kotlinx.coroutines.delay
 
 /**
  * Products Screen - Main product listing screen.
  * 
-* Displays products with search, filter, and pagination.
+ * Displays products with search, filter, and pagination.
  * Shows loading states and error handling.
+ * Features:
+ * - Search with real-time filtering
+ * - Advanced filter with price range
+ * - Image loading with Coil
+ * - Shimmer loading skeleton
+ * - Pagination support
  * 
  * @author NoghreSod Team
- * @version 1.0.0
+ * @version 1.1.0
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductsScreen(
     viewModel: ProductsViewModel = hiltViewModel(),
@@ -42,6 +53,9 @@ fun ProductsScreen(
     val error by viewModel.error.collectAsState()
     
     var searchQuery by remember { mutableStateOf("") }
+    var showFilterDialog by remember { mutableStateOf(false) }
+    var minPriceFilter by remember { mutableStateOf(0f) }
+    var maxPriceFilter by remember { mutableStateOf(100000f) }
 
     LaunchedEffect(Unit) {
         delay(500) // Small delay for UI initialization
@@ -52,14 +66,14 @@ fun ProductsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Header with search
+        // Header with search and filter
         ProductsHeader(
             searchQuery = searchQuery,
             onSearchChange = { query ->
                 searchQuery = query
                 viewModel.searchProducts(query)
             },
-            onFilterClick = { /* TODO: Show filter dialog */ }
+            onFilterClick = { showFilterDialog = true }
         )
 
         // Products list or empty state
@@ -84,6 +98,24 @@ fun ProductsScreen(
                 onLoadMore = { viewModel.loadMore() }
             )
         }
+    }
+
+    // Filter Bottom Sheet Dialog
+    if (showFilterDialog) {
+        FilterBottomSheet(
+            onDismiss = { showFilterDialog = false },
+            onApplyFilter = { priceRange, category ->
+                minPriceFilter = priceRange.start
+                maxPriceFilter = priceRange.endInclusive
+                // Apply filters to viewModel
+                viewModel.applyFilters(
+                    minPrice = minPriceFilter,
+                    maxPrice = maxPriceFilter,
+                    category = category
+                )
+                showFilterDialog = false
+            }
+        )
     }
 }
 
@@ -139,7 +171,7 @@ fun ProductsList(
             items = products,
             key = { it.id }
         ) { product ->
-            ProductCard(
+            ProductCardItem(
                 product = product,
                 onClick = { onProductClick(product) }
             )
@@ -190,7 +222,7 @@ fun ProductsList(
 }
 
 @Composable
-fun ProductCard(
+fun ProductCardItem(
     product: Product,
     onClick: () -> Unit
 ) {
@@ -207,23 +239,12 @@ fun ProductCard(
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Product image
-            Card(
-                modifier = Modifier
-                    .size(80.dp),
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // TODO: Load image with Coil
-                    Text(
-                        text = product.name.first().toString(),
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                }
-            }
+            // Product image with Coil
+            ProductImagePlaceholder(
+                imageUrl = product.imageUrl,
+                productName = product.name,
+                modifier = Modifier.size(80.dp)
+            )
 
             // Product details
             Column(
@@ -260,6 +281,63 @@ fun ProductCard(
 }
 
 @Composable
+fun ProductImagePlaceholder(
+    imageUrl: String?,
+    productName: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        if (imageUrl.isNullOrEmpty()) {
+            // Fallback placeholder
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = productName.first().toString(),
+                    style = MaterialTheme.typography.headlineMedium
+                )
+            }
+        } else {
+            // Load image with Coil - AsyncImage
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = productName,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                loading = { placeholder ->
+                    // Show shimmer while loading
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .shimmer()
+                    )
+                },
+                error = { error ->
+                    // Show fallback on error
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.errorContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "خطا",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
 fun ProductsLoadingState() {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -270,10 +348,11 @@ fun ProductsLoadingState() {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(104.dp),
+                    .height(104.dp)
+                    .shimmer(),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                // Shimmer skeleton
+                // Shimmer skeleton effect applied via modifier
             }
         }
     }
