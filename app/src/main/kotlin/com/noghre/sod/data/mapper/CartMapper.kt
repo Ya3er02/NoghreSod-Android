@@ -1,125 +1,53 @@
 package com.noghre.sod.data.mapper
 
 import com.noghre.sod.data.database.entity.CartEntity
-import com.noghre.sod.data.dto.remote.CartDto
-import com.noghre.sod.data.dto.remote.CartItemDto
+import com.noghre.sod.data.network.dto.CartDto
 import com.noghre.sod.domain.model.Cart
-import com.noghre.sod.domain.model.CartItem
-import kotlinx.serialization.json.Json
 
 /**
- * Mapper for Cart-related data transformations.
- *
- * Converts between:
- * - DTO ↔ Domain
- * - Entity ↔ Domain
- * - Entity ↔ DTO
+ * Mapper for Cart DTOs to Domain models.
  *
  * @author NoghreSod Team
- * @version 1.0.0
  */
 object CartMapper {
 
-    // ============ DTO TO DOMAIN ============
-
-    /**
-     * Convert CartDto to Cart domain model.
-     */
     fun CartDto.toDomain(): Cart = Cart(
-        id = this.id,
-        userId = this.userId,
-        items = this.items.map { it.toDomain() },
-        totalPrice = this.totalPrice,
-        itemCount = this.itemCount
+        id = id ?: "",
+        userId = userId ?: "",
+        items = items?.map { cartItemDto ->
+            cartItemDto.let {
+                com.noghre.sod.domain.model.CartItem(
+                    id = it.id ?: "",
+                    productId = it.productId ?: "",
+                    productName = it.productName ?: "",
+                    price = it.price ?: 0.0,
+                    quantity = it.quantity ?: 1,
+                    selectedColor = it.selectedColor,
+                    selectedSize = it.selectedSize,
+                    image = it.image
+                )
+            }
+        } ?: emptyList(),
+        totalPrice = totalPrice ?: 0.0,
+        itemCount = itemCount ?: 0,
+        lastUpdated = System.currentTimeMillis()
     )
 
-    /**
-     * Convert CartItemDto to CartItem domain model.
-     */
-    fun CartItemDto.toDomain(): CartItem = CartItem(
-        id = this.id,
-        cartId = this.cartId,
-        product = this.product.toDomain(),
-        quantity = this.quantity,
-        selectedColor = this.selectedColor,
-        selectedSize = this.selectedSize,
-        subtotal = this.subtotal
+    fun CartEntity.toDomain(): Cart = Cart(
+        id = id,
+        userId = userId,
+        items = items,
+        totalPrice = totalPrice,
+        itemCount = itemCount,
+        lastUpdated = lastUpdated
     )
 
-    // ============ ENTITY TO DOMAIN ============
-
-    /**
-     * Convert CartEntity to Cart domain model.
-     * Deserializes JSON items string.
-     */
-    fun CartEntity.toDomain(): Cart = try {
-        Cart(
-            id = this.id,
-            userId = this.userId,
-            items = try {
-                Json.decodeFromString<List<CartItem>>(this.itemsJson)
-            } catch (e: Exception) {
-                emptyList()
-            },
-            totalPrice = this.totalPrice,
-            itemCount = this.itemCount
-        )
-    } catch (e: Exception) {
-        Cart(
-            id = this.id,
-            userId = this.userId,
-            items = emptyList(),
-            totalPrice = 0.0,
-            itemCount = 0
-        )
-    }
-
-    // ============ DOMAIN TO ENTITY ============
-
-    /**
-     * Convert Cart domain model to CartEntity.
-     * Serializes items to JSON for storage.
-     */
     fun Cart.toEntity(): CartEntity = CartEntity(
-        id = this.id,
-        userId = this.userId,
-        itemsJson = try {
-            Json.encodeToString(this.items)
-        } catch (e: Exception) {
-            "[]"
-        },
-        totalPrice = this.totalPrice,
-        itemCount = this.itemCount,
-        lastUpdated = System.currentTimeMillis()
+        id = id,
+        userId = userId,
+        items = items,
+        totalPrice = totalPrice,
+        itemCount = itemCount,
+        lastUpdated = lastUpdated
     )
-
-    // ============ DTO TO ENTITY ============
-
-    /**
-     * Convert CartDto to CartEntity for caching.
-     */
-    fun CartDto.toEntity(): CartEntity = CartEntity(
-        id = this.id,
-        userId = this.userId,
-        itemsJson = try {
-            Json.encodeToString(this.items.map { it.toDomain() })
-        } catch (e: Exception) {
-            "[]"
-        },
-        totalPrice = this.totalPrice,
-        itemCount = this.itemCount,
-        lastUpdated = System.currentTimeMillis()
-    )
-
-    // ============ BATCH CONVERSIONS ============
-
-    /**
-     * Convert list of CartDtos to domain models.
-     */
-    fun List<CartDto>.toDomainList(): List<Cart> = map { it.toDomain() }
-
-    /**
-     * Convert list of CartEntities to domain models.
-     */
-    fun List<CartEntity>.toDomainList(): List<Cart> = map { it.toDomain() }
 }
