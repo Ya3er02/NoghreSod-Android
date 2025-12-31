@@ -1,264 +1,294 @@
 package com.noghre.sod.data.remote.api
 
+import com.noghre.sod.data.remote.dto.RequestDtos
+import com.noghre.sod.data.remote.dto.ResponseDtos
 import retrofit2.Response
 import retrofit2.http.*
-import com.noghre.sod.data.remote.dto.common.ResponseDto
-import com.noghre.sod.data.remote.dto.common.PaginatedResponseDto
-import com.noghre.sod.data.remote.dto.common.PaginationInfo
-import com.noghre.sod.data.remote.dto.response.*
-import com.noghre.sod.data.remote.dto.request.*
-import java.util.UUID
 
 /**
- * Main API Service
+ * Retrofit API Service for NoghreSod Backend.
  * 
- * All endpoints are protected with authentication.
- * Uses Response<T> wrapper to access HTTP status codes and headers.
+* All API endpoints for:
+ * - Products (list, search, details, categories)
+ * - Shopping Cart
+ * - Orders
+ * - Authentication & User
+ * - Payments
+ * 
+ * @author NoghreSod Team
+ * @version 1.0.0
  */
 interface ApiService {
-    
-    // ==================== Products ====================
-    
+
+    // ============ PRODUCTS ============
+
     /**
-     * Get paginated list of products
-     * Supports both page-based and cursor-based pagination
+     * Get products list with pagination and filters.
      */
     @GET("products")
-    suspend fun getAllProducts(
+    suspend fun getProducts(
         @Query("page") page: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("sortBy") sortBy: String? = null,
-        @Query("sortOrder") sortOrder: String? = null,
+        @Query("limit") pageSize: Int = 20,
+        @Query("search") search: String? = null,
         @Query("category") category: String? = null,
-        @Query("minPrice") minPrice: Long? = null,
-        @Query("maxPrice") maxPrice: Long? = null,
-        @Query("inStock") inStock: Boolean? = null
-    ): Response<ResponseDto<PaginatedResponseDto<ProductDto>>>
-    
+        @Query("sort") sortBy: String? = null,
+        @Query("min_price") minPrice: Double? = null,
+        @Query("max_price") maxPrice: Double? = null
+    ): Response<ResponseDtos.ApiResponse<List<ResponseDtos.ProductResponseDto>>>
+
     /**
-     * Get product details
-     */
-    @GET("products/{id}")
-    suspend fun getProductById(
-        @Path("id") productId: String
-    ): Response<ResponseDto<ProductDetailDto>>
-    
-    /**
-     * Search products
+     * Search products by query.
      */
     @GET("products/search")
     suspend fun searchProducts(
         @Query("q") query: String,
-        @Query("page") page: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("filters") filters: String? = null
-    ): Response<ResponseDto<PaginatedResponseDto<ProductDto>>>
-    
+        @Query("category") category: String? = null
+    ): Response<ResponseDtos.ApiResponse<List<ResponseDtos.ProductResponseDto>>>
+
     /**
-     * Get featured products
-     * Cached for 5 minutes
+     * Get products by category.
      */
-    @GET("products/featured")
-    suspend fun getFeaturedProducts(
-        @Query("limit") limit: Int = 10
-    ): Response<ResponseDto<List<ProductDto>>>
-    
+    @GET("products/category/{categoryId}")
+    suspend fun getProductsByCategory(
+        @Path("categoryId") categoryId: String
+    ): Response<ResponseDtos.ApiResponse<List<ResponseDtos.ProductResponseDto>>>
+
     /**
-     * Get new products
-     * Cached for 1 hour
+     * Get product details by ID.
      */
-    @GET("products/new")
-    suspend fun getNewProducts(
-        @Query("limit") limit: Int = 10
-    ): Response<ResponseDto<List<ProductDto>>>
-    
-    // ==================== Categories ====================
-    
+    @GET("products/{productId}")
+    suspend fun getProductById(
+        @Path("productId") productId: String
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.ProductResponseDto>>
+
     /**
-     * Get all categories
-     * Cached for 2 hours
+     * Get all categories.
      */
     @GET("categories")
-    suspend fun getAllCategories(): Response<ResponseDto<List<CategoryDto>>>
-    
+    suspend fun getCategories(): Response<ResponseDtos.ApiResponse<List<ResponseDtos.CategoryResponseDto>>>
+
+    // ============ AUTHENTICATION ============
+
     /**
-     * Get category by ID
+     * Login with mobile and password.
      */
-    @GET("categories/{id}")
-    suspend fun getCategoryById(
-        @Path("id") categoryId: String
-    ): Response<ResponseDto<CategoryDto>>
-    
-    // ==================== Cart ====================
-    
+    @POST("auth/login")
+    suspend fun login(
+        @Body request: RequestDtos.LoginRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.LoginResponseDto>>
+
     /**
-     * Get current user's cart
+     * Alternative login endpoint.
+     */
+    suspend fun login(
+        @Query("mobile") mobile: String,
+        @Query("password") password: String
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.LoginResponseDto>> {
+        return login(RequestDtos.LoginRequest(mobile, password))
+    }
+
+    /**
+     * Register new user.
+     */
+    @POST("auth/register")
+    suspend fun register(
+        @Body request: RequestDtos.RegisterRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.LoginResponseDto>>
+
+    /**
+     * Alternative register endpoint.
+     */
+    suspend fun register(
+        @Query("name") name: String,
+        @Query("mobile") mobile: String,
+        @Query("email") email: String,
+        @Query("password") password: String
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.LoginResponseDto>> {
+        return register(
+            RequestDtos.RegisterRequest(
+                name = name,
+                mobile = mobile,
+                email = email,
+                password = password
+            )
+        )
+    }
+
+    /**
+     * Logout user.
+     */
+    @POST("auth/logout")
+    suspend fun logout(): Response<ResponseDtos.ApiResponse<Unit>>
+
+    /**
+     * Refresh authentication token.
+     */
+    @POST("auth/refresh")
+    suspend fun refreshToken(
+        @Query("refreshToken") refreshToken: String
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.TokenResponseDto>>
+
+    /**
+     * Request password reset.
+     */
+    @POST("auth/request-reset")
+    suspend fun requestPasswordReset(
+        @Query("mobile") mobile: String
+    ): Response<ResponseDtos.ApiResponse<Unit>>
+
+    // ============ USER PROFILE ============
+
+    /**
+     * Get user profile.
+     */
+    @GET("user/profile")
+    suspend fun getUserProfile(): Response<ResponseDtos.ApiResponse<ResponseDtos.UserResponseDto>>
+
+    /**
+     * Update user profile.
+     */
+    @PUT("user/profile")
+    suspend fun updateProfile(
+        @Body request: RequestDtos.UpdateProfileRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.UserResponseDto>>
+
+    // ============ CART ============
+
+    /**
+     * Get cart items.
      */
     @GET("cart")
-    suspend fun getCart(): Response<ResponseDto<CartDto>>
-    
+    suspend fun getCart(): Response<ResponseDtos.ApiResponse<ResponseDtos.CartResponseDto>>
+
     /**
-     * Add item to cart
+     * Add item to cart.
      */
-    @POST("cart/items")
+    @POST("cart/add")
     suspend fun addToCart(
-        @Body request: AddToCartRequestDto
-    ): Response<ResponseDto<CartDto>>
-    
+        @Body request: RequestDtos.AddToCartRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.CartResponseDto>>
+
     /**
-     * Update cart item quantity
+     * Remove item from cart.
      */
-    @PATCH("cart/items/{itemId}")
-    suspend fun updateCartItem(
-        @Path("itemId") itemId: String,
-        @Body request: UpdateCartItemRequestDto
-    ): Response<ResponseDto<CartDto>>
-    
-    /**
-     * Remove item from cart
-     */
-    @DELETE("cart/items/{itemId}")
+    @DELETE("cart/{productId}")
     suspend fun removeFromCart(
-        @Path("itemId") itemId: String
-    ): Response<ResponseDto<CartDto>>
-    
+        @Path("productId") productId: String
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.CartResponseDto>>
+
     /**
-     * Clear entire cart
+     * Update cart item quantity.
+     */
+    @PUT("cart/{productId}")
+    suspend fun updateCartItem(
+        @Path("productId") productId: String,
+        @Body request: RequestDtos.UpdateCartItemRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.CartResponseDto>>
+
+    /**
+     * Clear entire cart.
      */
     @DELETE("cart")
-    suspend fun clearCart(): Response<ResponseDto<Unit>>
-    
-    // ==================== Orders ====================
-    
+    suspend fun clearCart(): Response<ResponseDtos.ApiResponse<Unit>>
+
+    // ============ ORDERS ============
+
     /**
-     * Create new order
-     * @param idempotencyKey Unique key to prevent duplicate orders
+     * Get user's orders.
+     */
+    @GET("orders")
+    suspend fun getOrders(
+        @Query("page") page: Int = 1,
+        @Query("limit") pageSize: Int = 10
+    ): Response<ResponseDtos.ApiResponse<List<ResponseDtos.OrderResponseDto>>>
+
+    /**
+     * Get order details.
+     */
+    @GET("orders/{orderId}")
+    suspend fun getOrderDetails(
+        @Path("orderId") orderId: String
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.OrderResponseDto>>
+
+    /**
+     * Create new order.
      */
     @POST("orders")
     suspend fun createOrder(
-        @Body request: CreateOrderRequestDto,
-        @Header("Idempotency-Key") idempotencyKey: String = UUID.randomUUID().toString()
-    ): Response<ResponseDto<OrderDto>>
-    
+        @Body request: RequestDtos.CreateOrderRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.OrderResponseDto>>
+
     /**
-     * Get order by ID
+     * Cancel order.
      */
-    @GET("orders/{id}")
-    suspend fun getOrderById(
-        @Path("id") orderId: String,
-        @Query("includeItems") includeItems: Boolean = true
-    ): Response<ResponseDto<OrderDto>>
-    
-    /**
-     * Get user's orders with pagination
-     */
-    @GET("orders")
-    suspend fun getUserOrders(
-        @Query("page") page: Int = 1,
-        @Query("pageSize") pageSize: Int = 20,
-        @Query("status") status: String? = null,
-        @Query("fromDate") fromDate: String? = null,
-        @Query("toDate") toDate: String? = null
-    ): Response<ResponseDto<PaginatedResponseDto<OrderDto>>>
-    
-    /**
-     * Cancel order
-     */
-    @POST("orders/{id}/cancel")
+    @POST("orders/{orderId}/cancel")
     suspend fun cancelOrder(
-        @Path("id") orderId: String,
-        @Body request: CancelOrderRequestDto
-    ): Response<ResponseDto<OrderDto>>
-    
-    // ==================== User Profile ====================
-    
+        @Path("orderId") orderId: String
+    ): Response<ResponseDtos.ApiResponse<Unit>>
+
+    // ============ PAYMENTS ============
+
     /**
-     * Get user profile
+     * Initiate payment.
      */
-    @GET("users/me")
-    suspend fun getUserProfile(): Response<ResponseDto<UserDto>>
-    
+    @POST("payments/init")
+    suspend fun initiatePayment(
+        @Body request: RequestDtos.PaymentInitRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.PaymentInitResponseDto>>
+
     /**
-     * Update user profile
+     * Verify payment.
      */
-    @PUT("users/me")
-    suspend fun updateUserProfile(
-        @Body request: UpdateProfileRequestDto
-    ): Response<ResponseDto<UserDto>>
-    
+    @POST("payments/verify")
+    suspend fun verifyPayment(
+        @Body request: RequestDtos.PaymentVerifyRequest
+    ): Response<ResponseDtos.ApiResponse<ResponseDtos.PaymentVerifyResponseDto>>
+
+    // ============ WISHLIST ============
+
     /**
-     * Get user addresses
+     * Get wishlist items.
      */
-    @GET("users/me/addresses")
-    suspend fun getUserAddresses(): Response<ResponseDto<List<AddressDto>>>
-    
+    @GET("wishlist")
+    suspend fun getWishlist(): Response<ResponseDtos.ApiResponse<List<ResponseDtos.ProductResponseDto>>>
+
     /**
-     * Add new address
+     * Add product to wishlist.
      */
-    @POST("users/me/addresses")
-    suspend fun addAddress(
-        @Body request: AddAddressRequestDto
-    ): Response<ResponseDto<AddressDto>>
-    
-    /**
-     * Update address
-     */
-    @PUT("users/me/addresses/{id}")
-    suspend fun updateAddress(
-        @Path("id") addressId: String,
-        @Body request: AddAddressRequestDto
-    ): Response<ResponseDto<AddressDto>>
-    
-    /**
-     * Delete address
-     */
-    @DELETE("users/me/addresses/{id}")
-    suspend fun deleteAddress(
-        @Path("id") addressId: String
-    ): Response<ResponseDto<Unit>>
-    
-    // ==================== Wishlist ====================
-    
-    /**
-     * Get user's wishlist
-     */
-    @GET("users/me/wishlist")
-    suspend fun getWishlist(): Response<ResponseDto<List<ProductDto>>>
-    
-    /**
-     * Add product to wishlist
-     */
-    @POST("users/me/wishlist/{productId}")
+    @POST("wishlist/{productId}")
     suspend fun addToWishlist(
         @Path("productId") productId: String
-    ): Response<ResponseDto<Unit>>
-    
+    ): Response<ResponseDtos.ApiResponse<Unit>>
+
     /**
-     * Remove product from wishlist
+     * Remove product from wishlist.
      */
-    @DELETE("users/me/wishlist/{productId}")
+    @DELETE("wishlist/{productId}")
     suspend fun removeFromWishlist(
         @Path("productId") productId: String
-    ): Response<ResponseDto<Unit>>
-    
-    // ==================== Reviews ====================
-    
+    ): Response<ResponseDtos.ApiResponse<Unit>>
+
+    // ============ FAVORITES ============
+
     /**
-     * Get product reviews
+     * Get favorite products.
      */
-    @GET("products/{productId}/reviews")
-    suspend fun getProductReviews(
-        @Path("productId") productId: String,
-        @Query("page") page: Int = 1,
-        @Query("pageSize") pageSize: Int = 10
-    ): Response<ResponseDto<PaginatedResponseDto<ReviewDto>>>
-    
+    @GET("favorites")
+    suspend fun getFavorites(): Response<ResponseDtos.ApiResponse<List<ResponseDtos.ProductResponseDto>>>
+
     /**
-     * Submit product review
+     * Add product to favorites.
      */
-    @POST("products/{productId}/reviews")
-    suspend fun submitReview(
-        @Path("productId") productId: String,
-        @Body request: SubmitReviewRequestDto
-    ): Response<ResponseDto<ReviewDto>>
+    @POST("favorites/{productId}")
+    suspend fun addToFavorites(
+        @Path("productId") productId: String
+    ): Response<ResponseDtos.ApiResponse<Unit>>
+
+    /**
+     * Remove product from favorites.
+     */
+    @DELETE("favorites/{productId}")
+    suspend fun removeFromFavorites(
+        @Path("productId") productId: String
+    ): Response<ResponseDtos.ApiResponse<Unit>>
 }
