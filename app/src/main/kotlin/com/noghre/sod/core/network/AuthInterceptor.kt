@@ -10,17 +10,17 @@ import javax.inject.Inject
 
 /**
  * Interceptor for handling authentication in network requests.
- * 
-* Adds auth token to all requests.
- * Handles token refresh on 401 unauthorized.
- * Logs requests and responses.
- * 
+ *
+ * - Adds auth token to all requests.
+ * - Handles token refresh on 401 unauthorized.
+ * - Thread-safe and robust error handling.
+ *
  * @author NoghreSod Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 class AuthInterceptor @Inject constructor(
     private val preferencesManager: PreferencesManager,
-    private val context: Context
+    private val context: Context,
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -28,9 +28,15 @@ class AuthInterceptor @Inject constructor(
         var request = originalRequest
 
         try {
-            // Get auth token
+            // Get auth token synchronously (since Interceptor is blocking)
+            // Ideally, PreferencesManager should provide a synchronous way or we use runBlocking
             val token = runBlocking {
-                preferencesManager.getAuthToken()
+                try {
+                    preferencesManager.getAuthToken()
+                } catch (e: Exception) {
+                    Timber.e(e, "Error reading auth token")
+                    null
+                }
             }
 
             // Add token to request if available
@@ -39,62 +45,52 @@ class AuthInterceptor @Inject constructor(
                     .header("Authorization", "Bearer $token")
                     .header("Content-Type", "application/json")
                     .build()
-
-                Timber.d("Adding auth token to request: ${originalRequest.url}")
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error adding auth token")
-        }
-
-        // Log request
-        Timber.d("→ Request: ${request.method} ${request.url}")
-        for ((name, value) in request.headers) {
-            if (name.lowercase() != "authorization") {
-                Timber.d("  Header: $name: $value")
-            }
+            Timber.e(e, "Unexpected error in AuthInterceptor setup")
         }
 
         return try {
             // Execute request
             val response = chain.proceed(request)
 
-            // Log response
-            Timber.d("← Response: ${response.code} for ${response.request.url}")
-
             // Handle 401 unauthorized
             if (response.code == 401) {
                 Timber.w("Unauthorized (401) - Token may be expired")
+                
+                // Close response body before retrying to avoid leakage
+                response.close()
 
                 // Try to refresh token
-                val refreshed = refreshToken()
-                if (refreshed) {
-                    Timber.d("Token refreshed, retrying request")
+                // NOTE: synchronized to prevent multiple threads refreshing at once
+                synchronized(this) {
+                    val refreshed = refreshToken()
+                    if (refreshed) {
+                        Timber.d("Token refreshed, retrying request")
 
-                    // Get new token and retry
-                    return try {
-                        val newToken = runBlocking {
-                            preferencesManager.getAuthToken()
+                        // Get new token and retry
+                        val newToken = runBlocking { preferencesManager.getAuthToken() }
+                        
+                        if (!newToken.isNullOrBlank()) {
+                            val retryRequest = originalRequest.newBuilder()
+                                .header("Authorization", "Bearer $newToken")
+                                .header("Content-Type", "application/json")
+                                .build()
+                            return chain.proceed(retryRequest)
                         }
-
-                        val retryRequest = originalRequest.newBuilder()
-                            .header("Authorization", "Bearer $newToken")
-                            .header("Content-Type", "application/json")
-                            .build()
-
-                        chain.proceed(retryRequest)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Error retrying request with new token")
-                        response
                     }
-                } else {
-                    Timber.w("Failed to refresh token")
-                    response
                 }
-            } else {
-                response
+                
+                // If refresh failed or logic not implemented, return original response (re-executed or new error)
+                // Since we closed original response, we technically need to re-execute or return a new 401 response
+                // For simplicity here, we assume if refresh failed, the user needs to login again.
+                // Re-executing original to get a fresh 401 response is safest if we closed it.
+                return chain.proceed(request)
             }
+
+            response
         } catch (e: Exception) {
-            Timber.e(e, "Network error: ${e.localizedMessage}")
+            Timber.e(e, "Network request failed in AuthInterceptor: ${e.message}")
             throw e
         }
     }
@@ -106,49 +102,15 @@ class AuthInterceptor @Inject constructor(
         return try {
             Timber.d("Attempting to refresh token")
 
-            // This would call the API to refresh token
-            // For now, we'll just return true as a placeholder
-            // The actual implementation should be in AuthRepository
-
-            true
+            // TODO: Implement actual token refresh logic here.
+            // Call AuthRepository to refresh token using refresh_token.
+            // For now, return false to indicate refresh is not fully implemented/failed.
+            // Returning true blindly causes infinite loops if refresh actually fails.
+            
+            false 
         } catch (e: Exception) {
-            Timber.e(e, "Token refresh failed: ${e.localizedMessage}")
+            Timber.e(e, "Token refresh failed: ${e.message}")
             false
-        }
-    }
-}
-
-/**
- * Logging Interceptor for debugging.
- * 
-* Logs detailed request and response information.
- */
-class LoggingInterceptor : Interceptor {
-
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        val startTime = System.nanoTime()
-
-        Timber.d(
-            "Sending request: ${request.method} ${request.url}\n" +
-                    "Headers: ${request.headers}"
-        )
-
-        return try {
-            val response = chain.proceed(request)
-            val elapsedTime = (System.nanoTime() - startTime) / 1_000_000
-
-            Timber.d(
-                "Received response: ${response.code}\n" +
-                        "Elapsed time: ${elapsedTime}ms\n" +
-                        "Headers: ${response.headers}"
-            )
-
-            response
-        } catch (e: Exception) {
-            val elapsedTime = (System.nanoTime() - startTime) / 1_000_000
-            Timber.e("Request failed after ${elapsedTime}ms: ${e.message}")
-            throw e
         }
     }
 }
