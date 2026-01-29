@@ -2,7 +2,7 @@ package com.noghre.sod.core.di
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.noghre.sod.core.config.ApiEndpoints
+import com.noghre.sod.core.config.AppConfig
 import com.noghre.sod.core.network.AuthInterceptor
 import com.noghre.sod.core.network.CertificatePinningConfig
 import com.noghre.sod.core.network.LoggingInterceptor
@@ -32,14 +32,13 @@ import javax.inject.Singleton
  * - Connection Pooling
  *
  * @author NoghreSod Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    // ============== Gson Configuration ==============
-
+    // ============== Gson Configuration ==============\n
     /**
      * Provides Gson instance with custom configuration.
      */
@@ -50,15 +49,12 @@ object NetworkModule {
         .setPrettyPrinting()
         .create()
 
-    // ============== OkHttpClient Configuration ==============
-
+    // ============== OkHttpClient Configuration ==============\n
     /**
      * Provides OkHttpClient with all interceptors and security settings.
      *
      * Configuration:
-     * - Connection Timeout: 30 seconds
-     * - Read Timeout: 30 seconds
-     * - Write Timeout: 30 seconds
+     * - Timeouts from AppConfig
      * - Certificate Pinning: Enabled
      * - Interceptors: Auth, Logging, Retry
      */
@@ -69,44 +65,56 @@ object NetworkModule {
         loggingInterceptor: LoggingInterceptor,
         retryInterceptor: RetryInterceptor,
         certificatePinningConfig: CertificatePinningConfig
-    ): OkHttpClient = OkHttpClient.Builder()
-        .apply {
-            // Timeouts
-            connectTimeout(30, TimeUnit.SECONDS)
-            readTimeout(30, TimeUnit.SECONDS)
-            writeTimeout(30, TimeUnit.SECONDS)
+    ): OkHttpClient {
+        return OkHttpClient.Builder()
+            .apply {
+                // Timeouts
+                connectTimeout(AppConfig.Api.CONNECT_TIMEOUT, TimeUnit.SECONDS)
+                readTimeout(AppConfig.Api.READ_TIMEOUT, TimeUnit.SECONDS)
+                writeTimeout(AppConfig.Api.WRITE_TIMEOUT, TimeUnit.SECONDS)
 
-            // Connection Pool
-            connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
+                // Connection Pool
+                connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
 
-            // Interceptors (order matters)
-            // Retry interceptor first (outermost)
-            addInterceptor(retryInterceptor)
-            // Logging interceptor
-            addInterceptor(loggingInterceptor)
-            // Auth interceptor (must be after logging)
-            addNetworkInterceptor(authInterceptor)
+                // Interceptors (order matters)
+                // 1. Retry (Application Interceptor - handles retries across network calls)
+                addInterceptor(retryInterceptor)
+                
+                // 2. Logging (Application Interceptor - logs request/response)
+                // Only add if logging is enabled
+                if (AppConfig.Logging.ENABLE_NETWORK_LOGGING) {
+                    addInterceptor(loggingInterceptor)
+                }
 
-            // SSL Certificate Pinning
-            certificatePinningConfig.getPinningSpec()?.let {
-                certificatePinner(it)
+                // 3. Auth (Network Interceptor - ensures headers are on the wire)
+                // Note: Auth can also be an application interceptor, but putting it as network
+                // ensures it runs after retry/logging for the actual call.
+                // However, usually Auth is better as addInterceptor to survive redirects better.
+                // Switching Auth to addInterceptor for stability.
+                addInterceptor(authInterceptor)
+
+                // SSL Certificate Pinning
+                if (AppConfig.Security.ENABLE_SSL_PINNING) {
+                    certificatePinningConfig.getPinningSpec()?.let {
+                        certificatePinner(it)
+                    }
+                }
+
+                // Follow redirects
+                followRedirects(true)
+                followSslRedirects(true)
+
+                // Retry on connection failure
+                retryOnConnectionFailure(true)
             }
+            .build()
+    }
 
-            // Follow redirects
-            followRedirects(true)
-            followSslRedirects(true)
-
-            // Retry on connection failure
-            retryOnConnectionFailure(true)
-        }
-        .build()
-
-    // ============== Retrofit Configuration ==============
-
+    // ============== Retrofit Configuration ==============\n
     /**
      * Provides Retrofit instance configured with OkHttpClient.
      *
-     * Base URL: [ApiEndpoints.BASE_URL]
+     * Base URL: [AppConfig.Api.BASE_URL]
      * Converter Factory: Gson
      *
      * @param okHttpClient Configured OkHttpClient
@@ -118,12 +126,14 @@ object NetworkModule {
     fun provideRetrofit(
         okHttpClient: OkHttpClient,
         gson: Gson
-    ): Retrofit = Retrofit.Builder()
-        .baseUrl(ApiEndpoints.BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create(gson))
-        .build()
-        .also {
-            Timber.i("Retrofit configured with base URL: ${ApiEndpoints.BASE_URL}")
-        }
+    ): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(AppConfig.Api.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+            .also {
+                Timber.i("Retrofit configured with base URL: ${AppConfig.Api.BASE_URL}")
+            }
+    }
 }
