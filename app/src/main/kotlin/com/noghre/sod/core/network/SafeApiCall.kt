@@ -1,105 +1,105 @@
 package com.noghre.sod.core.network
 
-import android.util.Log
-import com.noghre.sod.core.exception.AppException
-import com.noghre.sod.core.exception.HttpException
-import com.noghre.sod.core.exception.NetworkException
-import com.noghre.sod.core.exception.UnknownException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import retrofit2.Response
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
+import timber.log.Timber
 
 /**
  * Safe API call wrapper that handles all types of network errors.
- * Converts exceptions to Result types for better error handling.
+ * Converts exceptions to NetworkResult types for better error handling.
+ *
+ * Usage:
+ * ```
+ * val result = safeApiCall { apiService.getProducts() }
+ * when (result) {
+ *     is NetworkResult.Success -> updateUi(result.data)
+ *     is NetworkResult.Error -> showError(result.message)
+ *     ...
+ * }
+ * ```
  */
-suspend inline fun <reified T> safeApiCall(
-    apiCall: suspend () -> Response<T>
-): Result<T> = withContext(Dispatchers.IO) {
+suspend inline fun <T> safeApiCall(
+    crossinline apiCall: suspend () -> Response<T>
+): NetworkResult<T> = withContext(Dispatchers.IO) {
     try {
         val response = apiCall()
-        
+
         if (response.isSuccessful) {
             val body = response.body()
             if (body != null) {
-                Result.success(body)
+                NetworkResult.Success(body)
             } else {
-                Log.w("SafeApiCall", "Empty response body")
-                Result.failure(AppException.EmptyResponseException())
+                Timber.w("SafeApiCall: Empty response body")
+                // Treated as Empty result instead of Error
+                NetworkResult.Empty("پاسخ سرور خالی بود.")
             }
         } else {
-            Log.e("SafeApiCall", "HTTP Error: ${response.code()} - ${response.message()}")
+            val code = response.code()
+            val message = response.message()
+            Timber.e("SafeApiCall: HTTP Error: $code - $message")
             
-            val errorBody = response.errorBody()?.string()
-            Result.failure(
-                HttpException(
-                    code = response.code(),
-                    message = response.message(),
-                    errorBody = errorBody
-                )
-            )
+            // Re-throw as HttpException to be handled by NetworkErrorHandler
+            throw retrofit2.HttpException(response)
         }
-    } catch (e: SocketTimeoutException) {
-        Log.e("SafeApiCall", "Request timeout", e)
-        Result.failure(NetworkException.TimeoutException(e))
-    } catch (e: ConnectException) {
-        Log.e("SafeApiCall", "Connection failed", e)
-        Result.failure(NetworkException.ConnectionException(e))
-    } catch (e: UnknownHostException) {
-        Log.e("SafeApiCall", "Unknown host", e)
-        Result.failure(NetworkException.UnknownHostException(e))
-    } catch (e: IOException) {
-        Log.e("SafeApiCall", "Network error", e)
-        Result.failure(NetworkException(e))
     } catch (e: Exception) {
-        Log.e("SafeApiCall", "Unknown error", e)
-        Result.failure(UnknownException(e))
+        // Delegate all exception handling to NetworkErrorHandler
+        NetworkErrorHandler.handleException(e)
     }
 }
 
 /**
  * Safe API call with retry logic.
+ *
+ * Automatically retries on network/timeout errors with exponential backoff.
+ *
+ * @param maxRetries Maximum number of retries (default: 3)
+ * @param initialDelayMs Initial delay in milliseconds (default: 1000)
+ * @param apiCall The suspend function to execute
  */
-suspend inline fun <reified T> safeApiCallWithRetry(
+suspend inline fun <T> safeApiCallWithRetry(
     maxRetries: Int = 3,
     initialDelayMs: Long = 1000,
-    apiCall: suspend () -> Response<T>
-): Result<T> = withContext(Dispatchers.IO) {
-    var lastException: Exception? = null
-    var delay = initialDelayMs
+    crossinline apiCall: suspend () -> Response<T>
+): NetworkResult<T> = withContext(Dispatchers.IO) {
+    var currentDelay = initialDelayMs
+    var lastResult: NetworkResult<T>? = null
 
-    repeat(maxRetries) { attempt ->
+    repeat(maxRetries + 1) { attempt ->
         val result = safeApiCall(apiCall)
-        
-        if (result.isSuccess) {
+
+        if (result is NetworkResult.Success || result is NetworkResult.Empty) {
             return@withContext result
         }
-
-        lastException = result.exceptionOrNull()
         
-        // Only retry on specific errors
-        val shouldRetry = lastException?.let { exception ->
-            when (exception) {
-                is SocketTimeoutException -> true
-                is ConnectException -> true
-                is NetworkException.ConnectionException -> true
-                is NetworkException.TimeoutException -> true
+        lastResult = result
+
+        // If it's the last attempt, don't wait
+        if (attempt == maxRetries) return@repeat
+
+        // Check if error is retryable
+        if (result is NetworkResult.Error) {
+            val isRetryable = when (result.errorType) {
+                ErrorType.NETWORK, 
+                ErrorType.TIMEOUT, 
+                ErrorType.SERVER_ERROR -> true
                 else -> false
             }
-        } ?: false
 
-        if (shouldRetry && attempt < maxRetries - 1) {
-            Log.d("SafeApiCall", "Retry attempt ${attempt + 1}/$maxRetries after ${delay}ms")
-            kotlinx.coroutines.delay(delay)
-            delay *= 2 // Exponential backoff
+            if (!isRetryable) {
+                return@withContext result
+            }
         }
+
+        Timber.d("Retry attempt ${attempt + 1}/$maxRetries after ${currentDelay}ms")
+        delay(currentDelay)
+        currentDelay *= 2 // Exponential backoff
     }
 
-    return@withContext Result.failure(
-        lastException ?: UnknownException(Exception("Max retries exceeded"))
+    // Return the last error result, or unknown if null
+    lastResult ?: NetworkResult.Error(
+        exception = Exception("Max retries exceeded"),
+        message = "تلاش‌های مکرر برای اتصال با شکست مواجه شد."
     )
 }
