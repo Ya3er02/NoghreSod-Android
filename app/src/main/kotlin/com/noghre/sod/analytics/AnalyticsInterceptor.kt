@@ -31,7 +31,7 @@ import timber.log.Timber
  * is first composed and tracks composition/recomposition for debugging.
  *
  * @author NoghreSod Team
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 /**
@@ -50,14 +50,22 @@ fun AnalyticsScreenTracker(
     screenName: String,
     screenClass: String? = null,
     analyticsManager: AnalyticsManager,
-    additionalParams: Map<String, String> = emptyMap()
+    additionalParams: Map<String, String> = emptyMap(),
 ) {
     LaunchedEffect(screenName) {
-        analyticsManager.logScreenView(
-            screenName = screenName,
-            screenClass = screenClass ?: screenName
-        )
-        Timber.d("Screen tracked: $screenName")
+        try {
+            analyticsManager.logScreenView(
+                screenName = screenName,
+                screenClass = screenClass ?: screenName,
+            )
+            // Log additional parameters if provided
+            additionalParams.forEach { (key, value) ->
+                analyticsManager.setUserProperty(key, value)
+            }
+            Timber.d("Screen tracked: $screenName with params: $additionalParams")
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking screen: $screenName")
+        }
     }
 }
 
@@ -76,29 +84,37 @@ fun AnalyticsLifecycleTracker(
     screenName: String,
     analyticsManager: AnalyticsManager,
     onScreenEnter: (String) -> Unit = {},
-    onScreenExit: (String) -> Unit = {}
+    onScreenExit: (String) -> Unit = {},
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    analyticsManager.logScreenView(screenName)
-                    onScreenEnter(screenName)
-                    Timber.d("Screen resumed: $screenName")
+            try {
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> {
+                        analyticsManager.logScreenView(screenName)
+                        onScreenEnter(screenName)
+                        Timber.d("Screen resumed: $screenName")
+                    }
+                    Lifecycle.Event.ON_PAUSE -> {
+                        onScreenExit(screenName)
+                        Timber.d("Screen paused: $screenName")
+                    }
+                    else -> {}
                 }
-                Lifecycle.Event.ON_PAUSE -> {
-                    onScreenExit(screenName)
-                    Timber.d("Screen paused: $screenName")
-                }
-                else -> {}
+            } catch (e: Exception) {
+                Timber.e(e, "Error tracking lifecycle for screen: $screenName")
             }
         }
 
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+            try {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            } catch (e: Exception) {
+                Timber.e(e, "Error removing lifecycle observer")
+            }
         }
     }
 }
@@ -113,11 +129,11 @@ fun AnalyticsLifecycleTracker(
  * ) : ViewModel() {
  *
  *     fun onProductClicked(productId: String, productName: String) {
- *         logAnalyticsEvent(
- *             eventName = AnalyticsEvents.PRODUCT_VIEW,
+ *         analyticsManager.logUserAction(
+ *             actionName = AnalyticsEvents.PRODUCT_VIEW,
  *             params = mapOf(
- *                 "product_id" to productId,
- *                 "product_name" to productName
+ *                 AnalyticsEvents.Params.PRODUCT_ID to productId,
+ *                 AnalyticsEvents.Params.PRODUCT_NAME to productName
  *             )
  *         )
  *     }
@@ -126,10 +142,17 @@ fun AnalyticsLifecycleTracker(
  */
 fun AnalyticsManager.logUserAction(
     actionName: String,
-    params: Map<String, String> = emptyMap()
+    params: Map<String, String> = emptyMap(),
 ) {
-    Timber.d("User action: $actionName, Params: $params")
-    // Can be extended with additional logic for specific actions
+    try {
+        Timber.d("User action: $actionName, Params: $params")
+        // Log user properties from params if needed
+        params.forEach { (key, value) ->
+            this.setUserProperty(key, value)
+        }
+    } catch (e: Exception) {
+        Timber.e(e, "Error logging user action: $actionName")
+    }
 }
 
 /**
@@ -137,9 +160,11 @@ fun AnalyticsManager.logUserAction(
  *
  * Provides convenient methods for logging typical app interactions
  * without needing to construct parameter maps manually.
+ *
+ * Thread-safe implementation using injected AnalyticsManager.
  */
 class AnalyticsTracker(
-    private val analyticsManager: AnalyticsManager
+    private val analyticsManager: AnalyticsManager,
 ) {
 
     /**
@@ -147,10 +172,20 @@ class AnalyticsTracker(
      */
     fun trackButtonClick(
         buttonName: String,
-        screenName: String? = null
+        screenName: String? = null,
     ) {
-        Timber.d("Button clicked: $buttonName on $screenName")
-        // Can log custom event if needed
+        try {
+            Timber.d("Button clicked: $buttonName on $screenName")
+            analyticsManager.logUserAction(
+                actionName = "button_click",
+                params = mapOfNotNull(
+                    "button_name" to buttonName,
+                    "screen_name" to screenName,
+                ).toMap(),
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking button click: $buttonName")
+        }
     }
 
     /**
@@ -159,12 +194,30 @@ class AnalyticsTracker(
     fun trackFormSubmit(
         formName: String,
         fieldCount: Int,
-        isValid: Boolean
+        isValid: Boolean,
     ) {
-        if (isValid) {
-            Timber.d("Form submitted: $formName ($fieldCount fields)")
-        } else {
-            Timber.d("Form validation failed: $formName")
+        try {
+            if (isValid) {
+                Timber.d("Form submitted: $formName ($fieldCount fields)")
+                analyticsManager.logUserAction(
+                    actionName = "form_submit",
+                    params = mapOf(
+                        "form_name" to formName,
+                        "field_count" to fieldCount.toString(),
+                    ),
+                )
+            } else {
+                Timber.d("Form validation failed: $formName")
+                analyticsManager.logUserAction(
+                    actionName = "form_validation_failed",
+                    params = mapOf(
+                        "form_name" to formName,
+                        "field_count" to fieldCount.toString(),
+                    ),
+                )
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking form submit: $formName")
         }
     }
 
@@ -173,9 +226,20 @@ class AnalyticsTracker(
      */
     fun trackFieldFocus(
         fieldName: String,
-        screenName: String? = null
+        screenName: String? = null,
     ) {
-        Timber.d("Field focused: $fieldName on $screenName")
+        try {
+            Timber.d("Field focused: $fieldName on $screenName")
+            analyticsManager.logUserAction(
+                actionName = "field_focus",
+                params = mapOfNotNull(
+                    "field_name" to fieldName,
+                    "screen_name" to screenName,
+                ).toMap(),
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking field focus: $fieldName")
+        }
     }
 
     /**
@@ -184,10 +248,18 @@ class AnalyticsTracker(
     fun trackScroll(
         screenName: String,
         scrollPosition: Int,
-        totalItems: Int
+        totalItems: Int,
     ) {
-        if (scrollPosition % 10 == 0) {  // Log every 10th item
-            Timber.d("Scroll position: $scrollPosition / $totalItems on $screenName")
+        try {
+            if (scrollPosition % 10 == 0) {  // Log every 10th item
+                Timber.d("Scroll position: $scrollPosition / $totalItems on $screenName")
+                analyticsManager.setUserProperty(
+                    propertyName = "scroll_position_$screenName",
+                    value = scrollPosition.toString(),
+                )
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking scroll on: $screenName")
         }
     }
 
@@ -197,9 +269,21 @@ class AnalyticsTracker(
     fun trackShare(
         contentType: String,
         contentId: String,
-        method: String
+        method: String,
     ) {
-        Timber.i("Content shared: $contentType ($contentId) via $method")
+        try {
+            Timber.i("Content shared: $contentType ($contentId) via $method")
+            analyticsManager.logUserAction(
+                actionName = "content_shared",
+                params = mapOf(
+                    "content_type" to contentType,
+                    "content_id" to contentId,
+                    "share_method" to method,
+                ),
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking share: $contentType")
+        }
     }
 
     /**
@@ -208,12 +292,25 @@ class AnalyticsTracker(
     fun trackActionError(
         actionName: String,
         throwable: Throwable,
-        message: String? = null
+        message: String? = null,
     ) {
-        analyticsManager.recordException(
-            throwable = throwable,
-            message = "$actionName - ${message ?: throwable.message}",
-            fatal = false
-        )
+        try {
+            val errorMessage = "$actionName - ${message ?: throwable.message}"
+            analyticsManager.recordException(
+                throwable = throwable,
+                message = errorMessage,
+                fatal = false,
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Error tracking action error: $actionName")
+        }
     }
+}
+
+/**
+ * Helper function to build non-null map from nullable parameters
+ */
+private fun mapOfNotNull(vararg pairs: Pair<String, String?>): Map<String, String> {
+    return pairs.filter { it.second != null }
+        .associate { it.first to it.second!! }
 }
