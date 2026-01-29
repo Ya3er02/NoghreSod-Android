@@ -75,6 +75,8 @@ object AppConfig {
         const val PRICE_REFRESH_INTERVAL_MINUTES = 5
         // Price decimal places for display
         const val PRICE_DECIMAL_PLACES = 2
+        // Currency code for analytics and pricing display
+        const val CURRENCY_CODE = "IRR"
     }
 
     // ============ Security Configuration ============
@@ -109,5 +111,17 @@ object AppConfig {
         const val DATABASE_NAME = "noghresod.db"
         const val DATABASE_VERSION = 1
         const val ENABLE_WAL = true // Write-Ahead Logging
+    }
+
+    // ============ Analytics Configuration ============
+    object Analytics {
+        // Max number of events to queue before dropping oldest
+        const val MAX_QUEUE_SIZE = 500
+        // Number of events to process in a batch
+        const val BATCH_SIZE = 50
+        // Maximum number of retry attempts for failed events
+        const val MAX_RETRY_ATTEMPTS = 3
+        // SharedFlow replay size for event monitoring
+        const val EVENT_REPLAY_SIZE = 100
     }
 }
