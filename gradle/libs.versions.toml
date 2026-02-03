@@ -13,7 +13,7 @@ composeBom = "2025.01.00"
 androidxCore = "1.13.1"
 androidxLifecycle = "2.8.7"
 androidxActivity = "1.9.3"
-androidxFragment = "1.8.5"
+androidxFragment = "1.8.9"
 androidxNavigation = "2.8.5"
 
 # AndroidX - Data and Database
