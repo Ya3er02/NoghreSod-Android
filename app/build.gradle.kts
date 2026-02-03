@@ -102,7 +102,7 @@ dependencies {
     implementation("androidx.paging:paging-compose:3.2.1")
 
     // Jetpack WorkManager
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.work:work-runtime-ktx:2.11.0")
 
     // Hilt
     implementation("com.google.dagger:hilt-android:2.48")
