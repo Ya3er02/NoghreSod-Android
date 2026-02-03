@@ -95,7 +95,7 @@ dependencies {
     implementation("androidx.compose.material:material")
 
     // Jetpack Navigation
-    implementation("androidx.navigation:navigation-compose:2.7.5")
+    implementation("androidx.navigation:navigation-compose:2.9.6")
 
     // Jetpack Paging 3
     implementation("androidx.paging:paging-runtime-ktx:3.2.1")
